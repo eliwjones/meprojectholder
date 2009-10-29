@@ -10,7 +10,6 @@ class StartAMI(webapp.RequestHandler):
     def get(self):
       self.response.headers['Content-Type'] = 'text/plain'
       self.response.out.write('I am meAWS!!! I AMM2!\n\n')
-      self.response.out.write(putKeys('eli.jones@gmail.com','',''))
 
     def post(self):
         conn = createEC2connection()
@@ -69,21 +68,23 @@ class EC2Key(db.Model):
 
 email = 'eli.jones@gmail.com'
 application = webapp.WSGIApplication([('/startAMI', StartAMI),
-                      ('/checkIt', CheckInstance)],
+                                      ('/checkIt', CheckInstance)],
                                      debug=True)
 
 def putKeys(userEmail,pubKey,privKey):
     check_key = db.GqlQuery("SELECT * From EC2Key WHERE email = :1", userEmail)
     results = check_key.fetch(10)
 
-    if len(results) > 0:
+    if len(results) == 1:
         meStr = "found IT!\nemail: %s\nPublic: %s\nPrivate: %s\n" % (results[0].email,results[0].public,'ItSECRET!')
-    else:
-        meStr = "found 0 results putting key pair in DB"
+    elif len(results) == 0:
         meKey = EC2Key(email= userEmail,
                        public=pubKey,
                        private=privKey)
         meKey.put()
+        meStr = "found 0 results putting key pair in DB"
+    elif len(results) > 1:
+        meStr = "found more than 1 results which is weird!!!"
     return meStr
   
 def addChkInstanceTask(instanceStr):
