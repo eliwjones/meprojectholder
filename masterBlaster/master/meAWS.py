@@ -97,7 +97,11 @@ def addChkInstanceTask(instanceStr):
 
 def createEC2connection():
     try:
-        meConn = EC2Connection(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+        userEmail = 'eli.jones@gmail.com'
+        keyQuery = db.GqlQuery("SELECT * From EC2Key WHERE email = :1", userEmail)
+        result = keyQuery.fetch(1)
+        
+        meConn = EC2Connection(result[0].public, result[0].private)
         meConn.SignatureVersion = '1'  # SignatureVersion = '1' is only one I can get to work in AppEngine
         return meConn
     except Exception, e:
