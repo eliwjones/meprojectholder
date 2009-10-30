@@ -4,7 +4,7 @@ from google.appengine.ext import db
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 from boto.ec2.connection import EC2Connection
-
+import time
 
 class StartAMI(webapp.RequestHandler):
     def get(self):
@@ -97,12 +97,13 @@ def addChkInstanceTask(instanceStr):
 
 def createEC2connection():
     try:
-        userEmail = 'eli.jones@gmail.com'
-        keyQuery = db.GqlQuery("SELECT * From EC2Key WHERE email = :1", userEmail)
+        keyQuery = db.GqlQuery("SELECT * From EC2Key WHERE email = :1", email)
         result = keyQuery.fetch(1)
         
-        meConn = EC2Connection(result[0].public, result[0].private)
-        meConn.SignatureVersion = '1'  # SignatureVersion = '1' is only one I can get to work in AppEngine
+        meConn = EC2Connection(aws_access_key_id = result[0].public,
+                               aws_secret_access_key = result[0].private,
+                               is_secure = False)
+        meConn.SignatureVersion = '2'  # SignatureVersion = '2' requires HTTP on GAE.
         return meConn
     except Exception, e:
         mailIt('Error Connecting to EC2!', 'Exception:\n\n%s' % e)
