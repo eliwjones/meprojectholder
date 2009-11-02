@@ -12,7 +12,7 @@ class EC2Credentials(db.Model):
     email = db.StringProperty(required=True)
     public = db.StringProperty(required=True)
     private = db.StringProperty(required=True)
-    is_secure = db.StringProperty()
+    is_secure = db.BooleanProperty()
     SignatureVersion = db.StringProperty()
 
 class EC2Config(db.Model):
@@ -21,23 +21,7 @@ class EC2Config(db.Model):
     keypair_name = db.StringProperty(required=True)
     placement = db.StringProperty(required=True)
 
-def putCredentials(email,public,private,is_secure,SignatureVersion):
-    old_key = db.GqlQuery("Select * From EC2Key Where email = :1",email)
-    old_key_result = old_key.fetch(1)
-
-    if len(old_key_result) == 1:
-        meKey = EC2Credentials(email  = old_key_result[0].email,
-                               public = old_key_result[0].public,
-                               private = old_key_result[0].private,
-                               is_secure = 'False',
-                               SignatureVersion = '2')
-        meKey.put()
-        old_key_result[0].delete()
-    elif len(old_key_result) == 0:
-        meStr = "Old key successfully gone!\n"
-        return meStr
-        
-
+def putCredentials(email,public,private,is_secure,SignatureVersion): 
     check_key = db.GqlQuery("SELECT * From EC2Credentials WHERE email = :1", email)
     results = check_key.fetch(10)
 
@@ -55,4 +39,5 @@ def putCredentials(email,public,private,is_secure,SignatureVersion):
         meStr = "found 0 results putting key pair in DB"
     elif len(results) > 1:
         meStr = "found more than 1 results which is weird!!!"
+
     return meStr

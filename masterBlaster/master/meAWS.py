@@ -12,13 +12,10 @@ class StartAMI(webapp.RequestHandler):
     def get(self):
       self.response.headers['Content-Type'] = 'text/plain'
       self.response.out.write('I am meAWS!!! I AMM2!\n\n')
-
-      resp = meSchema.putCredentials(email,'','','','')
-      self.response.out.write(resp)
       
-      #conn = createEC2connection()
-      #meImage = conn.get_image('ami-592ac930')
-      #self.response.out.write(meImage)
+      conn = createEC2connection()
+      meImage = conn.get_image('ami-592ac930')
+      self.response.out.write(meImage)
 
     def post(self):
         conn = createEC2connection()
@@ -86,17 +83,17 @@ def addChkInstanceTask(instanceStr):
 
 def createEC2connection():
     try:
-        keyQuery = db.GqlQuery("SELECT * From EC2Key WHERE email = :1", email)
+        keyQuery = db.GqlQuery("SELECT * From EC2Credentials WHERE email = :1", email)
         result = keyQuery.fetch(1)
         
-        meConn = EC2Connection(aws_access_key_id = result[0].public,
+        meConn = EC2Connection(aws_access_key_id     = result[0].public,
                                aws_secret_access_key = result[0].private,
-                               is_secure = False)
-        meConn.SignatureVersion = '2'  # SignatureVersion = '2' requires HTTP on GAE.
+                               is_secure             = result[0].is_secure)    # Can store bool in db?
+        meConn.SignatureVersion = result[0].SignatureVersion        # SignatureVersion = '2' requires HTTP on GAE.
         return meConn
     except Exception, e:
         mailIt('Error Connecting to EC2!', 'Exception:\n\n%s' % e)
-        #raise        #Raising exception may cause Cron to retry indefinitely.  
+        raise        #Raising exception may cause Cron to retry indefinitely.  
 
 def mailIt(subject, body):
     mail.send_mail(email,email,subject,body)
