@@ -12,13 +12,13 @@ class StartAMI(webapp.RequestHandler):
     def get(self):
       self.response.headers['Content-Type'] = 'text/plain'
       self.response.out.write('I am meAWS!!! I AMM2!\n\n')
-      
+
       conn = meConnector.createEC2connection()
       meImage = conn.get_image('ami-592ac930')
       self.response.out.write(meImage)
 
     def post(self):
-        conn = createEC2connection()
+        conn = meConnector.createEC2connection()
         try:
             strayInstances = False
             meInstances = conn.get_all_instances()

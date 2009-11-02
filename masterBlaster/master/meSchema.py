@@ -20,9 +20,8 @@ def putCredentials(email,public,private,is_secure,SignatureVersion):
     results = check_key.fetch(10)
 
     if len(results) == 1:
-        meStr = "found IT!\nemail: %s\nPublic: %s\nPrivate: %s\nis_secure: %s\nSigVer: %s\n" % (results[0].email,
-                                                            results[0].public, 'ItSECRET!', results[0].is_secure,
-                                                            results[0].SignatureVersion)
+        meStr = "found results.  Trying to delete!"
+        results[0].delete()
     elif len(results) == 0:
         meKey = EC2Credentials(email  = email,
                                public = public,
@@ -32,5 +31,6 @@ def putCredentials(email,public,private,is_secure,SignatureVersion):
         meKey.put()
         meStr = "found 0 results putting key pair in DB"
     elif len(results) > 1:
-        meStr = "found more than 1 results which is weird!!!"
+        meStr = "found more than 1 result! Deleting one."
+        results[0].delete()
     return meStr
