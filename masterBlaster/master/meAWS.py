@@ -4,12 +4,17 @@ from google.appengine.ext import db
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 from boto.ec2.connection import EC2Connection
-import time
+
+import meSchema
+
 
 class StartAMI(webapp.RequestHandler):
     def get(self):
       self.response.headers['Content-Type'] = 'text/plain'
       self.response.out.write('I am meAWS!!! I AMM2!\n\n')
+      conn = createEC2connection()
+      meImage = conn.get_image('ami-592ac930')
+      self.response.out.write(meImage)
 
     def post(self):
         conn = createEC2connection()
@@ -22,7 +27,7 @@ class StartAMI(webapp.RequestHandler):
                         strayInstances = True
         except Exception, e:
             mailIt('Error with get_all_instances()!', 'Exception:\n\n%s' % e)
-            raise
+            #raise        #Raising exception may cause Cron to retry indefinitely.
         if not strayInstances:
             try:
                 meImage = conn.get_image('ami-592ac930_BAAD')  # ami-592ac930 # Also add wakeup-time?
@@ -32,13 +37,12 @@ class StartAMI(webapp.RequestHandler):
                 mailIt('Started new instance up!!!', '%s\n%s' % (result, result.instances[0].id))
             except Exception, e:
                 mailIt('Could Not Start AMI!','Error:\n%s' % e)
-                raise
+                #raise        #Raising exception may cause Cron to retry indefinitely.
             addChkInstanceTask(str(result.instances[0].id))
         else:
             mailIt('Instances Already Running!','Encountered non-Terminated instances.')
 
-
-class CheckInstance(webapp.RequestHandler):  # Need find out about retry timeout for taskqueue
+class CheckInstance(webapp.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/plain'
         instanceID = str(self.request.get('instanceID'))
@@ -59,41 +63,22 @@ class CheckInstance(webapp.RequestHandler):  # Need find out about retry timeout
                                                                                    (instance.id,instance.state))
         except Exception, e:
             mailIt('Error with get_all_instances()!', 'Exception:\n\n%s' % e)
-            raise
+            #raise            #Do not raise exception.. there will be an "infinite" retry loop. E-mail suffices.
 
-class EC2Key(db.Model):
-    email = db.StringProperty(required=True)
-    public = db.StringProperty(required=True)
-    private = db.StringProperty(required=True)
 
 email = 'eli.jones@gmail.com'
 application = webapp.WSGIApplication([('/startAMI', StartAMI),
                                       ('/checkIt', CheckInstance)],
                                      debug=True)
 
-def putKeys(userEmail,pubKey,privKey):
-    check_key = db.GqlQuery("SELECT * From EC2Key WHERE email = :1", userEmail)
-    results = check_key.fetch(10)
 
-    if len(results) == 1:
-        meStr = "found IT!\nemail: %s\nPublic: %s\nPrivate: %s\n" % (results[0].email,results[0].public,'ItSECRET!')
-    elif len(results) == 0:
-        meKey = EC2Key(email= userEmail,
-                       public=pubKey,
-                       private=privKey)
-        meKey.put()
-        meStr = "found 0 results putting key pair in DB"
-    elif len(results) > 1:
-        meStr = "found more than 1 results which is weird!!!"
-    return meStr
-  
 def addChkInstanceTask(instanceStr):
     try:
         taskqueue.add(url = '/checkIt', countdown = 25,
                       params = {'instanceID': instanceStr} )
     except Exception, e:
         mailIt('Problem Adding Task!','Error: %s' % e)
-        raise
+        #raise        #Raising exception may cause task to retry indefinitely.
 
 def createEC2connection():
     try:
@@ -107,7 +92,7 @@ def createEC2connection():
         return meConn
     except Exception, e:
         mailIt('Error Connecting to EC2!', 'Exception:\n\n%s' % e)
-        raise    
+        #raise        #Raising exception may cause Cron to retry indefinitely.  
 
 def mailIt(subject, body):
     mail.send_mail(email,email,subject,body)
