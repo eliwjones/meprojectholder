@@ -12,9 +12,13 @@ class StartAMI(webapp.RequestHandler):
     def get(self):
       self.response.headers['Content-Type'] = 'text/plain'
       self.response.out.write('I am meAWS!!! I AMM2!\n\n')
-      conn = createEC2connection()
-      meImage = conn.get_image('ami-592ac930')
-      self.response.out.write(meImage)
+
+      resp = meSchema.putCredentials(email,'','','','')
+      self.response.out.write(resp)
+      
+      #conn = createEC2connection()
+      #meImage = conn.get_image('ami-592ac930')
+      #self.response.out.write(meImage)
 
     def post(self):
         conn = createEC2connection()
