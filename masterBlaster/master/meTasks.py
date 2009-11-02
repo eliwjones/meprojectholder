@@ -12,7 +12,10 @@ class CheckInstance(webapp.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/plain'
         instanceID = str(self.request.get('instanceID'))
-        self.response.out.write('instanceID: %s\n' % instanceID)
+        if len(instanceID) == 0:
+            self.response.out.write('EMPTY ID!!')
+        else:
+            self.response.out.write('instanceID: %s\n' % instanceID)
     
     def post(self):
         instanceID = str(self.request.get('instanceID'))
@@ -29,7 +32,7 @@ class CheckInstance(webapp.RequestHandler):
                                                                                    (instance.id,instance.state))
         except Exception, e:
             meTools.mailIt(email,'Error with get_all_instances()!', 'Exception:\n\n%s' % e)
-            raise            #Do not raise exception.. there will be an "infinite" retry loop. E-mail suffices.
+            #raise            #Do not raise exception.. there will be an "infinite" retry loop. E-mail suffices.
 
 def addChkInstanceTask(instanceStr):
     try:
@@ -37,7 +40,7 @@ def addChkInstanceTask(instanceStr):
                       params = {'instanceID': instanceStr} )
     except Exception, e:
         meTools.mailIt(email,'Problem Adding Task!','Error: %s' % e)
-        raise        #Raising exception may cause task to retry indefinitely.
+        #raise        #Raising exception may cause task to retry indefinitely.
 
 email = 'eli.jones@gmail.com'
 application = webapp.WSGIApplication([('/tasks/checkIt', CheckInstance)],

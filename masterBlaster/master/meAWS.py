@@ -28,7 +28,7 @@ class StartAMI(webapp.RequestHandler):
                         strayInstances = True
         except Exception, e:
             meTools.mailIt(email,'Error with get_all_instances()!', 'Exception:\n\n%s' % e)
-            raise        #Raising exception may cause Cron to retry indefinitely.
+            #raise        #Raising exception may cause Cron to retry indefinitely.
         if not strayInstances:
             try:
                 meImage = conn.get_image('ami-592ac930_BAAD')  # ami-592ac930 # Also add wakeup-time?
@@ -38,7 +38,7 @@ class StartAMI(webapp.RequestHandler):
                 meTools.mailIt(email,'Started new instance up!!!', '%s\n%s' % (result, result.instances[0].id))
             except Exception, e:
                 meTools.mailIt(email,'Could Not Start AMI!','Error:\n%s' % e)
-                raise        #Raising exception may cause Cron to retry indefinitely.
+                #raise        #Raising exception may cause Cron to retry indefinitely.
             meTasks.addChkInstanceTask(str(result.instances[0].id))
         else:
             meTools.mailIt(email,'Instances Already Running!','Encountered non-Terminated instances.')
