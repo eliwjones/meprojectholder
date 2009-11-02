@@ -1,6 +1,5 @@
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
-from boto.ec2.connection import EC2Connection
 
 import meSchema
 import meTasks

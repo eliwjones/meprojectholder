@@ -1,6 +1,4 @@
-
 from google.appengine.ext import db
-from boto.ec2.connection import EC2Connection
 
 class EC2Credentials(db.Model):
     email = db.StringProperty(required=True)
