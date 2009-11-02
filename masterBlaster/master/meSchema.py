@@ -1,12 +1,6 @@
 
-
 from google.appengine.ext import db
 from boto.ec2.connection import EC2Connection
-
-class EC2Key(db.Model):                          # deprecated... must kill!
-    email = db.StringProperty(required=True)
-    public = db.StringProperty(required=True)
-    private = db.StringProperty(required=True)
 
 class EC2Credentials(db.Model):
     email = db.StringProperty(required=True)
@@ -39,5 +33,4 @@ def putCredentials(email,public,private,is_secure,SignatureVersion):
         meStr = "found 0 results putting key pair in DB"
     elif len(results) > 1:
         meStr = "found more than 1 results which is weird!!!"
-
     return meStr
