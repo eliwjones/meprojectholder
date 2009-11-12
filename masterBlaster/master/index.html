@@ -1,0 +1,39 @@
+<html>
+  <body>
+    whoami? :: <b>{{whoami}}!!</b><br><br>
+    <b>EC2Credentials:</b><br>
+    {% for result in credentials %}
+        email            = {{result.email}} <br>
+        public key       = {{result.public}}<br>
+        private key      = {{result.private}}<br>
+        is_secure        = {{result.is_secure}}<br>
+        SignatureVersion = {{result.SignatureVersion}}<br>
+    {% endfor %}
+    <br><b>Put New Credentials!</b><br>
+    <form action="/config/putNewCredentials" method="Post">
+        <div><textarea name="email" rows="1" cols="50"></textarea><b>:email</b></div>
+        <div><textarea name="public" rows="1" cols="50"></textarea><b>:public</b></div>
+        <div><textarea name="private" rows="1" cols="50"></textarea><b>:private</b></div>
+        <div><textarea name="is_secure" rows="1" cols="50"></textarea><b>:is_secure</b></div>
+        <div><textarea name="SignatureVersion" rows="1" cols="50"></textarea><b>:SignatureVersion</b></div>
+        <div><input type="submit" value="Put New Credentials"></div>
+    </form>
+    <br>
+   <b>EC2Config:</b><br>
+   {% for result in config %}
+       AMI_id = {{result.AMI_id}}<br>
+       security_groups = {{result.security_groups}}<br>
+       keypair_name = {{result.keypair_name}}<br>
+       placement = {{result.placement}}<br>
+   {% endfor %}
+   <br><b>Put New Config!</b><br>
+    <form action="/config/putNewConfig" method="Post">
+        <div><textarea name="AMI_id" rows="1" cols="50"></textarea><b>:AMI_id</b></div>
+        <div><textarea name="security_groups" rows="1" cols="50"></textarea><b>:security_groups</b></div>
+        <div><textarea name="keypair_name" rows="1" cols="50"></textarea><b>:keypair_name</b></div>
+        <div><textarea name="placement" rows="1" cols="50"></textarea><b>:placement</b></div>
+        <div><input type="submit" value="Put New Config"></div>
+    </form>
+    <br><br>
+  </body>
+</html>

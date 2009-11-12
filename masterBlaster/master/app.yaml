@@ -11,3 +11,7 @@ handlers:
 - url: /starter/.*
   script: meAWS.py
   login: admin
+
+- url: /config/.*
+  script: meConfig.py
+  login: admin
