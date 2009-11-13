@@ -1,11 +1,14 @@
 <html>
+  <head>
+    <link type ="text/css" rel="stylesheet" href="/stylesheets/main.css" />
+  </head>
   <body>
     whoami? :: <b>{{whoami}}!!</b><br><br>
     <b>EC2Credentials:</b><br>
     {% for result in credentials %}
         email            = {{result.email}} <br>
         public key       = {{result.public}}<br>
-        private key      = {{result.private}}<br>
+        private key      = ********************<br>
         is_secure        = {{result.is_secure}}<br>
         SignatureVersion = {{result.SignatureVersion}}<br>
     {% endfor %}

@@ -9,7 +9,7 @@ import meTools
 class CheckInstance(webapp.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/plain'
-        self.response.out.write('I am meAWS!!! I AMM2!\n\nThis page for TaskQueue only')
+        self.response.out.write('I am masterBlaster!!! I AMM2!\n\nThis page for TaskQueue only')
     
     def post(self):
         instanceID = str(self.request.get('instanceID'))

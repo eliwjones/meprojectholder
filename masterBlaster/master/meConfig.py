@@ -8,7 +8,7 @@ class MainPage(webapp.RequestHandler):
     def get(self):
         credentials = meSchema.getCredentials("")
         config = meSchema.getConfig()
-        whoami = "I am meAWS!"
+        whoami = "I am masterBlaster!"
         
         template_values = {
             'credentials':credentials,

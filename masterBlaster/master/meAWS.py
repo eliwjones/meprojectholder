@@ -9,7 +9,7 @@ import meTools
 class StartAMI(webapp.RequestHandler):
     def get(self):
       self.response.headers['Content-Type'] = 'text/plain'
-      self.response.out.write('I am meAWS!!! I AMM2!\n\nThis page for Cron only')
+      self.response.out.write('I am masterBlaster!!! I AMM2!\n\nThis page for Cron only')
       cron = 'false'
       if 'X-AppEngine-Cron' in self.request.headers:
           cron = self.request.headers['X-AppEngine-Cron']
