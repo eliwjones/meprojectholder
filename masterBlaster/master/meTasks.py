@@ -9,11 +9,7 @@ import meTools
 class CheckInstance(webapp.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/plain'
-        instanceID = str(self.request.get('instanceID'))
-        if len(instanceID) == 0:
-            self.response.out.write('EMPTY ID!!')
-        else:
-            self.response.out.write('instanceID: %s\n' % instanceID)
+        self.response.out.write('I am meAWS!!! I AMM2!\n\nThis page for TaskQueue only')
     
     def post(self):
         instanceID = str(self.request.get('instanceID'))
@@ -24,9 +20,11 @@ class CheckInstance(webapp.RequestHandler):
                 for instance in reservation.instances:
                     if instance.state == 'running':
                         meTools.mailIt(email,'Instance Running!','InstanceID: %s is %s' % (instance.id,instance.state))
+                    elif instance.state == 'terminated':
+                        meTools.mailIt(email,'Instance Terminated?!','InstanceID: %s is %s' % (instance.id,instance.state))
                     else:
-                        addChkInstanceTask(str(result.instances[0].id))
-                        meTools.mailIt(email,'Instance NOT Running!','Trying again in 25 seconds.\nInstanceID: %s is %s' %
+                        addChkInstanceTask(instanceID)
+                        meTools.mailIt(email,'Instance NOT Running!','Trying again in 50 seconds.\nInstanceID: %s is %s' %
                                                                                    (instance.id,instance.state))
         except Exception, e:
             meTools.mailIt(email,'Error with get_all_instances()!', 'Exception:\n\n%s' % e)
@@ -34,7 +32,7 @@ class CheckInstance(webapp.RequestHandler):
 
 def addChkInstanceTask(instanceStr):
     try:
-        taskqueue.add(url = '/tasks/checkIt', countdown = 25,
+        taskqueue.add(url = '/tasks/checkIt', countdown = 50,
                       params = {'instanceID': instanceStr} )
     except Exception, e:
         meTools.mailIt(email,'Problem Adding Task!','Error: %s' % e)
