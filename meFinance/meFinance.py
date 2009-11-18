@@ -2,26 +2,26 @@ from gdata.finance.service import FinanceService,PortfolioQuery,PositionQuery
 from gdata.finance import PortfolioData
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
-import datetime as dt
-from pytz import timezone
 import meSchema
 
 
 class meFinance(webapp.RequestHandler):
     def get(self):
         #format = "%Y-%m-%d %H:%M:%S"  # 2009-11-16 23:45:02
-        eastern = timezone('US/Eastern')
-        UTC = timezone('UTC')
-        datetime = dt.datetime.now(eastern)
-        
         self.response.headers['Content-Type'] = 'text/plain'
         email = str(self.request.get('email'))
         password = str(self.request.get('password'))
         action = str(self.request.get('action'))
 
         if action == 'put':
+            import datetime as dt
+            from pytz import timezone
+            eastern = timezone('US/Eastern')
+            datetime = dt.datetime.now(eastern)
+            
             tester = meFinanceTester(email,password)
             portfolios = tester.GetPortfolios(True)
+            
             for pfl in portfolios:
                 positions = tester.GetPositions(pfl,True)
                 for pos in positions:                
@@ -39,13 +39,9 @@ class meFinance(webapp.RequestHandler):
             self.response.out.write("in the get!\n")
             for symbol in ['GOOG','HBC','CME','INTC']:
                 result = meSchema.getStockQuote(symbol)
-                meDate = result.date.replace(tzinfo=UTC)
-                meDate = meDate.astimezone(eastern)
-                self.response.out.write('Symbol: %s\nlastPrice: %f\ndate: %s' % (symbol,result.lastPrice,result.date))
-        elif action == 'time':
-            self.response.out.write(datetime)
-            
-                    
+                self.response.out.write('Symbol: %s\nlastPrice: %f\ndate: %s\n' % (symbol,result.lastPrice,result.date))
+        else:
+            self.response.out.write('You requested I do nothing!')                
 
 class meCreds(webapp.RequestHandler):
     def get(self):
@@ -60,7 +56,10 @@ class meCreds(webapp.RequestHandler):
         elif action == 'get':
             self.response.out.write("Getting Credentials for %s\n" % email)
             credentials = meSchema.getCredentials(email)
-            self.response.out.write("email: %s\npass: %s\n"%(credentials.email,credentials.password))
+            if not (credentials is None):
+                self.response.out.write("email: %s\npass: %s\n"%(credentials.email,credentials.password))
+            else:
+                self.response.out.write('Found no credentials')
 
 class meFinanceTester(object):
     def __init__(self,email,password):
