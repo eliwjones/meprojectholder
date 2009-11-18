@@ -35,10 +35,7 @@ class indexSPX(db.Model):
     date = db.DateTimeProperty(required=True)
 
 def putStockQuote(symbol,lastPrice,bid,ask,date):
-    #mePutStr  = "eastern = timezone('US/Eastern')\n"
-    #mePutStr += "meDatetime = datetime.now(eastern)\n"
-    mePutStr = "meDatetime = datetime.now()\n"
-    #mePutStr += "meStock = stock%s(lastPrice=%f,bid=%f,ask=%f,date=%s)\n" % (symbol,lastPrice,bid,ask,date)
+    mePutStr  = "meDatetime = datetime.now()\n"
     mePutStr += "meStock = stock%s(lastPrice=%f,bid=%f,ask=%f,date=meDatetime)\n" % (symbol,lastPrice,bid,ask)
     mePutStr += "meStock.put()\n"
     exec mePutStr
@@ -48,6 +45,10 @@ def getStockQuote(symbol):
     queryStr = "Select * From stock%s Order By date Desc" % symbol
     meQuote = db.GqlQuery(queryStr).fetch(1)
     if len(meQuote) > 0:
+        eastern = timezone('US/Eastern')
+        UTC = timezone('UTC')
+        meQuote[0].date = meQuote[0].date.replace(tzinfo=UTC)    #tzinfo is None so must set it to UTC
+        meQuote[0].date = meQuote[0].date.astimezone(eastern)    #then represent it as EST
         return meQuote[0]
     else:
         return None

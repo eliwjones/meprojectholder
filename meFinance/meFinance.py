@@ -11,6 +11,7 @@ class meFinance(webapp.RequestHandler):
     def get(self):
         #format = "%Y-%m-%d %H:%M:%S"  # 2009-11-16 23:45:02
         eastern = timezone('US/Eastern')
+        UTC = timezone('UTC')
         datetime = dt.datetime.now(eastern)
         
         self.response.headers['Content-Type'] = 'text/plain'
@@ -38,6 +39,8 @@ class meFinance(webapp.RequestHandler):
             self.response.out.write("in the get!\n")
             for symbol in ['GOOG','HBC','CME','INTC']:
                 result = meSchema.getStockQuote(symbol)
+                meDate = result.date.replace(tzinfo=UTC)
+                meDate = meDate.astimezone(eastern)
                 self.response.out.write('Symbol: %s\nlastPrice: %f\ndate: %s' % (symbol,result.lastPrice,result.date))
         elif action == 'time':
             self.response.out.write(datetime)
