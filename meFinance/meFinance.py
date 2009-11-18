@@ -9,8 +9,6 @@ class meFinance(webapp.RequestHandler):
     def get(self):
         #format = "%Y-%m-%d %H:%M:%S"  # 2009-11-16 23:45:02
         self.response.headers['Content-Type'] = 'text/plain'
-        email = str(self.request.get('email'))
-        password = str(self.request.get('password'))
         action = str(self.request.get('action'))
 
         if action == 'put':
@@ -18,6 +16,10 @@ class meFinance(webapp.RequestHandler):
             from pytz import timezone
             eastern = timezone('US/Eastern')
             datetime = dt.datetime.now(eastern)
+
+            creds = meSchema.getCredentials()
+            email = creds.email
+            password = creds.password
             
             tester = meFinanceTester(email,password)
             portfolios = tester.GetPortfolios(True)
@@ -40,6 +42,12 @@ class meFinance(webapp.RequestHandler):
             for symbol in ['GOOG','HBC','CME','INTC']:
                 result = meSchema.getStockQuote(symbol)
                 self.response.out.write('Symbol: %s\nlastPrice: %f\ndate: %s\n' % (symbol,result.lastPrice,result.date))
+        elif action == 'wipeout':
+            meSchema.wipeOutCreds()
+            self.response.out.write('Wiped out the credentials')
+        elif action == 'range':
+            result = meSchema.getStockRange()
+            self.response.out.write('len of result = %s\n' % len(result))
         else:
             self.response.out.write('You requested I do nothing!')                
 

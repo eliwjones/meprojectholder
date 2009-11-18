@@ -1,0 +1,5 @@
+cron:
+- description: daily start up
+  url: /cron/putStats
+  schedule: every wed 9:31
+  timezone: America/New_York

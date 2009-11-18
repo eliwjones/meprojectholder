@@ -32,6 +32,13 @@ class indexSPX(db.Model):
     lastPrice = db.FloatProperty(required=True)
     date = db.DateTimeProperty(required=True)
 
+def getStockRange():
+    from datetime import datetime, timedelta
+    date1 = datetime.now()
+    date2 = date1 - timedelta(hours = 4)
+    meStocks = db.GqlQuery("Select * From stockHBC Where date < :1 AND date > :2",date1,date2).fetch(100)
+    return meStocks
+
 def putStockQuote(symbol,lastPrice,bid,ask,date):
     from datetime import datetime
     mePutStr  = "meDatetime = datetime.now()\n"
@@ -67,9 +74,9 @@ def putCredentials(email,password):
         meCreds = GDATACredentials(email=email,password=password)
         meCreds.put()
 
-def getCredentials(email):
+def getCredentials(email=""):
     import base64
-    if len(email) > 1:
+    if len(email) > 3:
         email = base64.b64encode(email)
         get_key = db.GqlQuery("Select * From GDATACredentials Where email = :1",email)
     else:
@@ -82,6 +89,10 @@ def getCredentials(email):
         return results[0]
     else:
         return None
+
+def wipeOutCreds():
+    results = db.GqlQuery("Select * From GDATACredentials").fetch(100)
+    db.delete(results)
     
     
 

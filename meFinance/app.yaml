@@ -7,3 +7,7 @@ handlers:
 - url: /config/.*
   script: meFinance.py
   login: admin
+
+- url: /cron/.*
+  script: statPutCron.py
+  login: admin
