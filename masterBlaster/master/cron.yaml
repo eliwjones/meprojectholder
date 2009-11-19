@@ -1,5 +1,5 @@
 cron:
 - description: daily start up
   url: /starter/startAMI
-  schedule: every thu 21:19
+  schedule: every wed 11:19
   timezone: America/New_York

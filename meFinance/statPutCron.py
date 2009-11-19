@@ -20,7 +20,7 @@ class putStats(webapp.RequestHandler):
     def post(self):
         count = int(self.request.get('counter')) + 1
         if count < 131:
-            putEm()
+            putEm(count)
 
 def putEm(count=0):
     from datetime import datetime
