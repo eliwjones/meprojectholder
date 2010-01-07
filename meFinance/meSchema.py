@@ -4,6 +4,9 @@ class GDATACredentials(db.Model):
     email = db.StringProperty(required=True)
     password = db.StringProperty(required=True)  #Store encoded version.
 
+class tokenStore(db.Model):
+    meToken = db.StringProperty(required=True)
+
 class stockCME(db.Model):
     lastPrice = db.FloatProperty(required=True)
     bid = db.FloatProperty(required=True)
@@ -32,6 +35,17 @@ class indexSPX(db.Model):
     lastPrice = db.FloatProperty(required=True)
     date = db.DateTimeProperty(required=True)
 
+def getToken():
+    token = db.GqlQuery("Select * From tokenStore").fetch(1)
+    return token
+
+def putToken(token):
+    #meToken
+    results = db.GqlQuery("Select * From tokenStore").fetch(100)
+    db.delete(results)
+    token = tokenStore(meToken=str(token))
+    token.put()
+
 def getStockRange():
     from datetime import datetime, timedelta
     date1 = datetime.now()
@@ -44,6 +58,17 @@ def putStockQuote(symbol,lastPrice,bid,ask,date):
     mePutStr  = "meDatetime = datetime.now()\n"
     mePutStr += "meStock = stock%s(lastPrice=%f,bid=%f,ask=%f,date=meDatetime)\n" % (symbol,lastPrice,bid,ask)
     mePutStr += "meStock.put()\n"
+    exec mePutStr
+    return mePutStr
+
+def putStockQuotes(dict):
+    from datetime import datetime
+    mePutStr  = "meDatetime = datetime.now()\n"
+    mePutStr += "meList = []\n"
+    for meKey in dict.keys():
+        mePutStr += "%s = stock%s(lastPrice=%f,bid=%f,ask=%f,date=meDatetime)\n" % (meKey,meKey,dict[meKey][0],dict[meKey][1],dict[meKey][2])
+        mePutStr += "meList.append(%s)\n" % (meKey)
+    mePutStr += "db.put(meList)\n"
     exec mePutStr
     return mePutStr
 

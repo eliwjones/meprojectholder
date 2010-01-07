@@ -34,6 +34,7 @@ def putEm(count=0):
     meData = meGDATA(email,password)
     portfolios = meData.GetPortfolios(True)
 
+    stockList = {}
     for pfl in portfolios:
         positions = meData.GetPositions(pfl,True)
         for pos in positions:
@@ -42,7 +43,9 @@ def putEm(count=0):
             bid = quote
             ask = quote
             if (symbol in ['GOOG','HBC','INTC','CME']):
-                result = meSchema.putStockQuote(symbol,quote,bid,ask,datetime)
+                #result = meSchema.putStockQuote(symbol,quote,bid,ask,datetime)
+                stockList[symbol] = (quote,bid,ask,datetime)
+    result = meSchema.putStockQuotes(stockList)
                 
     taskqueue.add(url = '/cron/putStats', countdown = 180,
                   params = {'counter' : count} )

@@ -48,6 +48,24 @@ class meFinance(webapp.RequestHandler):
         elif action == 'range':
             result = meSchema.getStockRange()
             self.response.out.write('len of result = %s\n' % len(result))
+        elif action == 'token':
+            myToken = meSchema.getToken()
+            
+            creds = meSchema.getCredentials()
+            email = creds.email
+            password = creds.password
+            
+            if not (myToken is None):
+                tester = meFinanceTester(email,'',myToken)
+                self.response.out.write('I in myToken auth')
+            else:
+                tester = meFinanceTester(email,password)
+                token = tester.GetToken()
+                meSchema.putToken(token)
+                self.response.out.write('I putting token')
+                
+            token = tester.GetToken()
+            self.response.out.write('meToken: %s' % token)
         else:
             self.response.out.write('You requested I do nothing!')                
 
@@ -70,9 +88,14 @@ class meCreds(webapp.RequestHandler):
                 self.response.out.write('Found no credentials')
 
 class meFinanceTester(object):
-    def __init__(self,email,password):
+    def __init__(self,email,password,token=''):
         self.client = FinanceService(source='meFinance')
-        self.client.ClientLogin(email,password)
+        if len(token)>2:
+            self.client.current_token = token
+            self.token_store.add_token(token)
+        else:
+            self.client.ClientLogin(email,password)
+            #meSchema.putToken(self.client.GetAuthSubtoken())
 
     def GetPortfolios(self, with_returns=False):
         query = PortfolioQuery()
@@ -83,6 +106,9 @@ class meFinanceTester(object):
         query = PositionQuery()
         query.returns = with_returns
         return self.client.GetPositionFeed(portfolio, query=query).entry
+
+    def GetToken(self):
+        return self.client.current_token
     
 
 application = webapp.WSGIApplication([('/config/meFinance',meFinance),

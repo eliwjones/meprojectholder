@@ -11,3 +11,7 @@ handlers:
 - url: /cron/.*
   script: statPutCron.py
   login: admin
+
+- url: /test/.*
+  script: test.py
+  login: admin
