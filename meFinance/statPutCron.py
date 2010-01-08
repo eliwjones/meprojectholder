@@ -19,7 +19,7 @@ class putStats(webapp.RequestHandler):
 
     def post(self):
         count = int(self.request.get('counter')) + 1
-        if count < 131:
+        if count < 79:
             putEm(count)
 
 def putEm(count=0):
@@ -47,7 +47,8 @@ def putEm(count=0):
                 stockList[symbol] = (quote,bid,ask,datetime)
     result = meSchema.putStockQuotes(stockList)
                 
-    taskqueue.add(url = '/cron/putStats', countdown = 180,
+    taskqueue.add(url = '/cron/putStats', countdown = 300,
+                  name = str(datetime.day) + str(count),
                   params = {'counter' : count} )
 
 
