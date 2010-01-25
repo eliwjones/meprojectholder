@@ -7,6 +7,20 @@ class GDATACredentials(db.Model):
 class tokenStore(db.Model):
     meToken = db.StringProperty(required=True)
 
+class stck(db.Model):
+    ID = db.IntegerProperty(required=True)
+    step = db.IntegerProperty(required=True)
+    quote = db.FloatProperty(required=True, indexed=False)
+    bidAsk = db.FloatProperty(indexed=False)
+
+class stckID(db.Model):
+    ID = db.IntegerProperty(required=True)
+    symbol = db.StringProperty(required=True)
+
+class stepDate(db.Model):
+    step = db.IntegerProperty(required=True)
+    date = db.DateTimeProperty(required=True)
+
 class stockCME(db.Model):
     lastPrice = db.FloatProperty(required=True)
     bid = db.FloatProperty(required=True)
@@ -46,11 +60,9 @@ def putToken(token):
     token = tokenStore(meToken=str(token))
     token.put()
 
-def getStockRange():
-    from datetime import datetime, timedelta
-    date1 = datetime.now()
-    date2 = date1 - timedelta(hours = 4)
-    meStocks = db.GqlQuery("Select * From stockHBC Where date < :1 AND date > :2",date1,date2).fetch(100)
+def getStockRange(date1,date2):
+    meStocks = db.GqlQuery("Select * From stockHBC Where date > :1 AND date < :2 Order By date desc",date1,date2).fetch(200)
+    #meStocks = db.GqlQuery("Select * From stockHBC Order By date").fetch(200)
     return meStocks
 
 def putStockQuote(symbol,lastPrice,bid,ask,date):

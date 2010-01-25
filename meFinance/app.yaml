@@ -15,3 +15,7 @@ handlers:
 - url: /test/.*
   script: test.py
   login: admin
+
+- url: /convert/.*
+  script: meConverter.py
+  login: admin

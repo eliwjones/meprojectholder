@@ -1,0 +1,6 @@
+indexes:
+- kind: stck
+  properties:
+  - name: ID
+  - name: step
+    direction: desc
