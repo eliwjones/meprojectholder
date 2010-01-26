@@ -11,7 +11,8 @@ class stck(db.Model):
     ID = db.IntegerProperty(required=True)
     step = db.IntegerProperty(required=True)
     quote = db.FloatProperty(required=True, indexed=False)
-    bidAsk = db.FloatProperty(indexed=False)
+    bid = db.FloatProperty(indexed=False)
+    ask = db.FloatProperty(indexed=False)
 
 class stckID(db.Model):
     ID = db.IntegerProperty(required=True)
@@ -60,10 +61,23 @@ def putToken(token):
     token = tokenStore(meToken=str(token))
     token.put()
 
-def getStockRange(date1,date2):
-    meStocks = db.GqlQuery("Select * From stockHBC Where date > :1 AND date < :2 Order By date desc",date1,date2).fetch(200)
-    #meStocks = db.GqlQuery("Select * From stockHBC Order By date").fetch(200)
+def getStockRange(symbol,date1,date2):
+    queryStr = "Select * From stock%s Where date > :1 AND date < :2 Order By date desc" % symbol
+    meStocks = db.GqlQuery(queryStr,date1,date2).fetch(200)
+
     return meStocks
+
+def getStck(ID,step):
+    meStocks = db.GqlQuery("Select * from stck Where ID = :1 AND step >= :2 AND step < :3 Order By step desc", ID,step,step+6).fetch(200)
+    return meStocks
+
+def convertStockRange(stockID,stepNum,stockRange):
+    meList = []
+    for stock in stockRange:
+        stckEntry = stck(ID=stockID,step=stepNum,quote=stock.lastPrice,bid=stock.lastPrice,ask=stock.lastPrice)
+        stepNum += 1
+        meList.append(stckEntry)
+    db.put(meList)
 
 def putStockQuote(symbol,lastPrice,bid,ask,date):
     from datetime import datetime
