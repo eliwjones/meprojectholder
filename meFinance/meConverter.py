@@ -1,7 +1,7 @@
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
-import meSchema
 from google.appengine.ext import db
+import meSchema
 
 
 class meConverter(webapp.RequestHandler):
@@ -9,34 +9,23 @@ class meConverter(webapp.RequestHandler):
         self.response.headers['Content-Type'] = 'text/plain'
         import datetime as dt
 
-        day=2
+        day=0
         stepID = 6*day + 1                    #works for ranges that include 6 items per day
 
         dayZero = dt.datetime(2009,11,18)
-        fauxDate = dayZero #+ dt.timedelta(hours=13)
-
+        fauxDate = dayZero
         startDate = dayZero + dt.timedelta(days=day)
         endDate = startDate + dt.timedelta(days=1)
 
-        self.response.out.write('startDate = %s\n' % (startDate))
-        self.response.out.write('endDate = %s\n' % (endDate))
-        self.response.out.write('fauxDate = %s\n' % (fauxDate))
-
         stockRange = meSchema.getStockRange("HBC",startDate,endDate)
-        self.response.out.write('len = %s\n' % (len(stockRange)))
-
-        if len(stockRange) == 0:
-            for i in range(5):
-                for k in range(6):
-                    fauxDate = dayZero + dt.timedelta(days=i, hours=15+k)
-                    HBC = meSchema.stockHBC(lastPrice = 89.23, bid = 89.23, ask = 88.45, date = fauxDate)
-                    HBC.put()
-        
-        for stock in stockRange:
-            self.response.out.write('price=%s  date=%s\n' %(stock.lastPrice,stock.date))
-
         #db.delete(stockRange)
 
+        for i in range(5):
+            for k in range(6):
+                fauxDate = dayZero + dt.timedelta(days=i, hours=15+k)
+                HBC = meSchema.stockHBC(lastPrice = 89.23, bid = 89.23, ask = 88.45, date = fauxDate)
+                HBC.put()
+        
         self.response.out.write('Trying to convert\n\n')
 
         meStckRange = meSchema.getStck(1,stepID)
@@ -57,6 +46,10 @@ class meConverter(webapp.RequestHandler):
 
 application = webapp.WSGIApplication([('/convert/convert',meConverter)],
                                      debug=True)
+
+
+def convertStockDay(stock,dayNum,dayDate):
+    print
 
 def main():
     run_wsgi_app(application)

@@ -4,3 +4,8 @@ indexes:
   - name: ID
   - name: step
     direction: desc
+- kind: stck
+  properties:
+  - name: ID
+  - name: step
+    direction: asc
