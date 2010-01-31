@@ -55,26 +55,25 @@ def convertStockDay(stock,startStep,start,end):
     step = startStep
     stockRange = meSchema.getStockRange(stock,start,end)
     k = len(stockRange)
-    if k <= 78:
+    if k < 78:
         return False
     m = k - 78
     skip = 0
     meList = []
 
     for i in range(k):
-        if len(meList) < 78:
-            if i%5 in [0,3] and skip < m:
-                skip += 1
-            else:
-                meStck = meSchema.stck(ID    = stckID,
-                                       step  = step,
-                                       quote = stockRange[i].lastPrice)
-                meList.append(meStck)
-                step += 1
-        elif len(meList) == 78:
-            db.put(meList)
-            return True
-    
+        if i%5 in [0,3] and skip < m:
+            skip += 1
+        else:
+            meStck = meSchema.stck(ID    = stckID,
+                                   step  = step,
+                                   quote = stockRange[i].lastPrice)
+            meList.append(meStck)
+            if len(meList) == 78:
+                db.put(meList)
+                return True
+            step += 1
+            
     return False
 
 
