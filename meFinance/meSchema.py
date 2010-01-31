@@ -17,7 +17,7 @@ class stck(db.Model):
 class stckID(db.Model):
     ID = db.IntegerProperty(required=True)
     symbol = db.StringProperty(required=True)
-
+    
 class stepDate(db.Model):
     step = db.IntegerProperty(required=True)
     date = db.DateTimeProperty(required=True)
@@ -49,6 +49,17 @@ class stockHBC(db.Model):
 class indexSPX(db.Model):
     lastPrice = db.FloatProperty(required=True)
     date = db.DateTimeProperty(required=True)
+
+def getStckID(stock):
+    if stock == "HBC":
+        return 1
+    if stock == "CME":
+        return 2
+    if stock == "GOOG":
+        return 3
+    if stock == "INTC":
+        return 4
+    raise Exception("%s is not a defined stock!" % stock)
 
 def getToken():
     token = db.GqlQuery("Select * From tokenStore").fetch(1)
@@ -88,7 +99,7 @@ def putStockQuote(symbol,lastPrice,bid,ask,date):
     mePutStr += "meStock.put()\n"
     exec mePutStr
     return mePutStr
-
+    
 def putStockQuotes(dict):
     from datetime import datetime
     mePutStr  = "meDatetime = datetime.now()\n"

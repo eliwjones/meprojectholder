@@ -30,10 +30,36 @@ class meConverter(webapp.RequestHandler):
                 else:
                     self.response.out.write('Error with stock=%s,step=%s,start=%s,end=%s\n'%(stock,stepID,startDate,endDate))
                 stepCounter += 1
+
+class fillStepDates(webapp.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        step = 0
+        dayZeroStart = dt.datetime(2009,11,18)
+        dayZeroStart += dt.timedelta(hours=14.5)
+
+        for day in range(73):
+            meList = []    # Must re-initialize at beginning of each day count.
+            dtime = dayZeroStart + dt.timedelta(days=day)
+            if dt.date.weekday(dtime) not in [5,6]:
+                for i in range(1,79):
+                    step += 1
+                    stepdate = dtime + dt.timedelta(minutes=i*5)
+                    meEntity = meSchema.stepDate(step = step,
+                                                 date = stepdate)
+                    meList.append(meEntity)
+
+                result = db.GqlQuery("Select * from stepDate Where step > :1 AND step < :2",step-77,step).fetch(100)
+                if len(result) == 0:
+                    db.put(meList)
+                    self.response.out.write('Populated datetimes for Steps %s - %s for date %s\n' % (step - 77, step, stepdate))
+                else:
+                    self.response.out.write('Already full! for Steps %s - %s for date %s\n' % (step - 77, step, stepdate))
+        self.response.out.write('Done!')
         
 
-
-application = webapp.WSGIApplication([('/convert/convert',meConverter)],
+application = webapp.WSGIApplication([('/convert/convert',meConverter),
+                                      ('/convert/fillDates',fillStepDates)],
                                      debug=True)
 
 def getStartStep(start,dayZero):
@@ -45,7 +71,7 @@ def getStartStep(start,dayZero):
     return counter
 
 def convertStockDay(stock,startStep,start,end):
-    stckID = getStckID(stock)
+    stckID = meSchema.getStckID(stock)
     result = meSchema.getStck(stckID,startStep)
     if len(result) == 78:
         return True  # If already 78.. then most likely already converted.
@@ -75,18 +101,6 @@ def convertStockDay(stock,startStep,start,end):
             step += 1
             
     return False
-
-
-def getStckID(stock):
-    if stock == "HBC":
-        return 1
-    if stock == "CME":
-        return 2
-    if stock == "GOOG":
-        return 3
-    if stock == "INTC":
-        return 4
-    raise Exception("%s is not a defined stock!" % stock)
 
 
 def main():

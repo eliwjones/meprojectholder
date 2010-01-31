@@ -15,7 +15,12 @@ class putStats(webapp.RequestHandler):
         if 'X-AppEngine-Cron' in self.request.headers:
             cron = self.request.headers['X-AppEngine-Cron']
         if (cron == 'true'):
-            putEm()
+            #putEm()    # start daily sequence off with TaskQueue instead.
+            from datetime import datetime
+            taskqueue.add(url = '/cron/putStats', countdown = 0,
+                          name = str(datetime.today().day) + '_0',
+                          params = {'counter' : 0} )
+            
 
     def post(self):
         count = int(self.request.get('counter')) + 1
@@ -35,6 +40,7 @@ def putEm(count=0):
     portfolios = meData.GetPortfolios(True)
 
     stockList = {}
+    meList = []
     for pfl in portfolios:
         positions = meData.GetPositions(pfl,True)
         for pos in positions:
@@ -48,7 +54,7 @@ def putEm(count=0):
     result = meSchema.putStockQuotes(stockList)
                 
     taskqueue.add(url = '/cron/putStats', countdown = 300,
-                  name = str(datetime.day) + str(count),
+                  name = str(datetime.day) + '_' + str(count),
                   params = {'counter' : count} )
 
 
