@@ -1,55 +1,94 @@
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.ext import db
+import datetime as dt
 import meSchema
 
 
 class meConverter(webapp.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/plain'
-        import datetime as dt
-
-        day=0
-        stepID = 6*day + 1                    #works for ranges that include 6 items per day
-
-        dayZero = dt.datetime(2009,11,18)
-        fauxDate = dayZero
-        startDate = dayZero + dt.timedelta(days=day)
-        endDate = startDate + dt.timedelta(days=1)
-
-        stockRange = meSchema.getStockRange("HBC",startDate,endDate)
-        #db.delete(stockRange)
-
-        for i in range(5):
-            for k in range(6):
-                fauxDate = dayZero + dt.timedelta(days=i, hours=15+k)
-                HBC = meSchema.stockHBC(lastPrice = 89.23, bid = 89.23, ask = 88.45, date = fauxDate)
-                HBC.put()
+        startRange = int(self.request.get('start'))
+        stopRange = int(self.request.get('stop'))
+        stock = str(self.request.get('stock'))
         
-        self.response.out.write('Trying to convert\n\n')
 
-        meStckRange = meSchema.getStck(1,stepID)
+        dayZeroStart = dt.datetime(2009,11,18)                  # dayZero Info and Ranges
+        dayZeroStart += dt.timedelta(hours=14.45)
+        dayZeroEnd = dayZeroStart + dt.timedelta(hours=6.7)
+        
+        stepCounter = getStartStep(startRange,dayZeroStart)
+        
+        for day in range(startRange,stopRange):
+            startDate = dayZeroStart + dt.timedelta(days=day)
+            endDate   = dayZeroEnd + dt.timedelta(days=day)
 
-        if len(meStckRange) == 0:
-            self.response.out.write('Converting...\n')
-            meSchema.convertStockRange(1,stepID,stockRange)
-            meStckRange = meSchema.getStck(1,stepID)
-        else:
-            self.response.out.write('Len was not 0..\n')
-            db.delete(meStckRange)
-
-        for stock in meStckRange:
-            self.response.out.write('ID=%s, step=%s, quote=%s\n'%(stock.ID,stock.step,stock.quote))
-
+            if dt.date.weekday(startDate) not in [5,6]:
+                stepID = 78*stepCounter + 1                      # works for ranges that include 78 items/day
+                if(convertStockDay(stock,stepID,startDate,endDate)):
+                    self.response.out.write('Converted stock=%s,step=%s,start=%s,end=%s\n'%(stock,stepID,startDate,endDate))
+                else:
+                    self.response.out.write('Error with stock=%s,step=%s,start=%s,end=%s\n'%(stock,stepID,startDate,endDate))
+                stepCounter += 1
         
 
 
 application = webapp.WSGIApplication([('/convert/convert',meConverter)],
                                      debug=True)
 
+def getStartStep(start,dayZero):
+    counter = 0
+    for i in range(start):
+        stepDay = dayZero + dt.timedelta(days=i)
+        if dt.date.weekday(stepDay) not in [5,6]:
+            counter += 1
+    return counter
 
-def convertStockDay(stock,dayNum,dayDate):
-    print
+def convertStockDay(stock,startStep,start,end):
+    stckID = getStckID(stock)
+    result = meSchema.getStck(stckID,startStep)
+    if len(result) == 78:
+        return True  # If already 78.. then most likely already converted.
+    elif len(result) > 0:
+        db.delete(result)
+
+    step = startStep
+    stockRange = meSchema.getStockRange(stock,start,end)
+    k = len(stockRange)
+    if k <= 78:
+        return False
+    m = k - 78
+    skip = 0
+    meList = []
+
+    for i in range(k):
+        if len(meList) < 78:
+            if i%5 in [0,3] and skip < m:
+                skip += 1
+            else:
+                meStck = meSchema.stck(ID    = stckID,
+                                       step  = step,
+                                       quote = stockRange[i].lastPrice)
+                meList.append(meStck)
+                step += 1
+        elif len(meList) == 78:
+            db.put(meList)
+            return True
+    
+    return False
+
+
+def getStckID(stock):
+    if stock == "HBC":
+        return 1
+    if stock == "CME":
+        return 2
+    if stock == "GOOG":
+        return 3
+    if stock == "INTC":
+        return 4
+    raise Exception("%s is not a defined stock!" % stock)
+
 
 def main():
     run_wsgi_app(application)

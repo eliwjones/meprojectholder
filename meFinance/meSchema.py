@@ -62,13 +62,15 @@ def putToken(token):
     token.put()
 
 def getStockRange(symbol,date1,date2):
-    queryStr = "Select * From stock%s Where date > :1 AND date < :2 Order By date desc" % symbol
+    queryStr = "Select * From stock%s Where date >= :1 AND date <= :2 Order By date" % symbol
     meStocks = db.GqlQuery(queryStr,date1,date2).fetch(200)
 
     return meStocks
 
 def getStck(ID,step):
-    meStocks = db.GqlQuery("Select * from stck Where ID = :1 AND step >= :2 AND step < :3 Order By step desc", ID,step,step+6).fetch(200)
+    meStocks = db.GqlQuery("Select * from stck Where ID = :1 AND step >= :2 AND step < :3 Order By step", ID,step,step+78).fetch(200)
+    # Temp fix until Indexes done building
+    #meStocks = db.GqlQuery("Select * from stck Where step >= :1 AND step < :2 Order By step", step,step+78).fetch(200)
     return meStocks
 
 def convertStockRange(stockID,stepNum,stockRange):
