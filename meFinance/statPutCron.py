@@ -3,6 +3,7 @@ from gdata.finance import PortfolioData
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.api.labs import taskqueue
+from google.appengine.ext import db
 import meSchema
 
 
@@ -11,27 +12,32 @@ class putStats(webapp.RequestHandler):
         self.response.headers['Content-Type'] = 'text/plain'
         self.response.out.write('I just put stats')
         cron = 'false'
-        cron = str(self.request.get('cron'))
+        #cron = str(self.request.get('cron'))
         if 'X-AppEngine-Cron' in self.request.headers:
             cron = self.request.headers['X-AppEngine-Cron']
         if (cron == 'true'):
-            #putEm()    # start daily sequence off with TaskQueue instead.
             from datetime import datetime
-            taskqueue.add(url = '/cron/putStats', countdown = 0,
-                          name = str(datetime.today().day) + '_0',
-                          params = {'counter' : 0} )
+            taskqueue.add(url    = '/cron/putStats', countdown = 0,
+                          name   = str(datetime.today().day) + '-1',
+                          params = {'counter' : 1,
+                                    'step'    : -1 } )
             
-
     def post(self):
-        count = int(self.request.get('counter')) + 1
+        count = int(self.request.get('counter'))
+        step = int(self.request.get('step'))
+        if step == -1:
+            result = db.GqlQuery("Select * from stepDate Order By step desc").fetch(1)
+            step = result[0].step + 1
         if count < 79:
-            putEm(count)
+            putEm(count,step)
 
-def putEm(count=0):
+def putEm(count,step):
     from datetime import datetime
     from pytz import timezone
+    
     eastern = timezone('US/Eastern')
     datetime = datetime.now(eastern)
+    
     creds = meSchema.getCredentials()
     email = creds.email
     password = creds.password
@@ -39,24 +45,39 @@ def putEm(count=0):
     meData = meGDATA(email,password)
     portfolios = meData.GetPortfolios(True)
 
-    stockList = {}
     meList = []
     for pfl in portfolios:
         positions = meData.GetPositions(pfl,True)
         for pos in positions:
             symbol = pos.ticker_id.split(':')[1]
             quote = float(str(pos.position_data.market_value).replace(' USD',''))
-            bid = quote
-            ask = quote
             if (symbol in ['GOOG','HBC','INTC','CME']):
-                #result = meSchema.putStockQuote(symbol,quote,bid,ask,datetime)
-                stockList[symbol] = (quote,bid,ask,datetime)
-    result = meSchema.putStockQuotes(stockList)
-                
-    taskqueue.add(url = '/cron/putStats', countdown = 300,
-                  name = str(datetime.day) + '_' + str(count),
-                  params = {'counter' : count} )
-
+                meStck = meSchema.stck(ID    = meSchema.getStckID(symbol),
+                                       step  = step,
+                                       quote = quote)
+                meList.append(meStck)
+    meStepDate = meSchema.stepDate(step = step, date = datetime)
+    meList.append(meStepDate)
+    
+    while True:
+        timeout_ms = 100
+        try:
+            db.put(meList)
+            break
+        except datastore_errors.Timeout:
+            thread.sleep(timeout_ms)
+            timeout_ms *= 2
+        
+    now = datetime.today()
+    seconds = 60*(now.minute) + now.second
+    delay = 300 - seconds%300                    # Gives the approximate number of seconds until next 5 minute mark.
+    if delay < 50:
+        delay += 300
+        
+    taskqueue.add(url    = '/cron/putStats', countdown = delay,
+                  name   = 'step-' + str(step+1),
+                  params = {'counter' : count+1,
+                            'step'    : step+1} )
 
 class meGDATA(object):
     def __init__(self,email,password):
