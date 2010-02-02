@@ -12,11 +12,12 @@ class putStats(webapp.RequestHandler):
         self.response.headers['Content-Type'] = 'text/plain'
         self.response.out.write('I just put stats')
         cron = 'false'
-        #cron = str(self.request.get('cron'))
+        cron = str(self.request.get('cron'))
         if 'X-AppEngine-Cron' in self.request.headers:
             cron = self.request.headers['X-AppEngine-Cron']
         if (cron == 'true'):
             from datetime import datetime
+            self.response.out.write('Put task!')
             taskqueue.add(url    = '/cron/putStats', countdown = 0,
                           name   = str(datetime.today().day) + '-1',
                           params = {'counter' : 1,
@@ -28,15 +29,15 @@ class putStats(webapp.RequestHandler):
         if step == -1:
             result = db.GqlQuery("Select * from stepDate Order By step desc").fetch(1)
             step = result[0].step + 1
-        if count < 79:
+        if count < 80:
             putEm(count,step)
 
 def putEm(count,step):
-    from datetime import datetime
+    from datetime import datetime        # Task fails if move import to top
     from pytz import timezone
     
     eastern = timezone('US/Eastern')
-    datetime = datetime.now(eastern)
+    meDatetime = datetime.now(eastern)
     
     creds = meSchema.getCredentials()
     email = creds.email
@@ -56,17 +57,18 @@ def putEm(count,step):
                                        step  = step,
                                        quote = quote)
                 meList.append(meStck)
-    meStepDate = meSchema.stepDate(step = step, date = datetime)
+    meStepDate = meSchema.stepDate(step = step, date = meDatetime)
     meList.append(meStepDate)
-    
+
+    timeout = .1
     while True:
-        timeout_ms = 100
         try:
             db.put(meList)
             break
-        except datastore_errors.Timeout:
-            thread.sleep(timeout_ms)
-            timeout_ms *= 2
+        except db.Timeout:
+            from time import sleep
+            sleep(timeout)
+            timeout *= 2
         
     now = datetime.today()
     seconds = 60*(now.minute) + now.second
