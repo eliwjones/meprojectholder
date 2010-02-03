@@ -1,5 +1,13 @@
 cron:
-- description: daily start up
+- description: primary daily start up
   url: /cron/putStats
   schedule: every mon,tue,wed,thu,fri 9:30
+  timezone: America/New_York
+- description: fallback daily start up
+  url: /cron/putStats
+  schedule: every mon,tue,wed,thu,fri 9:31
+  timezone: America/New_York
+- description: fallback fallback daily start up
+  url: /cron/putStats
+  schedule: every mon,tue,wed,thu,fri 9:32
   timezone: America/New_York

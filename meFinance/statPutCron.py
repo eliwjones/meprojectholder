@@ -18,10 +18,7 @@ class putStats(webapp.RequestHandler):
         if (cron == 'true'):
             from datetime import datetime
             self.response.out.write('Put task!')
-            taskqueue.add(url    = '/cron/putStats', countdown = 0,
-                          name   = str(datetime.today().day) + '-1',
-                          params = {'counter' : 1,
-                                    'step'    : -1 } )
+            taskAdd(0,str(datetime.today().day) + '-1',1,-1)
             
     def post(self):
         count = int(self.request.get('counter'))
@@ -60,7 +57,7 @@ def putEm(count,step):
     meStepDate = meSchema.stepDate(step = step, date = meDatetime)
     meList.append(meStepDate)
 
-    timeout = .1
+    wait = .1
     while True:
         try:
             db.put(meList)
@@ -68,18 +65,15 @@ def putEm(count,step):
         except db.Timeout:
             from time import sleep
             sleep(timeout)
-            timeout *= 2
+            wait *= 2
         
     now = datetime.today()
     seconds = 60*(now.minute) + now.second
     delay = 300 - seconds%300                    # Gives the approximate number of seconds until next 5 minute mark.
     if delay < 50:
         delay += 300
-        
-    taskqueue.add(url    = '/cron/putStats', countdown = delay,
-                  name   = 'step-' + str(step+1),
-                  params = {'counter' : count+1,
-                            'step'    : step+1} )
+
+    taskAdd(delay,'step-' + str(step+1),count+1,step+1)
 
 class meGDATA(object):
     def __init__(self,email,password):
@@ -100,6 +94,20 @@ class meGDATA(object):
 
 application = webapp.WSGIApplication([('/cron/putStats',putStats)],
                                      debug = True)
+
+
+def taskAdd(delay,name,counter,step,wait=.1):
+    try:
+        taskqueue.add(url    = '/cron/putStats', countdown = delay,
+                      name   = name,
+                      params = {'counter' : counter,
+                                'step'    : step} )
+    except taskqueue.TransientError, e:
+        from time import sleep
+        sleep(wait)
+        taskAdd(delay,name,counter,step,2*wait)
+    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
+        pass
 
 def main():
     run_wsgi_app(application)
