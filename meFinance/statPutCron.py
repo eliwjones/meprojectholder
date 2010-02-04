@@ -16,9 +16,10 @@ class putStats(webapp.RequestHandler):
         if 'X-AppEngine-Cron' in self.request.headers:
             cron = self.request.headers['X-AppEngine-Cron']
         if (cron == 'true'):
-            from datetime import datetime
+            from datetime import datetime,date
             self.response.out.write('Put task!')
-            taskAdd(0,str(datetime.today().day) + '-1',1,-1)
+            delay = getStartDelay()
+            taskAdd(delay,str(date.today()) + '-1',1,-1)
             
     def post(self):
         count = int(self.request.get('counter'))
@@ -30,7 +31,7 @@ class putStats(webapp.RequestHandler):
             putEm(count,step)
 
 def putEm(count,step):
-    from datetime import datetime        # Task fails if move import to top
+    from datetime import datetime
     from pytz import timezone
     
     eastern = timezone('US/Eastern')
@@ -50,11 +51,14 @@ def putEm(count,step):
             symbol = pos.ticker_id.split(':')[1]
             quote = float(str(pos.position_data.market_value).replace(' USD',''))
             if (symbol in ['GOOG','HBC','INTC','CME']):
-                meStck = meSchema.stck(ID    = meSchema.getStckID(symbol),
+                stckID = meSchema.getStckID(symbol)
+                meStck = meSchema.stck(key_name = "s" + str(stckID) + "_" + str(step),
+                                       ID    = stckID,
                                        step  = step,
                                        quote = quote)
                 meList.append(meStck)
-    meStepDate = meSchema.stepDate(step = step, date = meDatetime)
+                
+    meStepDate = meSchema.stepDate(key_name = "sD" + str(step),step = step, date = meDatetime)
     meList.append(meStepDate)
 
     wait = .1
@@ -83,20 +87,35 @@ class meGDATA(object):
     def GetPortfolios(self, with_returns=False):
         query = PortfolioQuery()
         query.returns = with_returns
-        return self.client.GetPortfolioFeed(query=query).entry
+        wait = .1
+        while True:
+            try:
+                feed = self.client.GetPortfolioFeed(query=query).entry
+                break
+            except Exception, e:
+                from time import sleep
+                sleep(wait)
+                wait *= 2
+        return feed
 
     def GetPositions(self, portfolio, with_returns=False):
         query = PositionQuery()
         query.returns = with_returns
-        return self.client.GetPositionFeed(portfolio, query=query).entry
-
-
+        wait = .1
+        while True:
+            try:
+                feed = self.client.GetPositionFeed(portfolio, query=query).entry
+                break
+            except Exception, e:
+                from time import sleep
+                sleep(wait)
+                wait *= 2
+        return feed
 
 application = webapp.WSGIApplication([('/cron/putStats',putStats)],
                                      debug = True)
 
-
-def taskAdd(delay,name,counter,step,wait=.1):
+def taskAdd(delay,name,counter,step,wait=.5):
     try:
         taskqueue.add(url    = '/cron/putStats', countdown = delay,
                       name   = name,
@@ -108,6 +127,23 @@ def taskAdd(delay,name,counter,step,wait=.1):
         taskAdd(delay,name,counter,step,2*wait)
     except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
         pass
+
+def getStartDelay():
+    from datetime import datetime, date
+    from pytz import timezone
+    eastern = timezone('US/Eastern')
+    UTC = timezone('UTC')
+
+    today    = date.today()
+    naive_DT = datetime.strptime(str(today) + " 9:30:30", "%Y-%m-%d %H:%M:%S")
+    local_DT = naive_DT.replace(tzinfo=eastern)
+    utc_DT   = local_DT.astimezone(UTC)
+    now      = datetime.now(UTC)
+    diff     = utc_DT - now
+    delay    = diff.seconds
+    if delay < 0:
+        delay = 0
+    return delay
 
 def main():
     run_wsgi_app(application)
