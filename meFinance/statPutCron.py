@@ -27,7 +27,7 @@ class putStats(webapp.RequestHandler):
         if step == -1:
             result = db.GqlQuery("Select * from stepDate Order By step desc").fetch(1)
             step = result[0].step + 1
-        if count < 80:
+        if count <= 78:
             putEm(count,step)
 
 def putEm(count,step):
@@ -36,9 +36,9 @@ def putEm(count,step):
     
     eastern = timezone('US/Eastern')
     meDatetime = datetime.now(eastern)
-    
-    creds = meSchema.getCredentials()
-    email = creds.email
+
+    email = "eli.jones@gmail.com"    
+    creds = meSchema.getCredentials(email)
     password = creds.password
 
     meData = meGDATA(email,password)
