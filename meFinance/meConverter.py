@@ -56,10 +56,105 @@ class fillStepDates(webapp.RequestHandler):
                 else:
                     self.response.out.write('Already full! for Steps %s - %s for date %s\n' % (step - 77, step, stepdate))
         self.response.out.write('Done!')
+
+class stepKeys(webapp.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        startStep = int(self.request.get('start'))
+        stopStep = int(self.request.get('stop'))
+
+        #stepDate keys have form: "sD" + step
+        stepDates = db.GqlQuery("Select * From stepDate Where step >= :1 AND step <= :2",startStep,stopStep).fetch(1000)
+        total = 0
+        meList = []
+        counter = 0
+        for meStep in stepDates:
+            if meStep.key().name() == "sD" + str(meStep.step):
+                newStep = meSchema.stepDate(key_name = str(meStep.step),
+                                            step     = meStep.step,
+                                            date     = meStep.date)
+                meList.append(newStep)
+                counter += 1
+                
+                if counter == 100:
+                    db.put(meList)
+                    meList = []
+                    total += counter
+                    counter = 0
+        if counter > 0:
+            db.put(meList)
+            total += counter
+        self.response.out.write('Done putting %s new key_names for stepDate!' % total)
+
+class stckKeys(webapp.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        startStep = int(self.request.get('start'))
+        stopStep = int(self.request.get('stop'))
+
+        stocks = db.GqlQuery("Select * from stck Where step >= :1 AND step <= :2 Order By step",startStep,stopStep).fetch(1000)
+        total = 0
+        meList = []
+        delList = []
+        counter = 0
+
+        for meStck in stocks:
+            k_name = meStck.key().name()
+            if k_name is None or k_name == "s" + str(meStck.ID) + "_" + str(meStck.step):
+                newStock = meSchema.stck(key_name = str(meStck.ID) + "_" + str(meStck.step),
+                                         ID = meStck.ID,
+                                         ask = meStck.ask,
+                                         bid = meStck.bid,
+                                         quote = meStck.quote,
+                                         step = meStck.step)
+                meList.append(newStock)
+                delList.append(meStck)
+                counter += 1
+
+                if counter == 100:
+                    db.put(meList)
+                    db.delete(delList)
+                    meList = []
+                    delList = []
+                    total += counter
+                    counter = 0
+        if counter > 0:
+            db.put(meList)
+            db.delete(delList)
+            total += counter
+        self.response.out.write("Done putting %s new key_names for stck!!" % total)
+
+class delStepDates(webapp.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        startStep = int(self.request.get('start'))
+        stopStep = int(self.request.get('stop'))
+
+        stepDates = db.GqlQuery("Select * From stepDate Where step >= :1 AND step <= :2",startStep,stopStep).fetch(1000)
+        total = 0
+        meList = []
+        counter = 0
+        for meStep in stepDates:
+            k_name = meStep.key().name()
+            if k_name is None or k_name == "sD" + str(meStep.step):
+                meList.append(meStep)
+                counter += 1
+                if counter == 100:
+                    db.delete(meList)
+                    meList = []
+                    total += counter
+                    counter = 0
+        if counter > 0:
+            db.delete(meList)
+            total += counter
+        self.response.out.write('Done deleting %s old stepDates!' % total)
         
 
 application = webapp.WSGIApplication([('/convert/convert',meConverter),
-                                      ('/convert/fillDates',fillStepDates)],
+                                      ('/convert/fillDates',fillStepDates),
+                                      ('/convert/stepKeys',stepKeys),
+                                      ('/convert/delKeys',delStepDates),
+                                      ('/convert/stckKeys',stckKeys)],
                                      debug=True)
 
 def getStartStep(start,dayZero):

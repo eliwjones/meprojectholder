@@ -23,7 +23,7 @@ class putStats(webapp.RequestHandler):
             
     def post(self):
         count = int(self.request.get('counter'))
-        step = int(self.request.get('step'))
+        step  = int(self.request.get('step'))
         if step == -1:
             result = db.GqlQuery("Select * from stepDate Order By step desc").fetch(1)
             step = result[0].step + 1
