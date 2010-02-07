@@ -4,15 +4,15 @@ class GDATACredentials(db.Model):
     email = db.StringProperty(required=True)
     password = db.StringProperty(required=True)
 
-class tokenStore(db.Model):
-    meToken = db.StringProperty(required=True)
-
 class stck(db.Model):
     ID = db.IntegerProperty(required=True)
     step = db.IntegerProperty(required=True)
     quote = db.FloatProperty(required=True, indexed=False)
     bid = db.FloatProperty(indexed=False)
     ask = db.FloatProperty(indexed=False)
+
+class delta(db.Model):
+    val = db.ListProperty(float,required=True, indexed=False)
 
 class stckID(db.Model):
     ID = db.IntegerProperty(required=True)
@@ -22,44 +22,11 @@ class stepDate(db.Model):
     step = db.IntegerProperty(required=True)
     date = db.DateTimeProperty(required=True)
 
-class stockCME(db.Model):
-    lastPrice = db.FloatProperty(required=True)
-    bid = db.FloatProperty(required=True)
-    ask = db.FloatProperty(required=True)
-    date = db.DateTimeProperty(required=True)
-
-class stockGOOG(db.Model):
-    lastPrice = db.FloatProperty(required=True)
-    bid = db.FloatProperty(required=True)
-    ask = db.FloatProperty(required=True)
-    date = db.DateTimeProperty(required=True)
-
-class stockINTC(db.Model):
-    lastPrice = db.FloatProperty(required=True)
-    bid = db.FloatProperty(required=True)
-    ask = db.FloatProperty(required=True)
-    date = db.DateTimeProperty(required=True)
-
-class stockHBC(db.Model):
-    lastPrice = db.FloatProperty(required=True)
-    bid = db.FloatProperty(required=True)
-    ask = db.FloatProperty(required=True)
-    date = db.DateTimeProperty(required=True)
-
-class indexSPX(db.Model):
-    lastPrice = db.FloatProperty(required=True)
-    date = db.DateTimeProperty(required=True)
-
 def getStckID(stock):
-    if stock == "HBC":
-        return 1
-    if stock == "CME":
-        return 2
-    if stock == "GOOG":
-        return 3
-    if stock == "INTC":
-        return 4
-    raise Exception("%s is not a defined stock!" % stock)
+    result = stckID.get_by_key_name(stock)
+    if result is None:
+        raise Exception("%s is not a defined stock!" % stock)
+    return result.ID
 
 def getStockRange(symbol,date1,date2):
     queryStr = "Select * From stock%s Where date >= :1 AND date <= :2 Order By date" % symbol
@@ -94,22 +61,5 @@ def getCredentials(email):
     return result
 
 def wipeOutCreds():
-    results = db.GqlQuery("Select * From GDATACredentials").fetch(100)
+    results = db.GqlQuery("Select __key__ From GDATACredentials").fetch(100)
     db.delete(results)
-
-def getToken():
-    token = db.GqlQuery("Select * From tokenStore").fetch(1)
-    return token
-
-def putToken(token):
-    results = db.GqlQuery("Select * From tokenStore").fetch(100)
-    db.delete(results)
-    token = tokenStore(meToken=str(token))
-    token.put()
-    
-
-
-    
-
-
-    

@@ -52,13 +52,13 @@ def putEm(count,step):
             quote = float(str(pos.position_data.market_value).replace(' USD',''))
             if (symbol in ['GOOG','HBC','INTC','CME']):
                 stckID = meSchema.getStckID(symbol)
-                meStck = meSchema.stck(key_name = "s" + str(stckID) + "_" + str(step),
+                meStck = meSchema.stck(key_name = str(stckID) + "_" + str(step),
                                        ID    = stckID,
                                        step  = step,
                                        quote = quote)
                 meList.append(meStck)
                 
-    meStepDate = meSchema.stepDate(key_name = "sD" + str(step),step = step, date = meDatetime)
+    meStepDate = meSchema.stepDate(key_name = str(step),step = step, date = meDatetime)
     meList.append(meStepDate)
 
     wait = .1
