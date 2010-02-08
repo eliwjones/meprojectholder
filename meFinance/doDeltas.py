@@ -1,23 +1,51 @@
 from google.appengine.ext import db
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
-#import logging
 import meSchema
 
 class doDeltas(webapp.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/plain'
-        self.response.out.write("I am the tester!\n")
+        self.response.out.write("I do the Deltas!\n")
 
-        stckID = int(self.request.get('stockID'))
+        task = 'false'
+        task = str(self.request.get('task'))
+        stockID = int(self.request.get('stockID'))
         start  = int(self.request.get('start'))
-        stop   = int(self.request.get('stop'))
 
-        doMeDeltas(stckID,start,stop)
-        self.response.out.write('Done!')
+        if (task == 'true'):
+            taskAdd(stockID,start)
+        else:
+            stop   = int(self.request.get('stop'))
+            doMeDeltas(stockID,start,stop)
+            self.response.out.write('Done!')
+            
+    def post(self):
+        stockID = int(self.request.get('stockID'))
+        start  = int(self.request.get('start'))
+        stop   = min(start + 49, 4527)
+        doMeDeltas(stockID,start,stop)
+        if stop < 4527:
+            taskAdd(stockID,stop+1)
+        
 
 application = webapp.WSGIApplication([('/convert/doDeltas',doDeltas)],
                                      debug = True)
+
+def taskAdd(stockID,start,wait=.5):
+    from google.appengine.api.labs import taskqueue
+    try:
+        taskqueue.add(url = '/convert/doDeltas', countdown = 0,
+                      name = str(stockID) + "-" + str(start),
+                      params = {'stockID' : stockID,
+                                'start'   : start})
+    except taskqueue.TransientError, e:
+        from time import sleep
+        sleep(wait)
+        taskAdd(stockID,start,2*wait)
+    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
+        pass
+        
 
 def doMeDeltas(stckID,startStep,stopStep):
     count = 0
@@ -44,7 +72,7 @@ def getDelta(stckID,currentStep):
             keyList.append(key)
 
     #results = meSchema.stck.get_by_key_name(keyList)
-    results = memGetStcks(keyList)
+    results = memGetStcks_v2(keyList)
     k=0
     deltaList = []
     
@@ -54,8 +82,8 @@ def getDelta(stckID,currentStep):
     lastQuote = results[0].quote
     
     for result in results:
-        if result is not None:
-            delta = (result.quote-lastQuote)/result.quote
+        if result is not None and float(result.quote) != 0.0:
+            delta = (lastQuote-result.quote)/result.quote
         else:
             delta = 0.0
         deltaList.append(delta)
@@ -71,6 +99,25 @@ def memGetStcks(stckKeyList):
         stock = memcache.get(memKey)
         if stock is not None:
             meList.append(stock)
+        else:
+            stock = meSchema.stck.get_by_key_name(stckKey)
+            memcache.add(memKey,stock)
+            meList.append(stock)
+    return meList
+
+def memGetStcks_v2(stckKeyList):
+    from google.appengine.api import memcache
+    meList = []
+    memKeys = []
+    for stckKey in stckKeyList:
+        memKey = "stck_" + stckKey
+        memKeys.append(memKey)
+    memStocks = memcache.get_multi(memKeys)
+
+    for stckKey in stckKeyList:
+        memKey = "stck_" + stckKey
+        if memKey in memStocks:
+            meList.append(memStocks[memKey])
         else:
             stock = meSchema.stck.get_by_key_name(stckKey)
             memcache.add(memKey,stock)
