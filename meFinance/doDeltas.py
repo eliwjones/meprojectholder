@@ -36,7 +36,7 @@ def taskAdd(stockID,start,wait=.5):
     from google.appengine.api.labs import taskqueue
     try:
         taskqueue.add(url = '/convert/doDeltas', countdown = 0,
-                      name = str(stockID) + "-" + str(start),
+                      name = str(stockID) + "doDeltas" + str(start),
                       params = {'stockID' : stockID,
                                 'start'   : start})
     except taskqueue.TransientError, e:
@@ -65,24 +65,23 @@ def doMeDeltas(stckID,startStep,stopStep):
 def getDelta(stckID,currentStep):
     currentKey = str(stckID) + "_" + str(currentStep)
     keyList = []
-    for i in range(0,400):
+    for i in range(0,401):
         keyStep = currentStep - i
         if keyStep > 0:
             key = str(stckID) + "_" + str(keyStep)
             keyList.append(key)
 
-    #results = meSchema.stck.get_by_key_name(keyList)
     results = memGetStcks_v2(keyList)
     k=0
     deltaList = []
     
-    if results[0] is None:                               # Handles random missing steps
+    if results[0] is None:
         return None
     
     lastQuote = results[0].quote
     
     for result in results:
-        if result is not None and float(result.quote) != 0.0:
+        if result is not None and float(result.quote) != 0.0 and float(lastQuote) != 0.0:
             delta = (lastQuote-result.quote)/result.quote
         else:
             delta = 0.0
@@ -120,7 +119,7 @@ def memGetStcks_v2(stckKeyList):
             meList.append(memStocks[memKey])
         else:
             stock = meSchema.stck.get_by_key_name(stckKey)
-            memcache.add(memKey,stock)
+            memcache.set(memKey,stock)
             meList.append(stock)
     return meList
     
