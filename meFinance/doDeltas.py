@@ -1,28 +1,28 @@
 from google.appengine.ext import db
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
+#import logging
 import meSchema
 
-class meTest(webapp.RequestHandler):
+class doDeltas(webapp.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/plain'
         self.response.out.write("I am the tester!\n")
 
-        stckID = str(self.request.get('stockID'))
+        stckID = int(self.request.get('stockID'))
+        start  = int(self.request.get('start'))
+        stop   = int(self.request.get('stop'))
 
-        doDeltas(2,38440,38446)
-
+        doMeDeltas(stckID,start,stop)
         self.response.out.write('Done!')
-        
 
-application = webapp.WSGIApplication([('/test/meTest',meTest)],
+application = webapp.WSGIApplication([('/convert/doDeltas',doDeltas)],
                                      debug = True)
 
-def doDeltas(stckID,startStep,stopStep):
+def doMeDeltas(stckID,startStep,stopStep):
     count = 0
     meDeltas = []
     for i in range(startStep,stopStep+1):
-        print '%s %s' % (stckID,i)
         meDelta = getDelta(stckID,i)
         if meDelta is not None:
             meDeltas.append(meDelta)
@@ -43,12 +43,12 @@ def getDelta(stckID,currentStep):
             key = str(stckID) + "_" + str(keyStep)
             keyList.append(key)
 
-    #results = meSchema.stck.get_by_key_name(keyList)    # replace with memcache gets?
+    #results = meSchema.stck.get_by_key_name(keyList)
     results = memGetStcks(keyList)
     k=0
     deltaList = []
     
-    if results[0] is None:     #handles random missing steps
+    if results[0] is None:                               # Handles random missing steps
         return None
     
     lastQuote = results[0].quote
@@ -65,7 +65,6 @@ def getDelta(stckID,currentStep):
 
 def memGetStcks(stckKeyList):
     from google.appengine.api import memcache
-
     meList = []
     for stckKey in stckKeyList:
         memKey = "stck_" + stckKey

@@ -20,6 +20,10 @@ handlers:
   script: test.py
   login: admin
 
+- url: /convert/doDeltas
+  script: doDeltas.py
+  login: admin
+
 - url: /convert/.*
   script: meConverter.py
   login: admin
