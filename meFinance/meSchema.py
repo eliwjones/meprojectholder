@@ -1,4 +1,5 @@
 from google.appengine.ext import db
+from google.appengine.api import memcache
 
 class GDATACredentials(db.Model):
     email = db.StringProperty(required=True)
@@ -11,8 +12,8 @@ class stck(db.Model):
     bid = db.FloatProperty(indexed=False)
     ask = db.FloatProperty(indexed=False)
 
-class delta(db.Model):
-    val = db.ListProperty(float,required=True, indexed=False)
+class delta(db.Expando):
+    cval = db.BlobProperty()
 
 class stckID(db.Model):
     ID = db.IntegerProperty(required=True)
@@ -23,10 +24,21 @@ class stepDate(db.Model):
     date = db.DateTimeProperty(required=True)
 
 def getStckID(stock):
-    result = stckID.get_by_key_name(stock)
+    memKey = "stckID-"+stock
+    result = memcache.get(memKey)
     if result is None:
-        raise Exception("%s is not a defined stock!" % stock)
-    return result.ID
+        while True:
+            try:
+                stock = stckID.get_by_key_name(stock)
+                break
+            except db.Timeout:
+                from time import sleep
+                sleep(1)        
+        if stock is None:
+            raise Exception("%s is not a defined stock!" % stock)
+        result = stock.ID
+        memcache.set(memKey,result)
+    return result
 
 def getStockRange(symbol,date1,date2):
     queryStr = "Select * From stock%s Where date >= :1 AND date <= :2 Order By date" % symbol

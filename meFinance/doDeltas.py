@@ -12,33 +12,39 @@ class doDeltas(webapp.RequestHandler):
         task = str(self.request.get('task'))
         stockID = int(self.request.get('stockID'))
         start  = int(self.request.get('start'))
+        stop   = int(self.request.get('stop'))
 
         if (task == 'true'):
-            taskAdd(stockID,start)
+            uniquifier = str(self.request.get('uniquifier'))
+            taskAdd(stockID,start,stop,uniquifier)
         else:
-            stop   = int(self.request.get('stop'))
             doMeDeltas(stockID,start,stop)
             self.response.out.write('Done!')
             
     def post(self):
         stockID = int(self.request.get('stockID'))
         start  = int(self.request.get('start'))
-        stop   = min(start + 49, 4527)
+        globalStop = int(self.request.get('globalStop'))
+        uniquifier = str(self.request.get('uniquifier'))
+        
+        stop   = min(start + 49, globalStop)
         doMeDeltas(stockID,start,stop)
-        if stop < 4527:
-            taskAdd(stockID,stop+1)
+        if stop < globalStop:
+            taskAdd(stockID,stop+1,globalStop,uniquifier)
         
 
 application = webapp.WSGIApplication([('/convert/doDeltas',doDeltas)],
                                      debug = True)
 
-def taskAdd(stockID,start,wait=.5):
+def taskAdd(stockID,start,globalStop,uniquifier,wait=.5):
     from google.appengine.api.labs import taskqueue
     try:
         taskqueue.add(url = '/convert/doDeltas', countdown = 0,
-                      name = str(stockID) + "doDeltas" + str(start),
-                      params = {'stockID' : stockID,
-                                'start'   : start})
+                      name = str(stockID) + "doDeltas-" + uniquifier + str(start),
+                      params = {'stockID'    : stockID,
+                                'start'      : start,
+                                'globalStop' : globalStop,
+                                'uniquifier' : uniquifier})
     except taskqueue.TransientError, e:
         from time import sleep
         sleep(wait)
@@ -83,11 +89,19 @@ def getDelta(stckID,currentStep):
     for result in results:
         if result is not None and float(result.quote) != 0.0 and float(lastQuote) != 0.0:
             delta = (lastQuote-result.quote)/result.quote
+            floatString = str(delta)
+            if "-" in floatString:
+                floatString = floatString[:6]
+            else:
+                floatString = floatString[:5]
+            delta = float(floatString)
+            
         else:
             delta = 0.0
         deltaList.append(delta)
-
-    meDelta = meSchema.delta(key_name = currentKey,val = deltaList)
+    import zlib
+    compDelta = zlib.compress(str(deltaList),9)
+    meDelta = meSchema.delta(key_name = currentKey,cval = compDelta)
     return meDelta
 
 def memGetStcks(stckKeyList):
