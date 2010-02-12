@@ -9,10 +9,12 @@ class go(webapp.RequestHandler):
         step = int(self.request.get('step'))
         
         self.response.out.write('I am an algorithm!\n')
-        result = algorithmDo(keyname,step)
-        
-        for thing in result:
-            self.response.out.write('%s\n'%thing)
+
+        for i in range(step,step+50):
+            self.response.out.write('Step: %s\n'%i)
+            result = algorithmDo(keyname,i)
+            for thing in result:
+                self.response.out.write('%s\n'%thing)
 
         self.response.out.write('I am done!')
 
@@ -24,14 +26,26 @@ def algorithmDo(keyname,step):
     deltakey = str(stckID) + "_" + str(step)
     cval = meSchema.decompCval(deltakey)        # should return len 401 list
 
-    meList.append("TimeDelta: %s" % cval[dna.TimeDelta])
+    meList.append("cval[TimeDelta]: %s" % cval[dna.TimeDelta])
 
     buyCue  = cmp(cval[dna.TimeDelta],dna.BuyDelta)
     sellCue = cmp(cval[dna.TimeDelta],dna.SellDelta)
+    distance = dna.BuyDelta - dna.SellDelta
+    buy = dna.BuyDelta*buyCue
+    sell = dna.SellDelta*sellCue
 
-    if dna.BuyDelta*buyCue >= 0:
+    if buy >= 0 and sell >=0:
+        if distance > 0 and cval[dna.TimeDelta] > 0:
+            meList.append('I want to buy!')
+        elif distance > 0 and cval[dna.TimeDelta] < 0:
+            meList.append('I want to sell!')
+        elif distance < 0 and cval[dna.TimeDelta] < 0:
+            meList.append('I want to buy!')
+        elif distance < 0 and cval[dna.TimeDelta] > 0:
+            meList.append('I want to sell!')
+    elif buy >= 0:
         meList.append('I want to buy!')
-    if dna.SellDelta*sellCue >= 0:
+    elif sell >= 0:
         meList.append('I want to sell!')
 
     return meList
