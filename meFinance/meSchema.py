@@ -1,4 +1,5 @@
 from google.appengine.ext import db
+from google.appengine.datastore import entity_pb
 from google.appengine.api import memcache
 
 class GDATACredentials(db.Model):
@@ -22,6 +23,37 @@ class stckID(db.Model):
 class stepDate(db.Model):
     step = db.IntegerProperty(required=True)
     date = db.DateTimeProperty(required=True)
+
+class meAlg(db.Model):
+    TradeSize = db.FloatProperty(required=True,indexed=False)
+    BuyDelta  = db.FloatProperty(required=True,indexed=False)
+    SellDelta = db.FloatProperty(required=True,indexed=False)
+    TimeDelta = db.IntegerProperty(required=True,indexed=False)
+    Cash      = db.FloatProperty(required=True,indexed=False)
+
+class algStats(db.Model):
+    Cash      = db.FloatProperty(required=True)
+    Positions = db.ListProperty(float,required=True,indexed=False)
+
+def memGet(model,keyname,time=0):
+    memkey = model + keyname
+    result = memcache.get(memkey)
+    if result:
+        result = db.model_from_protobuf(entity_pb.EntityProto(result))
+    else:
+        result = eval(model).get_by_key_name(keyname)
+        memcache.set(memkey,db.model_to_protobuf(result).Encode(),time)
+    return result
+
+def decompCval(deltakey):
+    memkey = "cval" + deltakey
+    result = memcache.get(memkey)
+    if not result:
+        delta = memGet("delta",deltakey,300)
+        from zlib import decompress
+        result = decompress(delta.cval)
+        memcache.set(memkey,result,300)
+    return eval(result)
 
 def getStckID(stock):
     memKey = "stckID-"+stock
