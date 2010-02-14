@@ -35,6 +35,13 @@ class algStats(db.Model):
     Cash      = db.FloatProperty(required=True)
     Positions = db.ListProperty(float,required=True,indexed=False)
 
+def memPut(entity,time=0):
+    # Modify to handle list of entities
+    db.put(entity)
+    if not isinstance(entity,list):
+        memkey = entity.kind() + entity.key().name()
+        memcache.set(memkey,db.model_to_protobuf(entity).Encode(),time)
+
 def memGet(model,keyname,time=0):
     memkey = model + keyname
     result = memcache.get(memkey)
@@ -42,7 +49,8 @@ def memGet(model,keyname,time=0):
         result = db.model_from_protobuf(entity_pb.EntityProto(result))
     else:
         result = eval(model).get_by_key_name(keyname)
-        memcache.set(memkey,db.model_to_protobuf(result).Encode(),time)
+        if result:
+            memcache.set(memkey,db.model_to_protobuf(result).Encode(),time)
     return result
 
 def decompCval(deltakey):
@@ -50,26 +58,18 @@ def decompCval(deltakey):
     result = memcache.get(memkey)
     if not result:
         delta = memGet("delta",deltakey,300)
-        from zlib import decompress
-        result = decompress(delta.cval)
-        memcache.set(memkey,result,300)
-    return eval(result)
+        if delta:
+            from zlib import decompress
+            result = decompress(delta.cval)
+            memcache.set(memkey,result,300)
+    if result:
+        return eval(result)
+    else:
+        return result
 
 def getStckID(stock):
-    memKey = "stckID-"+stock
-    result = memcache.get(memKey)
-    if result is None:
-        while True:
-            try:
-                stock = stckID.get_by_key_name(stock)
-                break
-            except db.Timeout:
-                from time import sleep
-                sleep(1)        
-        if stock is None:
-            raise Exception("%s is not a defined stock!" % stock)
-        result = stock.ID
-        memcache.set(memKey,result)
+    result = memGet("stckID",stock)
+    result = result.ID
     return result
 
 def getStockRange(symbol,date1,date2):

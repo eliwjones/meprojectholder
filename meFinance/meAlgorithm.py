@@ -10,13 +10,30 @@ class go(webapp.RequestHandler):
         
         self.response.out.write('I am an algorithm!\n')
 
-        for i in range(step,step+50):
-            self.response.out.write('Step: %s\n'%i)
-            result = algorithmDo(keyname,i)
-            for thing in result:
-                self.response.out.write('%s\n'%thing)
+        #result = testAllSteps(keyname)
+        result = testAllAlgs(step)
+        
+        for i in range(0,len(result)):
+            if result[i] in ('I want to sell!','I want to buy!'):
+                for k in range(-3,1):
+                    self.response.out.write('%s\n'%result[i+k])
 
         self.response.out.write('I am done!')
+
+def testAllAlgs(step):
+    meList = []
+    for i in range(1,2400 + 1):
+        result = algorithmDo(str(i),step)
+        meList += result
+    return meList
+
+def testAllSteps(keyname):
+    meList = []
+    for i in range(440,4917):
+        result = algorithmDo(keyname,i)
+        if len(result) == 3 and result[2] == 'I want to sell!':
+            meList += result
+    return meList
 
 
 def algorithmDo(keyname,step):
@@ -25,33 +42,42 @@ def algorithmDo(keyname,step):
     dna   = meSchema.memGet("meAlg",keyname)
     deltakey = str(stckID) + "_" + str(step)
     cval = meSchema.decompCval(deltakey)        # should return len 401 list
+    if cval is None:
+        return meList
 
-    meList.append("cval[TimeDelta]: %s" % cval[dna.TimeDelta])
+    buy = dna.BuyDelta
+    sell = dna.SellDelta
+    cue = cval[dna.TimeDelta]
+    buyCue  = cmp(cue,buy)
+    sellCue = cmp(cue,sell)
+    distance = buy - sell
+    doBuy = (buy >= 0 and buyCue >= 0) or (buy <= 0 and buyCue <= 0)
+    doSell = (sell >= 0 and sellCue >= 0) or (sell <= 0 and sellCue <= 0)
 
-    buyCue  = cmp(cval[dna.TimeDelta],dna.BuyDelta)
-    sellCue = cmp(cval[dna.TimeDelta],dna.SellDelta)
-    distance = dna.BuyDelta - dna.SellDelta
-    buy = dna.BuyDelta*buyCue
-    sell = dna.SellDelta*sellCue
-
-    if buy >= 0 and sell >=0:
-        if distance > 0 and cval[dna.TimeDelta] > 0:
+    if doBuy and doSell:
+        if distance > 0 and cue > 0:
             meList.append('I want to buy!')
-        elif distance > 0 and cval[dna.TimeDelta] < 0:
+        elif distance > 0 and cue < 0:
             meList.append('I want to sell!')
-        elif distance < 0 and cval[dna.TimeDelta] < 0:
+        elif distance < 0 and cue < 0:
             meList.append('I want to buy!')
-        elif distance < 0 and cval[dna.TimeDelta] > 0:
+        elif distance < 0 and cue > 0:
             meList.append('I want to sell!')
-    elif buy >= 0:
+    elif doBuy:
         meList.append('I want to buy!')
-    elif sell >= 0:
+    elif doSell:
         meList.append('I want to sell!')
+
+    if len(meList) == 0:
+        meList.append('I want to do nothing!')
+        
+    if len(meList) > 0:
+        meList.insert(0,'\nStep: %s'%step)
+        meList.insert(1,'Alg#: %s'%keyname)
+        meList.insert(2,"cval[TimeDelta]: %s" % cue)
 
     return meList
     
-    
-
 def recordAction():
     from google.appengine.ext import db
 

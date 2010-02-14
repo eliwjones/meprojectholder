@@ -4,6 +4,7 @@ from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.api.labs import taskqueue
 from google.appengine.ext import db
+from google.appengine.datastore import entity_pb
 from google.appengine.api import memcache
 import meSchema
 
@@ -64,7 +65,7 @@ def putEm(count,step):
                 meList.append(meStck)
 
     for stock in meList:
-        memcache.set("stck_" + stock.key().name(),stock)
+        memcache.set("stck" + stock.key().name(),db.model_to_protobuf(stock).Encode())
         doMeDeltas(stock.ID,step,step)
         
     meStepDate = meSchema.stepDate(key_name = str(step),step = step, date = meDatetime)
@@ -160,13 +161,7 @@ def getDelta(stckID,currentStep):
     for result in results:
         if result is not None and float(result.quote) != 0.0 and float(lastQuote) != 0.0:
             delta = (lastQuote-result.quote)/result.quote
-            floatString = str(delta)
-            if "-" in floatString:
-                floatString = floatString[:6]
-            else:
-                floatString = floatString[:5]
-            delta = float(floatString)
-            
+            delta = round(delta,4)
         else:
             delta = 0.0
         deltaList.append(delta)
@@ -179,17 +174,17 @@ def memGetStcks_v2(stckKeyList):
     meList = []
     memKeys = []
     for stckKey in stckKeyList:
-        memKey = "stck_" + stckKey
+        memKey = "stck" + stckKey
         memKeys.append(memKey)
     memStocks = memcache.get_multi(memKeys)
 
     for stckKey in stckKeyList:
-        memKey = "stck_" + stckKey
+        memKey = "stck" + stckKey
         if memKey in memStocks:
-            meList.append(memStocks[memKey])
+            stock = db.model_from_protobuf(entity_pb.EntityProto(memStocks[memKey]))
+            meList.append(stock)
         else:
-            stock = meSchema.stck.get_by_key_name(stckKey)
-            memcache.set(memKey,stock)
+            stock = meSchema.memGet("stck",stckKey)
             meList.append(stock)
     return meList
 
@@ -199,12 +194,12 @@ def taskAdd(delay,name,counter,step,wait=.5):
                       name   = name,
                       params = {'counter' : counter,
                                 'step'    : step} )
-    except taskqueue.TransientError, e:
+    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
+        pass
+    except:
         from time import sleep
         sleep(wait)
         taskAdd(delay,name,counter,step,2*wait)
-    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
-        pass
 
 def getStartDelay():
     from datetime import datetime, date
