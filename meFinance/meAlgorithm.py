@@ -7,11 +7,13 @@ class go(webapp.RequestHandler):
         self.response.headers['Content-Type'] = 'text/plain'
         keyname = str(self.request.get('keyname'))
         step = int(self.request.get('step'))
+        startAlg = int(self.request.get('start'))
+        stopAlg = int(self.request.get('stop'))
         
         self.response.out.write('I am an algorithm!\n')
 
         #result = testAllSteps(keyname)
-        result = testAllAlgs(step)
+        result = testAllAlgs(step,startAlg,stopAlg)
         
         for i in range(0,len(result)):
             if result[i] in ('I want to sell!','I want to buy!'):
@@ -20,9 +22,9 @@ class go(webapp.RequestHandler):
 
         self.response.out.write('I am done!')
 
-def testAllAlgs(step):
+def testAllAlgs(step,startAlg,stopAlg):
     meList = []
-    for i in range(1,2400 + 1):
+    for i in range(startAlg,stopAlg + 1):
         result = algorithmDo(str(i),step)
         meList += result
     return meList
@@ -38,7 +40,7 @@ def testAllSteps(keyname):
 
 def algorithmDo(keyname,step):
     meList = []
-    dna   = meSchema.memGet("meAlg",keyname)
+    dna   = meSchema.memGet(meSchema.meAlg,keyname)
     tradesize = dna.TradeSize
     buy = dna.BuyDelta
     sell = dna.SellDelta
@@ -93,7 +95,7 @@ def buySell(tradesize,buy,sell,cue):
 def recordAction(stckID,keyname,step,buysell,tradesize,cash):
     from google.appengine.ext import db
     from math import floor
-    price = meSchema.memGet("stck",str(stckID)+"_"+str(step)).quote
+    price = meSchema.memGet(meSchema.stck,str(stckID)+"_"+str(step)).quote
     meDesire = meSchema.desire(key_name = str(step) + "_" + keyname,
                                Status = 0,
                                Symbol = meSchema.getStckSymbol(stckID),

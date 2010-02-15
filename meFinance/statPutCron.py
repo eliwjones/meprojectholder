@@ -34,8 +34,7 @@ class putStats(webapp.RequestHandler):
         if step == -1:
             result = db.GqlQuery("Select * from stepDate Order By step desc").fetch(1)
             step = result[0].step + 1
-        if count <= 78:
-            putEm(count,step)
+        putEm(count,step)
 
 def putEm(count,step):
     from datetime import datetime
@@ -81,14 +80,14 @@ def putEm(count,step):
             from time import sleep
             sleep(timeout)
             wait *= 2
-        
-    now = datetime.today()
-    seconds = 60*(now.minute) + now.second
-    delay = 300 - seconds%300                    # Gives the approximate number of seconds until next 5 minute mark.
-    if delay < 50:
-        delay += 300
 
-    taskAdd(delay,'step-' + str(step+1),count+1,step+1)
+    if count <= 79:
+        now = datetime.today()
+        seconds = 60*(now.minute) + now.second
+        delay = 300 - seconds%300                    # Gives the approximate number of seconds until next 5 minute mark.
+        if delay < 50:
+            delay += 300
+        taskAdd(delay,'step-' + str(step+1),count+1,step+1)
 
 class meGDATA(object):
     def __init__(self,email,password):
