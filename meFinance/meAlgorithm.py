@@ -38,16 +38,35 @@ def testAllSteps(keyname):
 
 def algorithmDo(keyname,step):
     meList = []
-    stckID = 4
     dna   = meSchema.memGet("meAlg",keyname)
-    deltakey = str(stckID) + "_" + str(step)
-    cval = meSchema.decompCval(deltakey)        # should return len 401 list
-    if cval is None:
-        return meList
-
+    tradesize = dna.TradeSize
     buy = dna.BuyDelta
     sell = dna.SellDelta
-    cue = cval[dna.TimeDelta]
+
+    for stckID in [1,2,3,4]:
+        deltakey = str(stckID) + "_" + str(step)
+        cval = meSchema.decompCval(deltakey)
+        if cval is None:
+            return meList
+
+        cue = cval[dna.TimeDelta]
+        buysell = buySell(tradesize,buy,sell,cue)
+
+        if buysell == 1:
+            meList.append('I want to buy!')
+        elif buysell == -1:
+            meList.append('I want to sell!')
+
+        if buysell in (-1,1):
+            recordAction(stckID,keyname,step,buysell,tradesize,dna.Cash)
+            meList.insert(0,'\nStep: %s'%step)
+            meList.insert(1,'Alg#: %s'%keyname)
+            meList.insert(2,'stock: %s'%meSchema.getStckSymbol(stckID))
+            return meList
+    return meList
+
+def buySell(tradesize,buy,sell,cue):
+    buysell = 0
     buyCue  = cmp(cue,buy)
     sellCue = cmp(cue,sell)
     distance = buy - sell
@@ -56,30 +75,30 @@ def algorithmDo(keyname,step):
 
     if doBuy and doSell:
         if distance > 0 and cue > 0:
-            meList.append('I want to buy!')
+            buysell = 1
         elif distance > 0 and cue < 0:
-            meList.append('I want to sell!')
+            buysell = -1
         elif distance < 0 and cue < 0:
-            meList.append('I want to buy!')
+            buysell = 1
         elif distance < 0 and cue > 0:
-            meList.append('I want to sell!')
+            buysell = -1
     elif doBuy:
-        meList.append('I want to buy!')
+        buysell = 1
     elif doSell:
-        meList.append('I want to sell!')
+        buysell = -1
 
-    if len(meList) == 0:
-        meList.append('I want to do nothing!')
-        
-    if len(meList) > 0:
-        meList.insert(0,'\nStep: %s'%step)
-        meList.insert(1,'Alg#: %s'%keyname)
-        meList.insert(2,"cval[TimeDelta]: %s" % cue)
-
-    return meList
+    return buysell
     
-def recordAction():
+    
+def recordAction(stckID,keyname,step,buysell,tradesize,cash):
     from google.appengine.ext import db
+    from math import floor
+    price = meSchema.memGet("stck",str(stckID)+"_"+str(step)).quote
+    meDesire = meSchema.desire(key_name = str(step) + "_" + keyname,
+                               Status = 0,
+                               Symbol = meSchema.getStckSymbol(stckID),
+                               Shares = int((buysell)*floor((tradesize*cash)/price)))
+                               
 
 application = webapp.WSGIApplication([('/algorithms/go',go)],
                                      debug = True)

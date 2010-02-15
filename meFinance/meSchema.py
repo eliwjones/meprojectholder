@@ -31,36 +31,49 @@ class meAlg(db.Model):
     TimeDelta = db.IntegerProperty(required=True,indexed=False)
     Cash      = db.FloatProperty(required=True,indexed=False)
 
+class desire(db.Model):                                        # key_name = step + "_" + meAlg.key().name()
+    Status = db.IntegerProperty(required=True,indexed=False)
+    Symbol = db.StringProperty(required=True,indexed=False)
+    Shares = db.IntegerProperty(required=True,indexed=False)    # - for short, + for long
+
+class positions(db.Model):                                      # key_name = meAlg.key().name() + "_" + stckID
+    Symbol = db.StringProperty(required=True,indexed=False)
+    Shares = db.IntegerProperty(required=True,indexed=False)    # - for short, + for long
+
 class algStats(db.Model):
     Cash      = db.FloatProperty(required=True)
     Positions = db.ListProperty(float,required=True,indexed=False)
 
-def memPut(entity,time=0):
-    # Modify to handle list of entities
-    db.put(entity)
-    if not isinstance(entity,list):
-        memkey = entity.kind() + entity.key().name()
-        memcache.set(memkey,db.model_to_protobuf(entity).Encode(),time)
+def memPutGet(model,keyname,time=0):
+    memkey = model.kind() + keyname
+    result = model.get_by_key_name(keyname)
+    if result:
+        memcache.set(memkey,db.model_to_protobuf(result).Encode(),time)
+    else:
+        memcache.set(memkey,None)
+    return result
 
 def memGet(model,keyname,time=0):
-    memkey = model + keyname
+    memkey = model.kind() + keyname
     result = memcache.get(memkey)
     if result:
         result = db.model_from_protobuf(entity_pb.EntityProto(result))
     else:
-        result = eval(model).get_by_key_name(keyname)
+        result = model.get_by_key_name(keyname)
         if result:
             memcache.set(memkey,db.model_to_protobuf(result).Encode(),time)
+        else:
+            memcache.set(memkey,None)
     return result
 
 def decompCval(deltakey):
     memkey = "cval" + deltakey
     result = memcache.get(memkey)
     if not result:
-        delta = memGet("delta",deltakey,300)
-        if delta:
+        medelta = memGet(delta,deltakey,300)
+        if medelta:
             from zlib import decompress
-            result = decompress(delta.cval)
+            result = decompress(medelta.cval)
             memcache.set(memkey,result,300)
     if result:
         return eval(result)
@@ -68,8 +81,16 @@ def decompCval(deltakey):
         return result
 
 def getStckID(stock):
-    result = memGet("stckID",stock)
+    result = memGet(stckID,stock)
     result = result.ID
+    return result
+
+def getStckSymbol(stckID):
+    memkey = "stckID"+str(stckID)
+    result = memcache.get(memkey)
+    if not result:
+        result = db.GqlQuery("Select * from stckID Where ID = :1",stckID).fetch(1)[0].symbol
+        memcache.set(memkey,result)
     return result
 
 def getStockRange(symbol,date1,date2):
@@ -107,3 +128,4 @@ def getCredentials(email):
 def wipeOutCreds():
     results = db.GqlQuery("Select __key__ From GDATACredentials").fetch(100)
     db.delete(results)
+
