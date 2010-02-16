@@ -73,17 +73,16 @@ def memGet(model,keyname,time=0):
 
 def decompCval(deltakey):
     memkey = "cval" + deltakey
-    result = memcache.get(memkey)
+    result = cachepy.get(memkey)
     if not result:
-        medelta = memGet(delta,deltakey,300)
-        if medelta:
+        result = memcache.get(memkey)
+        if not result:
+            medelta = memGet(delta,deltakey)
             from zlib import decompress
-            result = decompress(medelta.cval)
-            memcache.set(memkey,result,300)
-    if result:
-        return eval(result)
-    else:
-        return result
+            result = eval(decompress(medelta.cval))
+            memcache.set(memkey,result)
+        cachepy.set(memkey,result)     
+    return result
 
 def getStckID(stock):
     result = memGet(stckID,stock)
@@ -91,11 +90,15 @@ def getStckID(stock):
     return result
 
 def getStckSymbol(stckID):
-    memkey = "stckID"+str(stckID)
-    result = memcache.get(memkey)
+    memkey = "symbol"+str(stckID)
+
+    result = cachepy.get(memkey)
     if not result:
-        result = db.GqlQuery("Select * from stckID Where ID = :1",stckID).fetch(1)[0].symbol
-        memcache.set(memkey,result)
+        result = memcache.get(memkey)
+        if not result:
+            result = db.GqlQuery("Select * from stckID Where ID = :1",stckID).fetch(1)[0].symbol
+            memcache.set(memkey,result)
+        cachepy.set(memkey,result)
     return result
 
 def getStockRange(symbol,date1,date2):
