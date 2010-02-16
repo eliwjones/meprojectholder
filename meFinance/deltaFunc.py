@@ -2,6 +2,7 @@ from google.appengine.ext import db
 from google.appengine.datastore import entity_pb
 from google.appengine.api import memcache
 import meSchema
+import cachepy
 
 def doMeDeltas(stckID,startStep,stopStep):
     count = 0

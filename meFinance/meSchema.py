@@ -1,6 +1,7 @@
 from google.appengine.ext import db
 from google.appengine.datastore import entity_pb
 from google.appengine.api import memcache
+import cachepy
 
 class GDATACredentials(db.Model):
     email = db.StringProperty(required=True)
@@ -55,15 +56,19 @@ def memPutGet(model,keyname,time=0):
 
 def memGet(model,keyname,time=0):
     memkey = model.kind() + keyname
-    result = memcache.get(memkey)
-    if result:
-        result = db.model_from_protobuf(entity_pb.EntityProto(result))
-    else:
-        result = model.get_by_key_name(keyname)
-        if result:
-            memcache.set(memkey,db.model_to_protobuf(result).Encode(),time)
+
+    result = cachepy.get(memkey)
+    if not result:
+        multiget = memcache.get_multi([memkey])
+        if memkey in multiget:
+            result = db.model_from_protobuf(entity_pb.EntityProto(multiget[memkey]))
         else:
-            memcache.set(memkey,None)
+            result = model.get_by_key_name(keyname)
+            if result:
+                memcache.set(memkey,db.model_to_protobuf(result).Encode(),time)
+            else:
+                memcache.set(memkey,None)
+        cachepy.set(memkey,result)
     return result
 
 def decompCval(deltakey):

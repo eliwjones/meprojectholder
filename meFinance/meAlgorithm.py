@@ -1,6 +1,7 @@
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 import meSchema
+import cachepy
 
 class go(webapp.RequestHandler):
     def get(self):
@@ -40,14 +41,21 @@ def testAllSteps(keyname):
 
 def algorithmDo(keyname,step):
     meList = []
-    dna   = meSchema.memGet(meSchema.meAlg,keyname)
+    dna = cachepy.get("meAlg"+keyname)
+    if not dna:
+        dna = meSchema.memGet(meSchema.meAlg,keyname)
+        cachepy.set("meAlg"+keyname,dna)
+
     tradesize = dna.TradeSize
     buy = dna.BuyDelta
     sell = dna.SellDelta
 
     for stckID in [1,2,3,4]:
         deltakey = str(stckID) + "_" + str(step)
-        cval = meSchema.decompCval(deltakey)
+        cval = cachepy.get("cval" + deltakey)
+        if not cval:
+            cval = meSchema.decompCval(deltakey)
+            cachepy.set("cval" + deltakey,cval)
         if cval is None:
             return meList
 
@@ -60,10 +68,14 @@ def algorithmDo(keyname,step):
             meList.append('I want to sell!')
 
         if buysell in (-1,1):
+            symbol = cachepy.get("symbol"+str(stckID))
+            if not symbol:
+                symbol = meSchema.getStckSymbol(stckID)
+                cachepy.set("symbol"+str(stckID),symbol)
             recordAction(stckID,keyname,step,buysell,tradesize,dna.Cash)
             meList.insert(0,'\nStep: %s'%step)
             meList.insert(1,'Alg#: %s'%keyname)
-            meList.insert(2,'stock: %s'%meSchema.getStckSymbol(stckID))
+            meList.insert(2,'stock: %s'%symbol)
             return meList
     return meList
 
@@ -95,10 +107,21 @@ def buySell(tradesize,buy,sell,cue):
 def recordAction(stckID,keyname,step,buysell,tradesize,cash):
     from google.appengine.ext import db
     from math import floor
-    price = meSchema.memGet(meSchema.stck,str(stckID)+"_"+str(step)).quote
+    
+    symbol = cachepy.get("symbol"+str(stckID))
+    if not symbol:
+        symbol = meSchema.getStckSymbol(stckID)
+        cachepy.set("symbol"+str(stckID),symbol)
+        
+    pricekey = str(stckID)+"_"+str(step)
+    price = cachepy.get("price"+pricekey)
+    if not price:
+        price = meSchema.memGet(meSchema.stck,pricekey).quote
+        cachepy.set("price"+pricekey,price)
+    
     meDesire = meSchema.desire(key_name = str(step) + "_" + keyname,
                                Status = 0,
-                               Symbol = meSchema.getStckSymbol(stckID),
+                               Symbol = symbol,
                                Shares = int((buysell)*floor((tradesize*cash)/price)))
                                
 
