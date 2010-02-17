@@ -58,13 +58,16 @@ def memGet(model,keyname,time=0):
     memkey = model.kind() + keyname
 
     result = cachepy.get(memkey)
-    if not result:
+    if result is None:
         multiget = memcache.get_multi([memkey])
         if memkey in multiget:
-            result = db.model_from_protobuf(entity_pb.EntityProto(multiget[memkey]))
+            if multiget[memkey] is not None:
+                result = db.model_from_protobuf(entity_pb.EntityProto(multiget[memkey]))
+            else:
+                result = None
         else:
             result = model.get_by_key_name(keyname)
-            if result:
+            if result is not None:
                 memcache.set(memkey,db.model_to_protobuf(result).Encode(),time)
             else:
                 memcache.set(memkey,None)
@@ -116,15 +119,18 @@ def getMissingKeys(keylist,dictionary):
             meList.append(keyname)
     return meList
         
-def decompCval(deltakey):
+def decompCval(deltakey):        # Must modify to use .multi_get to handle missing key_name values
     memkey = "cval" + deltakey
     result = cachepy.get(memkey)
     if not result:
         result = memcache.get(memkey)
         if not result:
             medelta = memGet(delta,deltakey)
-            from zlib import decompress
-            result = eval(decompress(medelta.cval))
+            if medelta is not None:
+                from zlib import decompress
+                result = eval(decompress(medelta.cval))
+            else:
+                result = None
             memcache.set(memkey,result)
         cachepy.set(memkey,result)     
     return result
