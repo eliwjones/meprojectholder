@@ -71,6 +71,51 @@ def memGet(model,keyname,time=0):
         cachepy.set(memkey,result)
     return result
 
+def memGet_multi(model,keylist):
+    cachepykeylist = []
+    entitykeylist = []
+    memEntities = {}
+    EntityDict = {}
+    for key in keylist:
+        memkey = model.kind() + key
+        cachepykeylist.append(memkey)
+    cachepyEntities = cachepy.get_multi(cachepykeylist)
+    memkeylist = getMissingKeys(cachepykeylist,cachepyEntities)
+    if len(memkeylist)>0:
+        memEntities = memcache.get_multi(memkeylist)
+        for key in memEntities:
+            if memEntities[key] is not None:
+                memEntities[key] = db.model_from_protobuf(entity_pb.EntityProto(memEntities[key]))
+            cachepy.set(key,memEntities[key])
+        entitykeylist = getMissingKeys(memkeylist,memEntities)
+    if len(entitykeylist) > 0:
+        for i in range(len(entitykeylist)):
+            entitykeylist[i] = entitykeylist[i].replace(model.kind(),'')
+        Entities = model.get_by_key_name(entitykeylist)
+        for i in range(len(entitykeylist)):
+            key = entitykeylist[i]
+            memkey = model.kind() + key
+            EntityDict[key] = Entities[i]
+            cachepy.set(memkey,EntityDict[key])
+            if EntityDict[key] is None:
+                memcache.set(memkey,None)
+            else:
+                memcache.set(memkey,db.model_to_protobuf(EntityDict[key]).Encode())
+    for key in cachepyEntities:
+        newkey = key.replace(model.kind(),'')
+        EntityDict[newkey] = cachepyEntities[key]
+    for key in memEntities:
+        newkey = key.replace(model.kind(),'')
+        EntityDict[newkey] = memEntities[key]
+    return EntityDict
+
+def getMissingKeys(keylist,dictionary):
+    meList = []
+    for keyname in keylist:
+        if keyname not in dictionary:
+            meList.append(keyname)
+    return meList
+        
 def decompCval(deltakey):
     memkey = "cval" + deltakey
     result = cachepy.get(memkey)

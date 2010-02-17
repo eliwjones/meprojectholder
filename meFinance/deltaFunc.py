@@ -2,7 +2,6 @@ from google.appengine.ext import db
 from google.appengine.datastore import entity_pb
 from google.appengine.api import memcache
 import meSchema
-import cachepy
 
 def doMeDeltas(stckID,startStep,stopStep):
     count = 0
@@ -28,7 +27,7 @@ def getDelta(stckID,currentStep):
             key = str(stckID) + "_" + str(keyStep)
             keyList.append(key)
 
-    results = memGetStcks_v2(keyList)
+    results = memGetStcks(keyList)
     k=0
     deltaList = []
     
@@ -49,22 +48,9 @@ def getDelta(stckID,currentStep):
     meDelta = meSchema.delta(key_name = currentKey,cval = compDelta)
     return meDelta
 
-def memGetStcks_v2(stckKeyList):
+def memGetStcks(stckKeyList):
     meList = []
-    memKeys = []
-    for stckKey in stckKeyList:
-        memKey = "stck" + stckKey
-        memKeys.append(memKey)
-    memStocks = memcache.get_multi(memKeys)
-
-    for stckKey in stckKeyList:
-        memKey = "stck" + stckKey
-        if memKey in memStocks:
-            stock = memStocks[memKey]
-            if stock is not None:
-                stock = db.model_from_protobuf(entity_pb.EntityProto(memStocks[memKey]))
-            meList.append(stock)
-        else:
-            stock = meSchema.memPutGet(meSchema.stck,stckKey)
-            meList.append(stock)
+    results = meSchema.memGet_multi(meSchema.stck,stckKeyList)
+    for key in stckKeyList:
+        meList.append(results[key])
     return meList
