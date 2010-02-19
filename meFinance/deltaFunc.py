@@ -44,7 +44,8 @@ def getDelta(stckID,currentStep):
             medelta = 0.0
         deltaList.append(medelta)
     from zlib import compress
-    compDelta = compress(str(deltaList),9)
+    from pickle import dumps
+    compDelta = compress(dumps(deltaList,-1),9)
     meDelta = meSchema.delta(key_name = currentKey,cval = compDelta)
     return meDelta
 

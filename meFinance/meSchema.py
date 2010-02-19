@@ -57,8 +57,10 @@ def memPutGet(model,keyname,time=0):
 def memGet(model,keyname,time=0):
     memkey = model.kind() + keyname
 
-    result = cachepy.get(memkey)
-    if result is None:
+    multiget = cachepy.get_multi([memkey])
+    if memkey in multiget:
+        result = multiget[memkey]
+    else:
         multiget = memcache.get_multi([memkey])
         if memkey in multiget:
             if multiget[memkey] is not None:
@@ -119,16 +121,21 @@ def getMissingKeys(keylist,dictionary):
             meList.append(keyname)
     return meList
         
-def decompCval(deltakey):        # Must modify to use .multi_get to handle missing key_name values
+def decompCval(deltakey):
     memkey = "cval" + deltakey
-    result = cachepy.get(memkey)
-    if not result:
-        result = memcache.get(memkey)
-        if not result:
-            medelta = memGet(delta,deltakey)
+    multiget = cachepy.get_multi([memkey])
+    if memkey in multiget:
+        result = multiget[memkey]
+    else:
+        multiget = memcache.get_multi([memkey])
+        if memkey in multiget:
+            result = multiget[memkey]
+        else:
+            medelta = delta.get_by_key_name(deltakey)
             if medelta is not None:
                 from zlib import decompress
-                result = eval(decompress(medelta.cval))
+                from pickle import loads
+                result = loads(decompress(medelta.cval))
             else:
                 result = None
             memcache.set(memkey,result)
@@ -142,11 +149,14 @@ def getStckID(stock):
 
 def getStckSymbol(stckID):
     memkey = "symbol"+str(stckID)
-
-    result = cachepy.get(memkey)
-    if not result:
-        result = memcache.get(memkey)
-        if not result:
+    memget = cachepy.get_multi([memkey])
+    if memkey in memget:
+        result = memget[memkey]
+    else:
+        memget = memcache.get_multi([memkey])
+        if memkey in memget:
+            result = memget[memkey]
+        else:
             result = db.GqlQuery("Select * from stckID Where ID = :1",stckID).fetch(1)[0].symbol
             memcache.set(memkey,result)
         cachepy.set(memkey,result)
@@ -171,17 +181,10 @@ def putCredentials(email,password):
 
 def getCredentials(email):
     from base64 import b64decode
-    wait = 1
-    while True:
-        try:
-            result = GDATACredentials.get_by_key_name(email)
-            break
-        except db.Timeout:
-            from time import sleep
-            sleep(wait)
-            wait += 1
-    result.email    = b64decode(result.email)
-    result.password = b64decode(result.password)
+    creds = memGet(GDATACredentials,email)
+    email    = b64decode(creds.email)
+    password = b64decode(creds.password)
+    result = GDATACredentials(email=email,password=password)
     return result
 
 def wipeOutCreds():
