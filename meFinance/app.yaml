@@ -20,6 +20,14 @@ handlers:
   script: test.py
   login: admin
 
+- url: /test2/.*
+  script: test2.py
+  login: admin
+
+- url: /convert/delDesires
+  script: deleteDesires.py
+  login: admin
+
 - url: /convert/doDeltas
   script: doDeltas.py
   login: admin

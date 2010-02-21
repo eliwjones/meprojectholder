@@ -32,7 +32,7 @@ class meAlg(db.Model):
     TimeDelta = db.IntegerProperty(required=True,indexed=False)
     Cash      = db.FloatProperty(required=True,indexed=False)
 
-class desire(db.Model):                                        # key_name = step + "_" + meAlg.key().name()
+class desire(db.Model):                                        # key_name = meAlg.key().name() + "_" + step
     Status = db.IntegerProperty(required=True,indexed=False)
     Symbol = db.StringProperty(required=True,indexed=False)
     Shares = db.IntegerProperty(required=True,indexed=False)    # - for short, + for long

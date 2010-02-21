@@ -2,7 +2,9 @@ from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.ext import db
 from google.appengine.api.labs import taskqueue
+from google.appengine.api import memcache
 import meSchema
+import cachepy
 
 class go(webapp.RequestHandler):
     def get(self):
@@ -11,9 +13,11 @@ class go(webapp.RequestHandler):
         
         task       = str(self.request.get('task'))
         step       = int(self.request.get('step'))
-        globalstop = int(self.request.get('globalstop'))
-        if task == 'true' and step <= globalstop:
-            taskAdd("Algs-1-800-step"+str(step), step, globalstop, 1, 800, 0)
+        if task == 'true':
+            globalstop = int(self.request.get('globalstop'))
+            uniquifier = str(self.request.get('uniquifier'))
+            taskAdd("Algs-1-800-step-"+str(step)+"-"+uniquifier,
+                    step, globalstop, uniquifier, 1, 800, 0)
         else:
             startAlg = int(self.request.get('start'))
             stopAlg  = int(self.request.get('stop'))
@@ -23,20 +27,23 @@ class go(webapp.RequestHandler):
     def post(self):
         step       = int(self.request.get('step'))
         globalstop = int(self.request.get('globalstop'))
+        uniquifier = str(self.request.get('uniquifier'))
         startAlg   = int(self.request.get('start'))
         stopAlg    = int(self.request.get('stop'))
 
         doAlgs(step,startAlg,stopAlg)
         if step < globalstop:
             step += 1
-            taskAdd("Algs-"+str(startAlg)+"-"+str(stopAlg)+"-step"+str(step), step, globalstop, startAlg, stopAlg, 0)
+            taskAdd("Algs-"+str(startAlg)+"-"+str(stopAlg)+"-step-"+str(step)+"-"+uniquifier,
+                    step, globalstop, uniquifier, startAlg, stopAlg, 0)
 
-def taskAdd(name,step,globalstop,startAlg,stopAlg,delay,wait=.5):
+def taskAdd(name,step,globalstop,uniquifier,startAlg,stopAlg,delay,wait=.5):
     try:
         taskqueue.add(url = '/algorithms/go', countdown = delay,
                       name = name,
                       params = {'step'      : step,
                                 'globalstop': globalstop,
+                                'uniquifier': uniquifier,
                                 'start'     : startAlg,
                                 'stop'      : stopAlg} )
     except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
@@ -44,7 +51,7 @@ def taskAdd(name,step,globalstop,startAlg,stopAlg,delay,wait=.5):
     except:
         from time import sleep
         sleep(wait)
-        taskAdd(name,step,globalstop,startAlg,stopAlg,delay,2*wait)
+        taskAdd(name,step,globalstop,uniquifier,startAlg,stopAlg,delay,2*wait)
 
 def doAlgs(step,startAlg,stopAlg):
     meList = []
@@ -55,11 +62,11 @@ def doAlgs(step,startAlg,stopAlg):
             meList.append(desire)
             count += 1
             if count == 100:
-                db.put(meList)
+                #db.put(meList)
                 meList = []
                 count = 0
-    if count > 0:
-        db.put(meList)
+    #if count > 0:
+    #    db.put(meList)
 
 def algorithmDo(keyname,step):
     dna = meSchema.memGet(meSchema.meAlg,keyname)
@@ -78,9 +85,37 @@ def algorithmDo(keyname,step):
         buysell = buySell(tradesize,buy,sell,cue)
 
         if buysell in (-1,1):
-            action = getDesire(stckID,keyname,step,buysell,tradesize,dna.Cash)
-            return action
+            recent = recency(keyname,step,stckID,buysell,dna.TimeDelta)
+            if not recent:
+                action = getDesire(stckID,keyname,step,buysell,tradesize,dna.Cash)
+                memcache.set(keyname + "_" + str(step) + "_" + str(stckID) + "_" + str(buysell),1)
+                return action
     return None
+
+def recency(keyname,step,stckID,buysell,timedelta):
+    keys = []
+    desire = str(stckID) + "_" + str(buysell)
+    for i in range(step-timedelta,step):
+        keys.append(keyname + "_" + str(i) + "_" + desire)
+    result = checkdesires(keys)
+    return result
+
+def checkdesires(keys):
+    retval = False
+    desires = cachepy.get_multi(keys)
+    for key in desires:
+        if desires[key] == 1:
+            return True
+    missingkeys = meSchema.getMissingKeys(keys,desires)
+    if len(missingkeys) > 0:
+        desires = memcache.get_multi(missingkeys)
+        for key in missingkeys:
+            if key in desires:
+                retval = True
+                cachepy.set(key,1,120)
+            else:
+                cachepy.set(key,0,120)
+    return retval 
 
 def buySell(tradesize,buy,sell,cue):
     buysell = 0
