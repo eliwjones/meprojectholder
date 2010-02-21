@@ -112,9 +112,9 @@ def checkdesires(keys):
         for key in missingkeys:
             if key in desires:
                 retval = True
-                cachepy.set(key,1,120)
+                cachepy.set(key,1)
             else:
-                cachepy.set(key,0,120)
+                cachepy.set(key,0)
     return retval 
 
 def buySell(tradesize,buy,sell,cue):

@@ -20,8 +20,9 @@ Not everything are upsides. You can not use it on every case because:
 import time
 import logging
 import os
+import medict
 
-CACHE = {}
+CACHE = medict.SizedDict()
 STATS_HITS = 0
 STATS_MISSES = 0
 STATS_KEYS_COUNT = 0
