@@ -1,26 +1,25 @@
 class SizedDict(dict):
     ''' Sized dictionary without timeout. '''
 
-    def __init__(self, size=100000):
+    def __init__(self, size=2000000):
         dict.__init__(self)
         self._maxsize = size
         self._stack = []
 
-    def __setitem__(self, name, value):
+    def __setitem__(self, key, value):
+        if key not in self:
+            self._stack.append(key)
         if len(self._stack) >= self._maxsize:
-            self.__delitem__(self._stack[0])
-            del self._stack[0]
-        self._stack.append(name)
-        return dict.__setitem__(self, name, value)
+            for i in range(2400):
+                self.__delitem__(self._stack[0])
+        dict.__setitem__(self, key, value)
 
-    # Recommended but not required:
-    def get(self, name, default=None, do_set=False):
-        try:
-            return self.__getitem__(name)
-        except KeyError:
-            if default is not None:
-                if do_set:
-                    self.__setitem__(name, default)
-                return default
-            else:
-                raise
+    def __delitem__(self,key):
+        self._stack.remove(key)
+        dict.__delitem__(self,key)
+
+    def get(self, key):  # Not used.  Too damn slow.
+        if key in self:
+            self._stack.remove(key)
+            self._stack.append(key)
+        return self.__getitem__(key)

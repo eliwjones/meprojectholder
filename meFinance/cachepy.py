@@ -56,7 +56,7 @@ def get( key ):
         STATS_MISSES += 1
         return None
     
-    value, expiry = CACHE[key]
+    value,expiry = CACHE[key]  #CACHE.get(key)
     current_timestamp = time.time()
     if expiry is None or current_timestamp < expiry:
         STATS_HITS += 1
@@ -76,7 +76,7 @@ def get_multi(keylist):
 
     for key in keylist:
         if key in CACHE:
-            value, expiry = CACHE[key]
+            value, expiry = CACHE[key]  # CACHE.get(key)
             current_timestamp = time.time()
             if expiry is None or current_timestamp < expiry:
                 multilist[key] = value

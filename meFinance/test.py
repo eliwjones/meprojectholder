@@ -11,23 +11,36 @@ class meTest(webapp.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/plain'
         self.response.out.write("I am the tester!\n")
-        if self.request.get('keyname') != '':
-            keyname = str(self.request.get('keyname'))
-        else:
-            keyname = "155_333"
+
+        algone = int(self.request.get('algone'))
+        alglast = int(self.request.get('alglast'))
+        start = int(self.request.get('start'))
+        stop = int(self.request.get('stop'))
+        action = str(self.request.get('action'))
 
         keylist = []
-        if self.request.get('fillit') != '':
-            self.response.out.write('this is fillit:|%s|!!!\n' % self.request.get('fillit'))
-            for i in range(1,400000):
-                keyname = "155_" + str(i)
-                keylist.append(keyname)
-                desire = meSchema.desire(key_name=keyname,Shares=i%101 + 1,Status=0,Symbol='HBC')
-                cachepy.set(keyname,desire)
 
-        result = cachepy.get(keyname)
-        self.response.out.write('key().name(): %s, %s, %s\n'%(result.key().name(),result.Symbol,result.Shares))
-        self.response.out.write('Done!')
+        for i in range(algone,alglast+1):
+            for j in range(start,stop+1):
+                keyname = str(i) + "_" + str(j)
+                keylist.append(keyname)
+
+        results = meSchema.desire.get_by_key_name(keylist)
+        count = 0
+        for result in results:
+            if result is not None:
+                count += 1                
+        self.response.out.write('Count: %s\n'%count)
+        if action == 'delete':
+            db.delete(results)
+        elif action == 'show':
+            for result in results:
+                if result is not None:
+                    self.response.out.write('key().name(): %s, %s, %s\n'%(result.key().name(),result.Symbol,result.Shares))
+        else:
+            self.response.out.write('You request I do nothing!\n')               
+        
+        self.response.out.write('Done!\n')
         
 
 application = webapp.WSGIApplication([('/test/meTest',meTest)],
