@@ -87,7 +87,6 @@ def algorithmDo(keyname,step):
 
         if buysell in (-1,1):
             recent = recency(keyname,step,stckID,buysell,dna.TimeDelta)
-            #recent = True
             if not recent:
                 action = getDesire(stckID,keyname,step,buysell,tradesize,dna.Cash)
                 memcache.set(keyname + "_" + str(step) + "_" + str(stckID) + "_" + str(buysell),1)

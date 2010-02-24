@@ -1,6 +1,5 @@
 class SizedDict(dict):
-    ''' Sized dictionary without timeout. '''
-
+    
     def __init__(self, size=10000):
         dict.__init__(self)
         self._maxsize = size
@@ -17,9 +16,3 @@ class SizedDict(dict):
     def __delitem__(self,key):
         self._stack.remove(key)
         dict.__delitem__(self,key)
-
-    def get(self, key):  # Not used.  Too damn slow.
-        if key in self:
-            self._stack.remove(key)
-            self._stack.append(key)
-        return self.__getitem__(key)
