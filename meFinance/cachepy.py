@@ -22,7 +22,7 @@ import logging
 import os
 import medict
 
-CACHE = medict.SizedDict()
+CACHE = medict.SizedDict(2000000)
 STATS_HITS = 0
 STATS_MISSES = 0
 STATS_KEYS_COUNT = 0
