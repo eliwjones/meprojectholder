@@ -23,20 +23,11 @@ import os
 import medict
 
 CACHE = medict.SizedDict(2000000)
-STATS_HITS = 0
-STATS_MISSES = 0
-STATS_KEYS_COUNT = 0
+PRIORITY_CACHE = medict.SizedDict(3000)
+CACHES = [CACHE,PRIORITY_CACHE]
 
-""" Flag to deactivate it on local environment. """
-#ACTIVE = False if os.environ.get('SERVER_SOFTWARE').startswith('Devel') else True
 ACTIVE = True
-
-""" 
-None means forever.
-Value in seconds.
-"""
 DEFAULT_CACHING_TIME = None
-
 URL_KEY = 'URL_%s'
 
 """
@@ -44,111 +35,60 @@ Curious thing: A dictionary in the global scope can be referenced and changed in
 but it can not be redefined.
 """
 
-def get( key ):
-    """ Gets the data associated to the key or a None """
+def get( key, priority=0 ):
     if ACTIVE is False:
         return None
         
-    global CACHE, STATS_MISSES, STATS_HITS
+    global CACHES, PRIORITY_CACHE, CACHE
         
     """ Return a key stored in the python instance cache or a None if it has expired or it doesn't exist """
-    if key not in CACHE:
-        STATS_MISSES += 1
+    if key not in CACHES[priority]:
         return None
     
-    value,expiry = CACHE[key]  #CACHE.get(key)
+    value,expiry = CACHES[priority][key]
     current_timestamp = time.time()
     if expiry is None or current_timestamp < expiry:
-        STATS_HITS += 1
         return value
     else:
-        STATS_MISSES += 1
         delete( key )
         return None
 
-def get_multi(keylist):
+def get_multi(keylist, priority=0):
     multilist = {}
     
     if ACTIVE is False:
         return None
 
-    global CACHE, STATS_MISSES, STATS_HITS
+    global CACHES, PRIORITY_CACHE, CACHE
 
     for key in keylist:
-        if key in CACHE:
-            value, expiry = CACHE[key]  # CACHE.get(key)
+        if key in CACHES[priority]:
+            value, expiry = CACHES[priority][key]
             current_timestamp = time.time()
             if expiry is None or current_timestamp < expiry:
                 multilist[key] = value
     return multilist
     
 
-def set( key, value, expiry = DEFAULT_CACHING_TIME ):
-    """
-    Sets a key in the current instance
-    key, value, expiry seconds till it expires 
-    """
+def set( key, value, priority=0, expiry = DEFAULT_CACHING_TIME ):
     if ACTIVE is False:
         return None
     
-    global CACHE, STATS_KEYS_COUNT
-    if key not in CACHE:
-        STATS_KEYS_COUNT += 1
+    global CACHES, PRIORITY_CACHE, CACHE
+
     if expiry != None:
         expiry = time.time() + int( expiry )
-    
     try:
-        CACHE[key] = ( value, expiry )
+        CACHES[priority][key] = ( value, expiry )
     except MemoryError:
         """ It doesn't seems to catch the exception, something in the GAE's python runtime probably """
         logging.info( "%s memory error setting key '%s'" % ( __name__, key ) )
  
-def delete( key ):
+def delete( key, priority=0 ):
     """ 
     Deletes the key stored in the cache of the current instance, not all the instances.
     There's no reason to use it except for debugging when developing, use expiry when setting a value instead.
     """
-    global CACHE, STATS_KEYS_COUNT
-    if key in CACHE:
-        STATS_KEYS_COUNT -= 1
-        del CACHE[key]
-
-def dump():
-    """
-    Returns the cache dictionary with all the data of the current instance, not all the instances.
-    There's no reason to use it except for debugging when developing.
-    """
-    global CACHE
-    return CACHE
-
-def flush():
-    """
-    Resets the cache of the current instance, not all the instances.
-    There's no reason to use it except for debugging when developing.
-    """
-    global CACHE, STATS_KEYS_COUNT
-    CACHE = {}
-    STATS_KEYS_COUNT = 0
-    
-def stats():
-    """ Return the hits and misses stats, the number of keys and the cache memory address of the current instance, not all the instances."""
-    global CACHE, STATS_MISSES, STATS_HITS, STATS_KEYS_COUNT
-    memory_address = "0x" + str("%X" % id( CACHE )).zfill(16)
-    return {'cache_memory_address': memory_address,
-            'hits': STATS_HITS,
-            'misses': STATS_MISSES ,
-            'keys_count': STATS_KEYS_COUNT,
-            }
-    
-def cacheit( keyformat, expiry=DEFAULT_CACHING_TIME ):
-    """ Decorator to memoize functions in the current instance cache, not all the instances. """
-    def decorator( fxn ):
-        def wrapper( *args, **kwargs ):
-            key = keyformat % args[:keyformat.count('%')]
-            data = get( key )
-            if data is None:
-                data = fxn( *args, **kwargs )
-                set( key, data, expiry )
-            return data
-        return wrapper
-    return decorator
+    global CACHES, PRIORITY_CACHE, CACHE
+    if key in CACHES[priority]:
+        del CACHES[priority][key]

@@ -144,7 +144,7 @@ def getDesire(stckID,keyname,step,buysell,tradesize,cash):
     from math import floor
     symbol = meSchema.getStckSymbol(stckID)
     pricekey = str(stckID)+"_"+str(step)
-    price = meSchema.memGet(meSchema.stck,pricekey).quote
+    price = meSchema.memGet(meSchema.stck,pricekey,priority=0).quote
     
     meDesire = meSchema.desire(key_name = keyname + "_" + str(step),
                                Status = 0,

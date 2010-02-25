@@ -54,10 +54,10 @@ def memPutGet(model,keyname,time=0):
         memcache.set(memkey,None)
     return result
 
-def memGet(model,keyname,time=0):
+def memGet(model,keyname,priority=1,time=0):
     memkey = model.kind() + keyname
 
-    multiget = cachepy.get_multi([memkey])
+    multiget = cachepy.get_multi([memkey],priority=priority)
     if memkey in multiget:
         result = multiget[memkey]
     else:
@@ -73,7 +73,7 @@ def memGet(model,keyname,time=0):
                 memcache.set(memkey,db.model_to_protobuf(result).Encode(),time)
             else:
                 memcache.set(memkey,None)
-        cachepy.set(memkey,result)
+        cachepy.set(memkey,result,priority=priority)
     return result
 
 def memGet_multi(model,keylist):
@@ -149,7 +149,7 @@ def getStckID(stock):
 
 def getStckSymbol(stckID):
     memkey = "symbol"+str(stckID)
-    memget = cachepy.get_multi([memkey])
+    memget = cachepy.get_multi([memkey],priority=1)
     if memkey in memget:
         result = memget[memkey]
     else:
@@ -159,7 +159,7 @@ def getStckSymbol(stckID):
         else:
             result = db.GqlQuery("Select * from stckID Where ID = :1",stckID).fetch(1)[0].symbol
             memcache.set(memkey,result)
-        cachepy.set(memkey,result)
+        cachepy.set(memkey,result,priority=1)
     return result
 
 def getStockRange(symbol,date1,date2):
