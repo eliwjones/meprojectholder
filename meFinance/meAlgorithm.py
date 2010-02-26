@@ -12,13 +12,28 @@ class go(webapp.RequestHandler):
         self.response.out.write('I am an algorithm!\n')
         
         task       = str(self.request.get('task'))
-        step       = int(self.request.get('step'))
+        globalstop = str(self.request.get('globalstop'))
+        if self.request.get('step') != '':
+            step       = int(self.request.get('step'))
         if task == 'true':
-            globalstop = int(self.request.get('globalstop'))
+            globalstop = int(globalstop)
             uniquifier = str(self.request.get('uniquifier'))
             for i in range(1,1602,800): 
                 taskAdd("Algs-"+str(i)+"-"+str(i+799)+"-step-"+str(step)+"-"+uniquifier,
                         step, globalstop, uniquifier, i, i+799, 0)
+        elif task == 'loop':
+            globalstop = int(globalstop)
+            n = str(self.request.get('n'))
+            if n == '':
+                n = 1
+            else:
+                n = int(n)
+            if n < globalstop:
+                doAlgs(n,1,2400)
+                n += 1
+                self.redirect('/algorithms/go?task=loop&n=%s&globalstop=%s'%(n,globalstop))
+            else:
+                self.response.out.write('Done with step %s!\n'%n)
         else:
             startAlg = int(self.request.get('start'))
             stopAlg  = int(self.request.get('stop'))
@@ -151,7 +166,6 @@ def getDesire(stckID,keyname,step,buysell,tradesize,cash):
                                Symbol = symbol,
                                Shares = int((buysell)*floor((tradesize*cash)/price)))
     return meDesire
-                               
 
 application = webapp.WSGIApplication([('/algorithms/go',go)],
                                      debug = True)
