@@ -62,12 +62,18 @@ def memcacheGetMulti(keys):                                   # Using wrapper to
         results = memcache.get_multi(keys)
     return results
 
-def memcacheSet(key,value):
+def memcacheSet(keyname,value):
     onLocal = False
     if onLocal:
-        cachepy.set(key,value)
+        cachepy.set(keyname,value)
     else:
-        memcache.set(key,value)
+        memcache.set(keyname,value)
+
+def dbGet(model,keyname):
+    pass
+
+def dbPut(model,keyname):
+    pass
 
 def memGet(model,keyname,priority=1,time=0):
     memkey = model.kind() + keyname
