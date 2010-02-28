@@ -54,6 +54,21 @@ def memPutGet(model,keyname,time=0):
         memcache.set(memkey,None)
     return result
 
+def memcacheGetMulti(keys):                                   # Using wrapper to handle local simulation.
+    onLocal = False
+    if onLocal:
+        results = cachepy.get_multi(keys)
+    else:
+        results = memcache.get_multi(keys)
+    return results
+
+def memcacheSet(key,value):
+    onLocal = False
+    if onLocal:
+        cachepy.set(key,value)
+    else:
+        memcache.set(key,value)
+
 def memGet(model,keyname,priority=1,time=0):
     memkey = model.kind() + keyname
 

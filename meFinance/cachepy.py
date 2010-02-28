@@ -23,7 +23,7 @@ import os
 import medict
 
 CACHE = medict.SizedDict(2000000)
-PRIORITY_CACHE = medict.SizedDict(3000)
+PRIORITY_CACHE = medict.SizedDict(6000)
 CACHES = [CACHE,PRIORITY_CACHE]
 
 ACTIVE = True
