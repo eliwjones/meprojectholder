@@ -1,0 +1,92 @@
+import sqlite3
+import csv
+from pickle import loads,dumps
+from zlib import compress,decompress
+import sys
+sys.path.append("C:\Program Files\Google\google_appengine")
+sys.path.append("C:\Program Files\Google\google_appengine\lib\yaml\lib")
+sys.path.append("C:\Program Files\Google\google_appengine\demos\me-finance")
+import meSchema
+
+tableschema = {
+ 'delta'    : 'key_name varchar(10) Primary Key, cval Blob',
+ 'meAlg'    : 'key_name varchar(6) Primary Key, TradeSize Float, BuyDelta Float, SellDelta Float, TimeDelta Int, Cash Float',
+ 'stck'     : 'key_name varchar(10) Primary Key, ID Int, step Int, quote Float, bid Float default Null, ask Float default Null',
+ 'stepDate' : 'key_name varchar(6) Primary Key, step Int, date DateTime'
+ }
+
+tablerows = {
+ 'delta'    : ['key_name','cval'],
+ 'meAlg'    : ['key_name','TradeSize','BuyDelta','SellDelta','TimeDelta','Cash'],
+ 'stck'     : ['key_name','ID','step','quote'],
+ 'stepDate' : ['key_name','step','date']
+ }
+
+# To extract cval, do:  decompress(loads(str(cval)))
+
+def loadCSV(kind):
+    filename = '../loaders/%s-2-28-2010.csv' % kind
+    mereader = csv.reader(open(filename), delimiter=',', quotechar='"')
+    return mereader
+
+def dumpToDB(table,csv):
+    db = sqlite3.connect('me-finance.db')
+    c = db.cursor()
+    rows = ''
+    values = ''
+    length = len(tablerows[table])
+    for i in range(length):
+        rows += tablerows[table][i]
+        values += '?'
+        if i < length - 1:
+            rows   += ','
+            values += ','
+    #c.executemany("insert into delta(key_name,cval) values (?,?)",gen_cvals(csv))
+    sql = 'insert into %s(%s) values (%s)'%(table,rows,values)
+    c.executemany(sql,gen_cvals(csv))
+    db.commit()
+    c.close()
+    db.close()
+
+def gen_cvals(csv):
+    for row in csv:
+        yield row
+
+def dropTables():
+    db = sqlite3.connect('me-finance.db')
+    c = db.cursor()
+    for table in tableschema:
+        sql = 'Drop Table %s' % table
+        try:
+            c.execute(sql)
+        except Exception,e:
+            print e
+            
+    db.commit()
+    c.close()
+    db.close()
+
+def createTables():
+    db = sqlite3.connect('me-finance.db')
+    c = db.cursor()
+    for table in tableschema:
+        sql = 'Create Table %s (%s)'%(table,tableschema[table])
+        try:
+            c.execute(sql)
+        except Exception,e:
+            print e
+            
+    db.commit()
+    c.close()
+    db.close()
+    
+def main():
+    kinds = ['delta','stck','meAlg','stepDate','stckID','GDATACredentials']
+    dropTables()
+    createTables()
+    deltafile = loadCSV(kinds[0])
+    dumpToDB('delta',deltafile)
+    print "done!"
+
+if __name__ == "__main__":
+    main()

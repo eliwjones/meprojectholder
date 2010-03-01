@@ -5,6 +5,7 @@ api_version: 1
 
 skip_files:
 - (loaders/.*)
+- (simulation/.*)
 
 handlers:
 - url: /remote_api
