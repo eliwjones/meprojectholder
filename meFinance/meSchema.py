@@ -11,9 +11,9 @@ class GDATACredentials(db.Model):
     password = db.StringProperty(required=True)
 
 class stck(db.Model):
-    ID = db.IntegerProperty(required=True)
-    step = db.IntegerProperty(required=True)
-    quote = db.FloatProperty(required=True, indexed=False)
+    ID = db.IntegerProperty(required=True,default=0)
+    step = db.IntegerProperty(required=True,default=0)
+    quote = db.FloatProperty(required=True,default=0.0,indexed=False)
     bid = db.FloatProperty(indexed=False)
     ask = db.FloatProperty(indexed=False)
 
@@ -21,12 +21,12 @@ class delta(db.Expando):
     cval = db.BlobProperty()
 
 class stckID(db.Model):
-    ID = db.IntegerProperty(required=True)
-    symbol = db.StringProperty(required=True)
+    ID = db.IntegerProperty(required=True,default=0)
+    symbol = db.StringProperty(required=True,default='')
     
 class stepDate(db.Model):
-    step = db.IntegerProperty(required=True)
-    date = db.DateTimeProperty(required=True)
+    step = db.IntegerProperty(required=True,default=0)
+    date = db.DateTimeProperty(required=True,auto_now_add=True)
 
 class meAlg(db.Model):
     TradeSize = db.FloatProperty(required=True,indexed=False)
@@ -78,8 +78,19 @@ def dbGet(model,keyname):
         c = db.cursor()
         sql = "Select * from %s Where key_name = '%s'"%(model.kind(),keyname)
         c.execute(sql)
-        for row in c:
-            result = stck(key_name=row['key_name'],ID=row['ID'],step=row['step'],quote=row['quote'])
+        row = c.fetchone()
+        result = model(key_name = row['key_name'])
+        props = model.properties()
+        for key in props:
+            prop = props[key]
+            name = prop.name
+            if prop.required:
+                import datetime
+                if isinstance(getattr(result,name),datetime.datetime):
+                    meRow = datetime.datetime.strptime(row[name],'%Y-%m-%d %H:%M:%S')
+                else:
+                    meRow = row[name]
+                setattr(result,name,meRow)
         c.close()
         db.close()
     else:
