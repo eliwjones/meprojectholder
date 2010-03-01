@@ -1,12 +1,5 @@
 import sqlite3
 import csv
-from pickle import loads,dumps
-from zlib import compress,decompress
-import sys
-sys.path.append("C:\Program Files\Google\google_appengine")
-sys.path.append("C:\Program Files\Google\google_appengine\lib\yaml\lib")
-sys.path.append("C:\Program Files\Google\google_appengine\demos\me-finance")
-import meSchema
 
 tableschema = {
  'delta'    : 'key_name varchar(10) Primary Key, cval Blob',

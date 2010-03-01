@@ -2,6 +2,9 @@ from google.appengine.ext import db
 from google.appengine.datastore import entity_pb
 from google.appengine.api import memcache
 import cachepy
+import os
+
+SERVER_SOFTWARE = os.environ.get('SERVER_SOFTWARE')
 
 class GDATACredentials(db.Model):
     email = db.StringProperty(required=True)
@@ -55,25 +58,41 @@ def memPutGet(model,keyname,time=0):
     return result
 
 def memcacheGetMulti(keys):                                   # Using wrapper to handle local simulation.
-    onLocal = False
-    if onLocal:
+    if SERVER_SOFTWARE == 'Simulation':
         results = cachepy.get_multi(keys)
     else:
         results = memcache.get_multi(keys)
     return results
 
 def memcacheSet(keyname,value):
-    onLocal = False
-    if onLocal:
+    if SERVER_SOFTWARE == 'Simulation':
         cachepy.set(keyname,value)
     else:
         memcache.set(keyname,value)
 
 def dbGet(model,keyname):
-    pass
+    if SERVER_SOFTWARE == 'Simulation':
+        import sqlite3
+        db = sqlite3.connect('C:/Program Files/Google/google_appengine/demos/me-finance/simulation/me-finance.db')
+        db.row_factory = sqlite3.Row
+        c = db.cursor()
+        sql = "Select * from %s Where key_name = '%s'"%(model.kind(),keyname)
+        c.execute(sql)
+        for row in c:
+            result = stck(key_name=row['key_name'],ID=row['ID'],step=row['step'],quote=row['quote'])
+        c.close()
+        db.close()
+    else:
+        result = model.get_by_key_name(keyname)
+    return result
 
-def dbPut(model,keyname):
-    pass
+def dbPut(model):
+    onLocal = False
+    if onLocal:
+        import sqlite3
+        pass
+    else:
+        db.put(model)
 
 def memGet(model,keyname,priority=1,time=0):
     memkey = model.kind() + keyname
