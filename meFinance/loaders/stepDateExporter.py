@@ -9,7 +9,6 @@ class stepDateExporter(bulkloader.Exporter):
         bulkloader.Exporter.__init__(self, 'stepDate',
                                      [('__key__',str,None),
                                       ('step',int, None),
-                                      #('date',export_date("%Y-%m-%d %H:%M:%S"))
                                       ('date',str,None)
                                       ])
 def export_date(fmt):
