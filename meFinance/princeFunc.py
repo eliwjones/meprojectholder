@@ -31,15 +31,15 @@ def mergePosition(desire,positions):
             if signDes != signPos:
                 print 'different position types.. release cash'
                 stockDiff = abs(positions[pos][0]) - abs(desire[pos][0])
-                priceDiff = abs(positions[pos][1]) - abs(desire[pos][1])
+                priceDiff = positions[pos][1] - desire[pos][1]
                 if stockDiff >= 0:
-                    #cash += desire[pos][0]*(priceDiff)
-                    cash = (-1)*(signPos)*desire[pos][0]*(2*abs(positions[pos][1]) - abs(desire[pos][1]))
-                    print 'Submit Sell to Close Order'
+                    cash  = abs(desire[pos][0])*positions[pos][1]
+                    cash += desire[pos][0]*priceDiff
+                    print 'Submit Sell/Buy to Close Order'
                 else:
-                    #cash = (-1)*positions[pos][0]*(priceDiff)
-                    cash =  (signPos)*positions[pos][0]*(2*abs(positions[pos][1]) - abs(desire[pos][1]))
-                    cash += (stockDiff)*(desire[pos][1])
+                    cash  = abs(positions[pos][0])*positions[pos][1]
+                    cash += (-1)*positions[pos][0]*priceDiff
+                    cash -= abs(stockDiff)*(desire[pos][1])
                     positions[pos][1] = desire[pos][1]
                     print 'Submit Sell/Buy to Close Order'
                     print 'Submit Buy/Sell to Open Order'
