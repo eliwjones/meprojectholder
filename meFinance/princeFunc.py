@@ -1,47 +1,54 @@
 #import meSchema
 
 
-def processDesire(step):
-    desire    = {"HBC" : [-150,  70.00,  0] }
-    for pos in desire:
-        desire[pos][2] = desire[pos][0]*desire[pos][1]
+def generatePositions():
+    pos = {}
+    des = {}
+    price = 50.00
+    shares = 100
+    for i in [-1,1]:
+        for j in [-1,1]:
+            for s in [shares-30,shares,shares+30]:
+                for p in [price-10,price,price+10]:
+                    des['HBC'] = [j*s, p, j*s*p]
+                    pos['HBC'] = [i*shares, price, i*shares*price ]
+                    cashdelta = mergePosition(des,pos)
+                    print cashdelta
+                    print ''
     
-    positions = {"HBC" : [200,  60.00, 0],
-                "GOOG" : [  10, 555.94, 0] }
-    for pos in positions:
-        positions[pos][2] = positions[pos][0]*positions[pos][1]
 
-    cashdelta = mergePosition(desire,positions)
-    print cashdelta
-    # merge cashdelta to algstat Model
+def processDesire(step):
+    print 'process desire!'
 
 def mergePosition(desire,positions):
+    print 'Positions : %s ' % positions
+    print 'Desire    : %s ' % desire
     cash = 0
     for pos in desire:
         if pos in positions:
-            val  = positions[pos][2]
-            if desire[pos][2]/val < 0:
+            signDes = cmp(desire[pos][0], 0)
+            signPos = cmp(positions[pos][0], 0)
+            if signDes != signPos:
                 print 'different position types.. release cash'
-                diff = abs(desire[pos][0]) - abs(positions[pos][0])
-                if diff <= 0 and desire[pos][1] < 0:
-                    cash = desire[pos][0]*(desire[pos][1]-positions[pos][1])
-                elif diff <= 0 and desire[pos][1] > 0:
-                    cash = desire[pos][0]*(positions[pos][1]-desire[pos][1])
-                elif diff > 0 and desire[pos][1] < 0:
-                    cash = positions[pos][0]*(desire[pos][1]-positions[pos][1])
-                    cash -= diff*(desire[pos][1])
-                elif diff > 0 and desire[pos] > 0:
-                    cash = positions[pos][0]*(positions[pos][1]-desire[pos][1])
-                    cash -= diff*(desire[pos][1])
-
+                stockDiff = abs(positions[pos][0]) - abs(desire[pos][0])
+                priceDiff = abs(positions[pos][1]) - abs(desire[pos][1])
+                if stockDiff >= 0:
+                    #cash += desire[pos][0]*(priceDiff)
+                    cash = (-1)*(signPos)*desire[pos][0]*(2*abs(positions[pos][1]) - abs(desire[pos][1]))
+                    print 'Submit Sell to Close Order'
+                else:
+                    #cash = (-1)*positions[pos][0]*(priceDiff)
+                    cash =  (signPos)*positions[pos][0]*(2*abs(positions[pos][1]) - abs(desire[pos][1]))
+                    cash += (stockDiff)*(desire[pos][1])
+                    positions[pos][1] = desire[pos][1]
+                    print 'Submit Sell/Buy to Close Order'
+                    print 'Submit Buy/Sell to Open Order'
                 positions[pos][0] += desire[pos][0]
-                positions[pos][2] += desire[pos][2]
-                #positions[pos][2] = positions[pos][0]*
-                    
+                
                 if positions[pos][0] == 0:
                     del positions[pos]
                 else:
-                    positions[pos][1] = (positions[pos][2])/(positions[pos][0]) # Get new avg price
+                    positions[pos][2] = positions[pos][0]*positions[pos][1]
             else:
                 print 'same position type.. combine positions return cash = -abs(desire[pos][2])'
                 cash = -abs(desire[pos][2])
@@ -58,7 +65,8 @@ def mergePosition(desire,positions):
 
 
 def main():
-    processDesire(1)
+    #processDesire(1)
+    generatePositions()
 
 if __name__ == "__main__":
     main()
