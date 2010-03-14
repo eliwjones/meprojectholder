@@ -42,7 +42,6 @@ handlers:
 
 - url: /algorithms/go
   script: meAlgorithm.py
-  login: admin
 
 - url: /algorithms/.*
   script: makeAlgorithms.py

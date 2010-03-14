@@ -1,4 +1,3 @@
-
 def generatePositions():
     pos = {}
     des = {}
@@ -57,7 +56,6 @@ def mergePosition(desire,positions):
             cash = -abs(desire[pos][2])
             positions[pos] = [desire[pos][0],desire[pos][1],desire[pos][2]]
     return cash
-
 
 def main():
     generatePositions()
