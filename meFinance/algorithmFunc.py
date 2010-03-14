@@ -37,14 +37,12 @@ def algorithmDo(keyname,step):
             recent = recency(keyname,step,stckID,buysell,dna.TimeDelta)
             if not recent:
                 action = getDesire(stckID,keyname,step,buysell,tradesize,dna.Cash)
-                #meSchema.memcacheSet(keyname + "_" + str(step) + "_" + str(stckID) + "_" + str(buysell),1)
                 meSchema.memcacheSet(keyname + "_" + str(step) + "_" + str(buysell),1)
                 return action
     return None
 
 def recency(keyname,step,stckID,buysell,timedelta):
     keys = []
-    #desire = str(stckID) + "_" + str(buysell)
     desire = str(buysell)
     for i in range(step-timedelta,step):
         keys.append(keyname + "_" + str(i) + "_" + desire)

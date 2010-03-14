@@ -2,9 +2,6 @@ from google.appengine.ext import db
 from google.appengine.datastore import entity_pb
 from google.appengine.api import memcache
 import cachepy
-import os
-
-SERVER_SOFTWARE = os.environ.get('SERVER_SOFTWARE')
 
 class GDATACredentials(db.Model):
     email = db.StringProperty(required=True)
@@ -57,53 +54,19 @@ def memPutGet(model,keyname,time=0):
         memcache.set(memkey,None)
     return result
 
-def memcacheGetMulti(keys):                                   # Using wrapper to handle local simulation.
-    if SERVER_SOFTWARE == 'Simulation':
-        results = cachepy.get_multi(keys)
-    else:
-        results = memcache.get_multi(keys)
+def memcacheGetMulti(keys):
+    results = memcache.get_multi(keys)
     return results
 
 def memcacheSet(keyname,value):
-    if SERVER_SOFTWARE == 'Simulation':
-        cachepy.set(keyname,value)
-    else:
-        memcache.set(keyname,value)
+    memcache.set(keyname,value)
 
 def dbGet(model,keyname):
-    if SERVER_SOFTWARE == 'Simulation':
-        import sqlite3
-        db = sqlite3.connect('C:/Program Files/Google/google_appengine/demos/me-finance/simulation/me-finance.db')
-        db.row_factory = sqlite3.Row
-        c = db.cursor()
-        sql = "Select * from %s Where key_name = '%s'"%(model.kind(),keyname)
-        c.execute(sql)
-        row = c.fetchone()
-        result = model(key_name = row['key_name'])
-        props = model.properties()
-        for key in props:
-            prop = props[key]
-            name = prop.name
-            if prop.required:
-                import datetime
-                if isinstance(getattr(result,name),datetime.datetime):
-                    meRow = datetime.datetime.strptime(row[name],'%Y-%m-%d %H:%M:%S')
-                else:
-                    meRow = row[name]
-                setattr(result,name,meRow)
-        c.close()
-        db.close()
-    else:
-        result = model.get_by_key_name(keyname)
+    result = model.get_by_key_name(keyname)
     return result
 
 def dbPut(model):
-    onLocal = False
-    if onLocal:
-        import sqlite3
-        pass
-    else:
-        db.put(model)
+    db.put(model)
 
 def memGet(model,keyname,priority=1,time=0):
     memkey = model.kind() + keyname
