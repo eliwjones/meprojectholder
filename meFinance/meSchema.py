@@ -8,22 +8,22 @@ class GDATACredentials(db.Model):
     password = db.StringProperty(required=True)
 
 class stck(db.Model):
-    ID = db.IntegerProperty(required=True,default=0)
-    step = db.IntegerProperty(required=True,default=0)
-    quote = db.FloatProperty(required=True,default=0.0,indexed=False)
+    ID = db.IntegerProperty(required=True)
+    step = db.IntegerProperty(required=True)
+    quote = db.FloatProperty(required=True,indexed=False)
     bid = db.FloatProperty(indexed=False)
     ask = db.FloatProperty(indexed=False)
 
-class delta(db.Expando):
+class delta(db.Model):
     cval = db.BlobProperty()
 
 class stckID(db.Model):
-    ID = db.IntegerProperty(required=True,default=0)
-    symbol = db.StringProperty(required=True,default='')
+    ID = db.IntegerProperty(required=True)
+    symbol = db.StringProperty(required=True)
     
 class stepDate(db.Model):
-    step = db.IntegerProperty(required=True,default=0)
-    date = db.DateTimeProperty(required=True,auto_now_add=True)
+    step = db.IntegerProperty(required=True)
+    date = db.DateTimeProperty(required=True)
 
 class meAlg(db.Model):
     TradeSize = db.FloatProperty(required=True,indexed=False)
@@ -32,18 +32,15 @@ class meAlg(db.Model):
     TimeDelta = db.IntegerProperty(required=True,indexed=False)
     Cash      = db.FloatProperty(required=True,indexed=False)
 
-class desire(db.Model):                                        # key_name = meAlg.key().name() + "_" + step
-    Status = db.IntegerProperty(required=True,indexed=False)
+class desire(db.Model):                                         # key_name = step + "_" + meAlg.key().name()
     Symbol = db.StringProperty(required=True,indexed=False)
     Shares = db.IntegerProperty(required=True,indexed=False)    # - for short, + for long
-
-class positions(db.Model):                                      # key_name = meAlg.key().name() + "_" + stckID
-    Symbol = db.StringProperty(required=True,indexed=False)
-    Shares = db.IntegerProperty(required=True,indexed=False)    # - for short, + for long
+    Price  = db.FloatProperty(required=True,indexed=False)
 
 class algStats(db.Model):
     Cash      = db.FloatProperty(required=True)
-    Positions = db.ListProperty(float,required=True,indexed=False)
+    CashDelta = db.BlobProperty(required=True)                  # Last N values returned by mergePostion() or 0.
+    Positions = db.BlobProperty(required=True)                  # Serialized dict() of stock positions.
 
 def memPutGet(model,keyname,time=0):
     memkey = model.kind() + keyname
