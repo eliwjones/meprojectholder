@@ -33,9 +33,12 @@ class meAlg(db.Model):
     Cash      = db.FloatProperty(required=True,indexed=False)
 
 class desire(db.Model):                                         # key_name = step + "_" + meAlg.key().name()
-    Symbol = db.StringProperty(required=True,indexed=False)
-    Shares = db.IntegerProperty(required=True,indexed=False)    # - for short, + for long
-    Price  = db.FloatProperty(required=True,indexed=False)
+    desire = db.BlobProperty(required=True)                     # Serialized dict() with appropriate desire.
+
+class meDesire(db.Model):
+    Symbol = db.StringProperty(required=True)
+    Shares = db.IntegerProperty(required=True)
+    Price  = db.FloatProperty(required=True)
 
 class algStats(db.Model):
     Cash      = db.FloatProperty(required=True)

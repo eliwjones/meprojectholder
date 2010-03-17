@@ -140,14 +140,12 @@ def getStartDelay():
     from datetime import datetime, date
     from pytz import timezone
     eastern = timezone('US/Eastern')
-    UTC = timezone('UTC')
 
     today    = date.today()
     naive_DT = datetime.strptime(str(today) + " 9:30:30", "%Y-%m-%d %H:%M:%S")
-    local_DT = naive_DT.replace(tzinfo=eastern)
-    utc_DT   = local_DT.astimezone(UTC)
-    now      = datetime.now(UTC)
-    diff     = utc_DT - now
+    local_DT = eastern.localize(naive_DT, is_dst=True)
+    now      = datetime.now(eastern)
+    diff     = local_DT - now
     delay    = diff.seconds
     if delay < 0:
         delay = 0
