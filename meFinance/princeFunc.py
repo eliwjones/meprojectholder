@@ -7,8 +7,12 @@ def generatePositions():
         for j in [-1,1]:
             for s in [shares-30,shares,shares+30]:
                 for p in [price-10,price,price+10]:
-                    des['HBC'] = [j*s, p, j*s*p]
-                    pos['HBC'] = [i*shares, price, i*shares*price ]
+                    des['HBC'] = {'Shares' : j*s,
+                                  'Price'  : p,
+                                  'Value'  : j*s*p}
+                    pos['HBC'] = {'Shares' : i*shares,
+                                  'Price'  : price,
+                                  'Value'  : i*shares*price}
                     cashdelta = mergePosition(des,pos)
                     print cashdelta
                     print ''
@@ -26,35 +30,38 @@ def generatePositions():
 '''
 
 def mergePosition(desire,positions):
+    print positions
+    print desire
     cash = 0
     for pos in desire:
         if pos in positions:
-            signDes = cmp(desire[pos][0], 0)
-            signPos = cmp(positions[pos][0], 0)
+            signDes = cmp(desire[pos]['Shares'], 0)
+            signPos = cmp(positions[pos]['Shares'], 0)
             if signDes != signPos:
-                stockDiff = abs(positions[pos][0]) - abs(desire[pos][0])
-                priceDiff = positions[pos][1] - desire[pos][1]
+                stockDiff = abs(positions[pos]['Shares']) - abs(desire[pos]['Shares'])
+                priceDiff = positions[pos]['Price'] - desire[pos]['Price']
                 if stockDiff >= 0:
-                    cash  = abs(desire[pos][0])*positions[pos][1]
-                    cash += desire[pos][0]*priceDiff
+                    cash  = abs(desire[pos]['Shares'])*positions[pos]['Price']
+                    cash += desire[pos]['Shares']*priceDiff
                 else:
-                    cash  = abs(positions[pos][0])*positions[pos][1]
-                    cash += (-1)*positions[pos][0]*priceDiff
-                    cash -= abs(stockDiff)*(desire[pos][1])
-                    positions[pos][1] = desire[pos][1]
-                positions[pos][0] += desire[pos][0]
-                if positions[pos][0] == 0:
+                    cash  = abs(positions[pos]['Shares'])*positions[pos]['Price']
+                    cash += (-1)*positions[pos]['Shares']*priceDiff
+                    cash -= abs(stockDiff)*(desire[pos]['Price'])
+                    positions[pos]['Price'] = desire[pos]['Price']
+                positions[pos]['Shares'] += desire[pos]['Shares']
+                if positions[pos]['Shares'] == 0:
                     del positions[pos]
                 else:
-                    positions[pos][2] = positions[pos][0]*positions[pos][1]
+                    positions[pos]['Value'] = positions[pos]['Shares']*positions[pos]['Price']
             else:
-                cash = -abs(desire[pos][2])
-                positions[pos][0] += desire[pos][0]
-                positions[pos][2] += desire[pos][2]
-                positions[pos][1] = (positions[pos][2])/(positions[pos][0])
+                cash = -abs(desire[pos]['Value'])
+                positions[pos]['Shares'] += desire[pos]['Shares']
+                positions[pos]['Value'] += desire[pos]['Value']
+                positions[pos]['Price'] = (positions[pos]['Value'])/(positions[pos]['Shares'])
         else:
-            cash = -abs(desire[pos][2])
-            positions[pos] = [desire[pos][0],desire[pos][1],desire[pos][2]]
+            cash = -abs(desire[pos]['Value'])
+            positions[pos] = [desire[pos]['Shares'],desire[pos]['Price'],desire[pos]['Value']]
+    print positions
     return cash
 
 def main():

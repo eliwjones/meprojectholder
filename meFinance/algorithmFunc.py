@@ -36,7 +36,7 @@ def algorithmDo(keyname,step):
         if buysell in (-1,1):
             recent = recency(keyname,step,stckID,buysell,dna.TimeDelta)
             if not recent:
-                action = getDesire(stckID,keyname,step,buysell,tradesize,dna.Cash)
+                action = makeDesire(stckID,keyname,step,buysell,tradesize,dna.Cash)
                 meSchema.memcacheSet(str(step) + "_" + keyname + "_" + str(buysell),1)
                 return action
     return None
@@ -88,7 +88,7 @@ def buySell(tradesize,buy,sell,cue):
         buysell = -1
     return buysell
     
-def getDesire(stckID,keyname,step,buysell,tradesize,cash):
+def makeDesire(stckID,keyname,step,buysell,tradesize,cash):
     from math import floor
     from pickle import dumps
     symbol = meSchema.getStckSymbol(stckID)
