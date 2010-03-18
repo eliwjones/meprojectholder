@@ -6,6 +6,8 @@ from google.appengine.api.labs import taskqueue
 from google.appengine.ext import db
 from google.appengine.datastore import entity_pb
 from google.appengine.api import memcache
+from datetime import datetime, date
+from pytz import timezone
 import meSchema
 import deltaFunc
 
@@ -19,14 +21,13 @@ class putStats(webapp.RequestHandler):
         if 'X-AppEngine-Cron' in self.request.headers:
             cron = self.request.headers['X-AppEngine-Cron']
         if (cron == 'true'):
-            from datetime import datetime,date
             self.response.out.write('Put task!')
             delay = getStartDelay()
             taskAdd(delay,str(date.today()) + '-1',1,-1)
         elif (cron == 'test'):
             result = db.GqlQuery("Select * from stepDate Order By step desc").fetch(1)
             step = result[0].step + 1
-            putEm(78,step)
+            putEm(step)
             
     def post(self):
         count = int(self.request.get('counter'))
@@ -34,15 +35,16 @@ class putStats(webapp.RequestHandler):
         if step == -1:
             result = db.GqlQuery("Select * from stepDate Order By step desc").fetch(1)
             step = result[0].step + 1
-        putEm(count,step)
+        putEm(step)
+        if count <= 79:
+            now = datetime.today()
+            seconds = 60*(now.minute) + now.second
+            delay = 300 - seconds%300
+            if delay < 50:
+                delay += 300
+            taskAdd(delay,'step-' + str(step+1),count+1,step+1)
 
-def putEm(count,step):
-    from datetime import datetime
-    from pytz import timezone
-    
-    eastern = timezone('US/Eastern')
-    meDatetime = datetime.now(eastern)
-
+def putEm(step):
     email = "eli.jones@gmail.com"    
     creds = meSchema.getCredentials(email)
     password = creds.password
@@ -50,6 +52,7 @@ def putEm(count,step):
     meData = meGDATA(email,password)
     portfolios = meData.GetPortfolios(True)
 
+    meDatetime = datetime.now()
     meList = []
     for pfl in portfolios:
         positions = meData.GetPositions(pfl,True)
@@ -80,14 +83,7 @@ def putEm(count,step):
             from time import sleep
             sleep(timeout)
             wait *= 2
-
-    if count <= 79:
-        now = datetime.today()
-        seconds = 60*(now.minute) + now.second
-        delay = 300 - seconds%300                    # Gives the approximate number of seconds until next 5 minute mark.
-        if delay < 50:
-            delay += 300
-        taskAdd(delay,'step-' + str(step+1),count+1,step+1)
+            
 
 class meGDATA(object):
     def __init__(self,email,password):
@@ -137,10 +133,7 @@ def taskAdd(delay,name,counter,step,wait=.5):
         taskAdd(delay,name,counter,step,2*wait)
 
 def getStartDelay():
-    from datetime import datetime, date
-    from pytz import timezone
     eastern = timezone('US/Eastern')
-
     today    = date.today()
     naive_DT = datetime.strptime(str(today) + " 9:30:30", "%Y-%m-%d %H:%M:%S")
     local_DT = eastern.localize(naive_DT, is_dst=True)
