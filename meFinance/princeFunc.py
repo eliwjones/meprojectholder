@@ -39,7 +39,12 @@ def updateAlgStats(step):
     algstats = getAlgStats()
     desires = getDesires(step)
 
-def getAlgStats():
+def getAlgStats(alphaAlg='0',omegaAlg='999999'):
+    alpha = meSchema.buildAlgKey(alphaAlg)
+    alpha = Key.from_path('meAlg',alpha)
+    omega = meSchema.buildAlgKey(omegaAlg)
+    omega = Key.from_path('meAlg',omega)
+    algs = db.GqlQuery("Select * from algStats Where __key__ > :1 AND __key__ < :2",alpha,omega).fetch(5000)
     print 'get algStat info: Cash, CashDelta and Positions.'
     
 '''

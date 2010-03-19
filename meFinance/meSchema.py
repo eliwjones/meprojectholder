@@ -211,6 +211,10 @@ def buildDesireKey(step,algKey):
     keyname   = newstep + '_' + newalgKey
     return keyname
 
+def buildAlgKey(id):
+    keyname = str(id).rjust(6,'0')
+    return keyname
+
 def convertAlgKeys():
     result = db.GqlQuery("Select * from meAlg").fetch(10000)
 
