@@ -25,7 +25,7 @@ class stepDate(db.Model):
     step = db.IntegerProperty(required=True)
     date = db.DateTimeProperty(required=True)
 
-class meAlg(db.Model):
+class meAlg(db.Model):                                          # Need to implement 0-padded key_name for consistency.
     TradeSize = db.FloatProperty(required=True,indexed=False)
     BuyDelta  = db.FloatProperty(required=True,indexed=False)
     SellDelta = db.FloatProperty(required=True,indexed=False)
@@ -35,12 +35,12 @@ class meAlg(db.Model):
 class desire(db.Model):                                         # key_name = step + "_" + meAlg.key().name()
     desire = db.BlobProperty(required=True)                     # Serialized dict() with appropriate desire.
 
-class meDesire(db.Model):
+class meDesire(db.Model):                                       # Used for stucturing desire.  Needed anymore?
     Symbol = db.StringProperty(required=True)
     Shares = db.IntegerProperty(required=True)
     Price  = db.FloatProperty(required=True)
 
-class algStats(db.Model):
+class algStats(db.Model):                                       # key_name = meAlg.key().name()
     Cash      = db.FloatProperty(required=True)
     CashDelta = db.BlobProperty(required=True)                  # Last N values returned by mergePostion() or 0.
     Positions = db.BlobProperty(required=True)                  # Serialized dict() of stock positions.
@@ -204,4 +204,36 @@ def getCredentials(email):
 def wipeOutCreds():
     results = db.GqlQuery("Select __key__ From GDATACredentials").fetch(100)
     db.delete(results)
+
+def buildDesireKey(step,algKey):
+    newstep   = str(step).rjust(7,'0')
+    newalgKey = algKey.rjust(6,'0')
+    keyname   = newstep + '_' + newalgKey
+    return keyname
+
+def convertAlgKeys():
+    result = db.GqlQuery("Select * from meAlg").fetch(10000)
+
+    deleteMe = []
+    putMe    = []
+
+    for alg in result:
+        key = alg.key().name().rjust(6,'0')
+        newAlg = meAlg(key_name  = key,
+                       TradeSize = alg.TradeSize,
+                       BuyDelta  = alg.BuyDelta,
+                       SellDelta = alg.SellDelta,
+                       TimeDelta = alg.TimeDelta,
+                       Cash      = alg.Cash)
+        deleteMe.append(alg)
+        putMe.append(newAlg)
+        if len(deleteMe) > 100:
+            db.delete(deleteMe)
+            db.put(putMe)
+            deleteMe = []
+            putMe = []
+
+    if len(deleteMe) + len(putMe) > 0:
+        db.delete(deleteMe)
+        db.put(putMe)
 

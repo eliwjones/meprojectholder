@@ -1,13 +1,17 @@
+import meSchema
+from google.appengine.ext import db
+from google.appengine.api.datastore import Key
+
 def generatePositions():
-    pos = {}
-    des = {}
     price = 50.00
     shares = 100
     for i in [-1,1]:
         for j in [-1,1]:
             for s in [shares-30,shares,shares+30]:
                 for p in [price-10,price,price+10]:
-                    des['HBC'] = {'Shares' : j*s,
+                    des = {}
+                    pos = {}
+                    des['INTC'] = {'Shares' : j*s,
                                   'Price'  : p,
                                   'Value'  : j*s*p}
                     pos['HBC'] = {'Shares' : i*shares,
@@ -15,14 +19,37 @@ def generatePositions():
                                   'Value'  : i*shares*price}
                     cashdelta = mergePosition(des,pos)
                     print cashdelta
-                    print ''
+
+def moveAlgorithms():
+    print 'move algorithms towards better positions'
+
+def processDesires(desires):
+    print 'merge desires into positions and adjust cash level'
+
+def getDesires(step,alphaAlg='0',omegaAlg='999999'):
+    alpha = meSchema.buildDesireKey(step, alphaAlg)
+    alpha = Key.from_path('desire',alpha)
+    omega = meSchema.buildDesireKey(step, omegaAlg)
+    omega = Key.from_path('desire',omega)
+    desires = db.GqlQuery("Select * from desire Where __key__ > :1 AND __key__ < :2",alpha,omega).fetch(5000)
+    return desires
+
+def updateAlgStats(step):
+    print 'updating'
+    algstats = getAlgStats()
+    desires = getDesires(step)
+
+def getAlgStats():
+    print 'get algStat info: Cash, CashDelta and Positions.'
     
 '''
    Returns cash value indicating money locked up or released by given trade.
    Must be modified to handle putting position changes to datastore.
 
    positions:
-       {'stck' : [shares,price,value]}
+       {'stck' : {'Shares' : shares,
+                  'Price'  : price,
+                  'Value'  : value } }
 
        shares: -+ value depending on long/short.
        price:  price when position was entered.
@@ -30,8 +57,6 @@ def generatePositions():
 '''
 
 def mergePosition(desire,positions):
-    print positions
-    print desire
     cash = 0
     for pos in desire:
         if pos in positions:
@@ -60,12 +85,13 @@ def mergePosition(desire,positions):
                 positions[pos]['Price'] = (positions[pos]['Value'])/(positions[pos]['Shares'])
         else:
             cash = -abs(desire[pos]['Value'])
-            positions[pos] = [desire[pos]['Shares'],desire[pos]['Price'],desire[pos]['Value']]
-    print positions
+            positions[pos] = {'Shares' : desire[pos]['Shares'],
+                              'Price'  : desire[pos]['Price'],
+                              'Value'  : desire[pos]['Value']}
     return cash
 
 def main():
-    generatePositions()
+    print 'Nothing'
 
 if __name__ == "__main__":
     main()
