@@ -1,4 +1,5 @@
 import meSchema
+from pickle import dumps
 from google.appengine.ext import db
 from google.appengine.api.datastore import Key
 
@@ -20,6 +21,21 @@ def generatePositions():
                     cashdelta = mergePosition(des,pos)
                     print cashdelta
 
+def initializeAlgStats():
+    meList = []
+    algs = db.GqlQuery("Select * from meAlg order by __key__").fetch(5000)
+    for alg in algs:
+        algstat = meSchema.algStats(key_name  = alg.key().name(),
+                                    Cash      = alg.Cash,
+                                    CashDelta = dumps([]),
+                                    Positions = dumps({}))
+        meList.append(algstat)
+        if len(meList) == 100:
+            db.put(meList)
+            meList = []
+    if len(meList) > 0:
+        db.put(meList)
+
 def moveAlgorithms():
     print 'move algorithms towards better positions'
 
@@ -35,17 +51,21 @@ def getDesires(step,alphaAlg='0',omegaAlg='999999'):
     return desires
 
 def updateAlgStats(step):
-    print 'updating'
     algstats = getAlgStats()
     desires = getDesires(step)
+    for alg in algstats:
+        if str(step) + "_" + alg.key().name() in desires:
+            print 'merge desire'
+        else:
+            print 'merge zero desire'
 
 def getAlgStats(alphaAlg='0',omegaAlg='999999'):
     alpha = meSchema.buildAlgKey(alphaAlg)
-    alpha = Key.from_path('meAlg',alpha)
+    alpha = Key.from_path('algStats',alpha)
     omega = meSchema.buildAlgKey(omegaAlg)
-    omega = Key.from_path('meAlg',omega)
+    omega = Key.from_path('algStats',omega)
     algs = db.GqlQuery("Select * from algStats Where __key__ > :1 AND __key__ < :2",alpha,omega).fetch(5000)
-    print 'get algStat info: Cash, CashDelta and Positions.'
+    return algs
     
 '''
    Returns cash value indicating money locked up or released by given trade.
