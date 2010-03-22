@@ -1,5 +1,5 @@
 import meSchema
-from pickle import dumps
+from pickle import dumps, loads
 from google.appengine.ext import db
 from google.appengine.api.datastore import Key
 
@@ -13,28 +13,34 @@ def generatePositions():
                     des = {}
                     pos = {}
                     des['INTC'] = {'Shares' : j*s,
-                                  'Price'  : p,
-                                  'Value'  : j*s*p}
-                    pos['HBC'] = {'Shares' : i*shares,
-                                  'Price'  : price,
-                                  'Value'  : i*shares*price}
+                                   'Price'  : p,
+                                   'Value'  : j*s*p}
+                    pos['HBC']  = {'Shares' : i*shares,
+                                   'Price'  : price,
+                                   'Value'  : i*shares*price}
                     cashdelta = mergePosition(des,pos)
                     print cashdelta
 
-def initializeAlgStats():
-    meList = []
-    algs = db.GqlQuery("Select * from meAlg order by __key__").fetch(5000)
-    for alg in algs:
-        algstat = meSchema.algStats(key_name  = alg.key().name(),
-                                    Cash      = alg.Cash,
-                                    CashDelta = dumps([]),
-                                    Positions = dumps({}))
-        meList.append(algstat)
-        if len(meList) == 100:
-            db.put(meList)
-            meList = []
-    if len(meList) > 0:
-        db.put(meList)
+def updateAlgStats(step):
+    algstats = getAlgStats()
+    desires = getDesires(step)
+    alglist = []
+    for alg in algstats:
+        desireKey = meSchema.buildDesireKey(step,alg.key().name())
+        if desireKey in desires:
+            cash, position = mergePosition(loads(desires[desireKey].desire),loads(alg.Positions))
+            # Must change alg.CashDelta to collection so can append to front of list.
+            cash += alg.Cash
+            if cash > 0:
+                alg.Cash = cash
+                alg.Positions = dumps(position)
+            else:
+                do = None # Merge in 0 CashDelta for Step.
+            alglist.append(alg)
+        else:
+            alglist.append(alg)
+            # Merge in 0 CashDelta for Step.
+    meSchema.batchPut(alglist)
 
 def moveAlgorithms():
     print 'move algorithms towards better positions'
@@ -47,24 +53,20 @@ def getDesires(step,alphaAlg='0',omegaAlg='999999'):
     alpha = Key.from_path('desire',alpha)
     omega = meSchema.buildDesireKey(step, omegaAlg)
     omega = Key.from_path('desire',omega)
-    desires = db.GqlQuery("Select * from desire Where __key__ > :1 AND __key__ < :2",alpha,omega).fetch(5000)
-    return desires
-
-def updateAlgStats(step):
-    algstats = getAlgStats()
-    desires = getDesires(step)
-    for alg in algstats:
-        if str(step) + "_" + alg.key().name() in desires:
-            print 'merge desire'
-        else:
-            print 'merge zero desire'
+    query = db.GqlQuery("Select * from desire Where __key__ > :1 AND __key__ < :2",alpha,omega)
+    desires = query.fetch(5000)
+    desireDict = {}
+    for desire in desires:
+        desireDict[desire.key().name()] = desire
+    return desireDict
 
 def getAlgStats(alphaAlg='0',omegaAlg='999999'):
     alpha = meSchema.buildAlgKey(alphaAlg)
     alpha = Key.from_path('algStats',alpha)
     omega = meSchema.buildAlgKey(omegaAlg)
     omega = Key.from_path('algStats',omega)
-    algs = db.GqlQuery("Select * from algStats Where __key__ > :1 AND __key__ < :2",alpha,omega).fetch(5000)
+    query = db.GqlQuery("Select * from algStats Where __key__ > :1 AND __key__ < :2",alpha,omega)
+    algs = query.fetch(5000)
     return algs
     
 '''
@@ -113,7 +115,23 @@ def mergePosition(desire,positions):
             positions[pos] = {'Shares' : desire[pos]['Shares'],
                               'Price'  : desire[pos]['Price'],
                               'Value'  : desire[pos]['Value']}
-    return cash
+    return cash, positions
+
+
+def initializeAlgStats():
+    meList = []
+    algs = db.GqlQuery("Select * from meAlg order by __key__").fetch(5000)
+    for alg in algs:
+        algstat = meSchema.algStats(key_name  = alg.key().name(),
+                                    Cash      = alg.Cash,
+                                    CashDelta = dumps([]),
+                                    Positions = dumps({}))
+        meList.append(algstat)
+        if len(meList) == 100:
+            db.put(meList)
+            meList = []
+    if len(meList) > 0:
+        db.put(meList)
 
 def main():
     print 'Nothing'

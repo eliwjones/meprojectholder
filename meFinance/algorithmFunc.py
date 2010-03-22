@@ -18,13 +18,14 @@ def doAlgs(step,startAlg,stopAlg):
         db.put(meList)
 
 def algorithmDo(keyname,step):
+    keyname = meSchema.buildAlgKey(keyname)
     dna = meSchema.memGet(meSchema.meAlg,keyname)
     tradesize = dna.TradeSize
     buy = dna.BuyDelta
     sell = dna.SellDelta
 
     for stckID in [1,2,3,4]:
-        deltakey = str(stckID) + "_" + str(step)
+        deltakey = str(stckID) + "_" + str(step)    # Must eventually change key to 0-padded.
         cval = meSchema.decompCval(deltakey)
         
         if cval is None or len(cval) < dna.TimeDelta + 1:
