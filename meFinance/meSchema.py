@@ -45,15 +45,25 @@ class algStats(db.Model):                                       # key_name = meA
     CashDelta = db.BlobProperty(required=True)                  # Last N values returned by mergePostion() or 0.
     Positions = db.BlobProperty(required=True)                  # Serialized dict() of stock positions.
 
-def batchPut(entities):
+def batchPut(entities, cache=False, memkey=None, time=0):
     batch = []
     for entity in entities:
         batch.append(entity)
-        if len(batch) > 100:
+        if len(batch) > 800:
             db.put(batch)
             batch=[]
     if len(batch) > 0:
         db.put(batch)
+    if cache:
+        memcache.set(memkey,entities,time)
+
+def memGqlQuery(query, n, time=0):
+    memkey = query + "_" + str(n)
+    result = memcache.get(memkey)
+    if result is None:
+        result = db.GqlQuery(query).fetch(n)
+        memcache.set(memkey, result, time)
+    return result
 
 def memPutGet(model,keyname,time=0):
     memkey = model.kind() + keyname

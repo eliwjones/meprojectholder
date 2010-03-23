@@ -40,7 +40,8 @@ def updateAlgStats(step):
         else:
             alglist.append(alg)
             # Merge in 0 CashDelta for Step.
-    meSchema.batchPut(alglist)
+    memkey = getAlgQueryStr() + "_5000"
+    meSchema.batchPut(alglist, True, memkey, 30000)
 
 def moveAlgorithms():
     print 'move algorithms towards better positions'
@@ -50,25 +51,27 @@ def processDesires(desires):
 
 def getDesires(step,alphaAlg='0',omegaAlg='999999'):
     alpha = meSchema.buildDesireKey(step, alphaAlg)
-    alpha = Key.from_path('desire',alpha)
     omega = meSchema.buildDesireKey(step, omegaAlg)
-    omega = Key.from_path('desire',omega)
-    query = db.GqlQuery("Select * from desire Where __key__ > :1 AND __key__ < :2",alpha,omega)
-    desires = query.fetch(5000)
+    model = 'desire'
+    query = "Select * from %s Where __key__ > Key('%s','%s') AND __key__ < Key('%s','%s')" % (model,model,alpha,model,omega)
+    desires = db.GqlQuery(query).fetch(5000)
     desireDict = {}
     for desire in desires:
         desireDict[desire.key().name()] = desire
     return desireDict
 
 def getAlgStats(alphaAlg='0',omegaAlg='999999'):
-    alpha = meSchema.buildAlgKey(alphaAlg)
-    alpha = Key.from_path('algStats',alpha)
-    omega = meSchema.buildAlgKey(omegaAlg)
-    omega = Key.from_path('algStats',omega)
-    query = db.GqlQuery("Select * from algStats Where __key__ > :1 AND __key__ < :2",alpha,omega)
-    algs = query.fetch(5000)
+    query = getAlgQueryStr(alphaAlg,omegaAlg)
+    algs = meSchema.memGqlQuery(query,5000,30000)
     return algs
-    
+
+def getAlgQueryStr(alphaAlg='0',omegaAlg='999999'):
+    alpha = meSchema.buildAlgKey(alphaAlg)
+    omega = meSchema.buildAlgKey(omegaAlg)
+    model = 'algStats'
+    query = "Select * from %s Where __key__ > Key('%s','%s') AND __key__ < Key('%s','%s')" % (model,model,alpha,model,omega)
+    return query
+
 '''
    Returns cash value indicating money locked up or released by given trade.
    Must be modified to handle putting position changes to datastore.
