@@ -24,24 +24,22 @@ def generatePositions():
 def updateAlgStats(step):
     algstats = getAlgStats()
     desires = getDesires(step)
-    alglist = []
+    alglist = {}
     for alg in algstats:
-        desireKey = meSchema.buildDesireKey(step,alg.key().name())
-        if desireKey in desires:
-            cash, position = mergePosition(loads(desires[desireKey].desire),loads(alg.Positions))
+        desireKey = meSchema.buildDesireKey(step,alg)
+        if desires[desireKey] is not None:
+            cash, position = mergePosition(loads(desires[desireKey].desire),loads(algstats[alg].Positions))
             # Must change alg.CashDelta to collection so can append to front of list.
-            cash += alg.Cash
+            cash += algstats[alg].Cash
             if cash > 0:
-                alg.Cash = cash
-                alg.Positions = dumps(position)
-            else:
-                do = None # Merge in 0 CashDelta for Step.
-            alglist.append(alg)
+                algstats[alg].Cash = cash
+                algstats[alg].Positions = dumps(position)
+                alglist[alg] = algstats[alg]
         else:
-            alglist.append(alg)
-            # Merge in 0 CashDelta for Step.
-    memkey = getAlgQueryStr() + "_5000"
-    meSchema.batchPut(alglist, True, memkey, 30000)
+            pass
+            # alglist.append(algstats[alg])
+            # Deal only with modified algStats.
+    meSchema.memPut_multi(alglist)
 
 def moveAlgorithms():
     print 'move algorithms towards better positions'
@@ -49,20 +47,22 @@ def moveAlgorithms():
 def processDesires(desires):
     print 'merge desires into positions and adjust cash level'
 
-def getDesires(step,alphaAlg='0',omegaAlg='999999'):
-    alpha = meSchema.buildDesireKey(step, alphaAlg)
-    omega = meSchema.buildDesireKey(step, omegaAlg)
-    model = 'desire'
-    query = "Select * from %s Where __key__ > Key('%s','%s') AND __key__ < Key('%s','%s')" % (model,model,alpha,model,omega)
-    desires = db.GqlQuery(query).fetch(5000)
-    desireDict = {}
-    for desire in desires:
-        desireDict[desire.key().name()] = desire
-    return desireDict
+def getDesires(step,alphaAlg=1,omegaAlg=2400):
+    keylist = []
+    model = meSchema.desire
+    for i in range(alphaAlg,omegaAlg+1):
+        key_name = meSchema.buildDesireKey(step, str(i))
+        keylist.append(key_name)
+    desires = meSchema.memGet_multi(model,keylist)
+    return desires
 
-def getAlgStats(alphaAlg='0',omegaAlg='999999'):
-    query = getAlgQueryStr(alphaAlg,omegaAlg)
-    algs = meSchema.memGqlQuery(query,5000,30000)
+def getAlgStats(alphaAlg=1,omegaAlg=2400):
+    keylist = []
+    model = meSchema.algStats
+    for i in range(alphaAlg,omegaAlg+1):
+        key_name = meSchema.buildAlgKey(str(i))
+        keylist.append(key_name)
+    algs = meSchema.memGet_multi(model,keylist)
     return algs
 
 def getAlgQueryStr(alphaAlg='0',omegaAlg='999999'):
