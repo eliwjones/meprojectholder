@@ -120,21 +120,43 @@ def mergePosition(desire,positions):
                               'Value'  : desire[pos]['Value']}
     return cash, positions
 
+def closeoutPositions(step):
+    algstats = getAlgStats()
+    alglist = {}
+    desires = {}
+    prices = {}
+    for stckID in [1,2,3,4]:
+        symbol = meSchema.getStckSymbol(stckID)
+        pricekey = str(stckID)+"_"+str(step)
+        price = meSchema.memGet(meSchema.stck,pricekey,priority=0).quote
+        prices[symbol] = price
+    for alg in algstats:
+        desires[alg] = loads(algstats[alg].Positions)
+        for stck in desires[alg]:
+            desires[alg][stck]['Shares'] *= -1
+            desires[alg][stck]['Price']   = prices[stck]
+            desires[alg][stck]['Value']   = prices[stck]*(desires[alg][stck]['Shares'])
+        cash,positions = mergePosition(desires[alg],loads(algstats[alg].Positions))
+        cash += algstats[alg].Cash
+        algstats[alg].Cash = cash
+        algstats[alg].Positions = dumps(positions)
+        alglist[alg] = algstats[alg]
+    return alglist
+    
 
 def initializeAlgStats():
     meList = []
+    meDict = {}
     algs = db.GqlQuery("Select * from meAlg order by __key__").fetch(5000)
     for alg in algs:
-        algstat = meSchema.algStats(key_name  = alg.key().name(),
+        key = alg.key().name()
+        algstat = meSchema.algStats(key_name  = key,
                                     Cash      = alg.Cash,
                                     CashDelta = dumps([]),
                                     Positions = dumps({}))
-        meList.append(algstat)
-        if len(meList) == 100:
-            db.put(meList)
-            meList = []
-    if len(meList) > 0:
-        db.put(meList)
+        #meList.append(algstat)
+        meDict[key] = algstat
+    meSchema.memPut_multi(meDict)
 
 def main():
     print 'Nothing'

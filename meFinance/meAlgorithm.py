@@ -2,6 +2,7 @@ from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.api.labs import taskqueue
 import algorithmFunc
+import princeFunc
 
 class go(webapp.RequestHandler):
     def get(self):
@@ -26,7 +27,8 @@ class go(webapp.RequestHandler):
             else:
                 n = int(n)
             if n < globalstop:
-                algorithmFunc.doAlgs(n,1,2400)
+                algorithmFunc.doAlgs(n,1,2400)     # Algorithms express desires
+                princeFunc.updateAlgStats(n)       # Prince processes desires and updates algStats
                 n += 1
                 self.redirect('/algorithms/go?task=loop&n=%s&globalstop=%s'%(n,globalstop))
             else:

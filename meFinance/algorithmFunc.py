@@ -39,7 +39,7 @@ def algorithmDo(keyname,step):
             if not recent:
                 action = makeDesire(stckID,keyname,step,buysell,tradesize,dna.Cash)
                 meSchema.memcacheSet(action.key().name() + "_" + str(buysell),1)
-                return action
+                return action    # add action/desire to list and return list ?
     return None
 
 def recency(keyname,step,stckID,buysell,timedelta):

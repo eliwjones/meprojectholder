@@ -160,9 +160,12 @@ def memPut_multi(entities):                     # Must add in code to handle pro
             putlist = []
     if len(putlist) > 0:
         db.put(putlist)
-    memcache.set_multi(cachedict)
     for key in cachedict:
         cachepy.set(key,cachedict[key])
+    for key in cachedict:
+        if cachedict[key] is not None:
+            cachedict[key] = db.model_to_protobuf(cachedict[key]).Encode()
+    memcache.set_multi(cachedict)
 
 def getMissingKeys(keylist,dictionary):
     meList = []
