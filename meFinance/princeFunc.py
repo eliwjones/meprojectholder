@@ -96,10 +96,10 @@ def mergePosition(desire,positions):
                 stockDiff = abs(positions[pos]['Shares']) - abs(desire[pos]['Shares'])
                 priceDiff = positions[pos]['Price'] - desire[pos]['Price']
                 if stockDiff >= 0:
-                    cash  = abs(desire[pos]['Shares'])*positions[pos]['Price']
+                    cash += abs(desire[pos]['Shares'])*positions[pos]['Price']
                     cash += desire[pos]['Shares']*priceDiff
                 else:
-                    cash  = abs(positions[pos]['Shares'])*positions[pos]['Price']
+                    cash += abs(positions[pos]['Shares'])*positions[pos]['Price']
                     cash += (-1)*positions[pos]['Shares']*priceDiff
                     cash -= abs(stockDiff)*(desire[pos]['Price'])
                     positions[pos]['Price'] = desire[pos]['Price']
@@ -109,15 +109,16 @@ def mergePosition(desire,positions):
                 else:
                     positions[pos]['Value'] = positions[pos]['Shares']*positions[pos]['Price']
             else:
-                cash = -abs(desire[pos]['Value'])
+                cash += -abs(desire[pos]['Value'])
                 positions[pos]['Shares'] += desire[pos]['Shares']
                 positions[pos]['Value'] += desire[pos]['Value']
                 positions[pos]['Price'] = (positions[pos]['Value'])/(positions[pos]['Shares'])
         else:
-            cash = -abs(desire[pos]['Value'])
+            cash += -abs(desire[pos]['Value'])
             positions[pos] = {'Shares' : desire[pos]['Shares'],
                               'Price'  : desire[pos]['Price'],
                               'Value'  : desire[pos]['Value']}
+        cash -= 9.95                                           # Must subtract trade commission
     return cash, positions
 
 def closeoutPositions(step):
@@ -154,7 +155,6 @@ def initializeAlgStats():
                                     Cash      = alg.Cash,
                                     CashDelta = dumps([]),
                                     Positions = dumps({}))
-        #meList.append(algstat)
         meDict[key] = algstat
     meSchema.memPut_multi(meDict)
 
