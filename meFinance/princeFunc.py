@@ -21,9 +21,9 @@ def generatePositions():
                     cashdelta = mergePosition(des,pos)
                     print cashdelta
 
-def updateAlgStats(step):
-    algstats = getAlgStats()
-    desires = getDesires(step)
+def updateAlgStats(step,alphaAlg=1,omegaAlg=2400):
+    algstats = getAlgStats(alphaAlg,omegaAlg)
+    desires = getDesires(step,alphaAlg,omegaAlg)
     alglist = {}
     for alg in algstats:
         desireKey = meSchema.buildDesireKey(step,alg)

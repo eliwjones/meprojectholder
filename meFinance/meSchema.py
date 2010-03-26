@@ -111,6 +111,18 @@ def memGet(model,keyname,priority=1,time=0):
     return result
 
 def memGet_multi(model,keylist):
+    returnDict = {}
+    batchkeys = []
+    for key in keylist:
+        batchkeys.append(key)
+        if len(batchkeys) > 900:
+            returnDict.update(memGet_multi_base(model,batchkeys))
+            batchkeys = []
+    if len(batchkeys) > 0:
+        returnDict.update(memGet_multi_base(model,batchkeys))
+    return returnDict
+
+def memGet_multi_base(model,keylist):
     cachepykeylist = []
     entitykeylist = []
     memEntities = {}

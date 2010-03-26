@@ -9,6 +9,9 @@ class go(webapp.RequestHandler):
         self.response.headers['Content-Type'] = 'text/plain'
         self.response.out.write('I am an algorithm!\n')
         
+        import os
+        inDev = os.environ.get('SERVER_SOFTWARE', '').startswith('Dev')
+        
         task       = str(self.request.get('task'))
         globalstop = str(self.request.get('globalstop'))
         if self.request.get('step') != '':
@@ -19,7 +22,7 @@ class go(webapp.RequestHandler):
             for i in range(1,1602,800): 
                 taskAdd("Algs-"+str(i)+"-"+str(i+799)+"-step-"+str(step)+"-"+uniquifier,
                         step, globalstop, uniquifier, i, i+799, 0)
-        elif task == 'loop':
+        elif task == 'loop' and inDev:
             globalstop = int(globalstop)
             n = str(self.request.get('n'))
             if n == '':
@@ -33,6 +36,8 @@ class go(webapp.RequestHandler):
                 self.redirect('/algorithms/go?task=loop&n=%s&globalstop=%s'%(n,globalstop))
             else:
                 self.response.out.write('Done with step %s!\n'%n)
+        elif task == 'loop' and not inDev:
+            self.response.out.write('I refuse to loop when not in Dev!')
         else:
             startAlg = int(self.request.get('start'))
             stopAlg  = int(self.request.get('stop'))
@@ -47,6 +52,7 @@ class go(webapp.RequestHandler):
         stopAlg    = int(self.request.get('stop'))
 
         algorithmFunc.doAlgs(step,startAlg,stopAlg)
+        princeFunc.updateAlgStats(step,startAlg,stopAlg)
         if step < globalstop:
             step += 1
             taskAdd("Algs-"+str(startAlg)+"-"+str(stopAlg)+"-step-"+str(step)+"-"+uniquifier,
