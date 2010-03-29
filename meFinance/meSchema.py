@@ -49,7 +49,7 @@ def batchPut(entities, cache=False, memkey=None, time=0):
     batch = []
     for entity in entities:
         batch.append(entity)
-        if len(batch) > 800:
+        if len(batch) > 100:
             db.put(batch)
             batch=[]
     if len(batch) > 0:
@@ -110,7 +110,7 @@ def memGet(model,keyname,priority=1,time=0):
         cachepy.set(memkey,result,priority=priority)
     return result
 
-def memGet_multi(model,keylist):
+def memGet_multi_vOLD(model,keylist):
     returnDict = {}
     batchkeys = []
     for key in keylist:
@@ -122,7 +122,7 @@ def memGet_multi(model,keylist):
         returnDict.update(memGet_multi_base(model,batchkeys))
     return returnDict
 
-def memGet_multi_base(model,keylist):
+def memGet_multi(model,keylist):
     cachepykeylist = []
     entitykeylist = []
     memEntities = {}
@@ -160,20 +160,20 @@ def memGet_multi_base(model,keylist):
         EntityDict[newkey] = memEntities[key]
     return EntityDict
 
-def memPut_multi(entities):                     # Must add in code to handle protobuff for memcache set_multi? (or drop protobuff technique?)
+def memPut_multi(entities, priority=0):                     # Must add in code to handle protobuff for memcache set_multi? (or drop protobuff technique?)
     putlist = []
     cachedict = {}
     for key in entities:
         putlist.append(entities[key])
         memkey = entities[key].kind() + key
         cachedict[memkey] = entities[key]
-        if len(putlist) > 800:
+        if len(putlist) > 100:
             db.put(putlist)
             putlist = []
     if len(putlist) > 0:
         db.put(putlist)
     for key in cachedict:
-        cachepy.set(key,cachedict[key])
+        cachepy.set(key,cachedict[key], priority=priority)
     for key in cachedict:
         if cachedict[key] is not None:
             cachedict[key] = db.model_to_protobuf(cachedict[key]).Encode()

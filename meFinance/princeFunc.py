@@ -1,25 +1,6 @@
 import meSchema
-from pickle import dumps, loads
 from google.appengine.ext import db
 from google.appengine.api.datastore import Key
-
-def generatePositions():
-    price = 50.00
-    shares = 100
-    for i in [-1,1]:
-        for j in [-1,1]:
-            for s in [shares-30,shares,shares+30]:
-                for p in [price-10,price,price+10]:
-                    des = {}
-                    pos = {}
-                    des['INTC'] = {'Shares' : j*s,
-                                   'Price'  : p,
-                                   'Value'  : j*s*p}
-                    pos['HBC']  = {'Shares' : i*shares,
-                                   'Price'  : price,
-                                   'Value'  : i*shares*price}
-                    cashdelta = mergePosition(des,pos)
-                    print cashdelta
 
 def updateAlgStats(step,alphaAlg=1,omegaAlg=2400):
     algstats = getAlgStats(alphaAlg,omegaAlg)
@@ -28,18 +9,18 @@ def updateAlgStats(step,alphaAlg=1,omegaAlg=2400):
     for alg in algstats:
         desireKey = meSchema.buildDesireKey(step,alg)
         if desires[desireKey] is not None:
-            cash, position = mergePosition(loads(desires[desireKey].desire),loads(algstats[alg].Positions))
+            cash, position = mergePosition(eval(desires[desireKey].desire),eval(algstats[alg].Positions))
             # Must change alg.CashDelta to collection so can append to front of list.
             cash += algstats[alg].Cash
             if cash > 0:
                 algstats[alg].Cash = cash
-                algstats[alg].Positions = dumps(position)
+                algstats[alg].Positions = repr(position)
                 alglist[alg] = algstats[alg]
         else:
             pass
             # alglist.append(algstats[alg])
             # Deal only with modified algStats.
-    meSchema.memPut_multi(alglist)
+    #meSchema.memPut_multi(alglist)
 
 def moveAlgorithms():
     print 'move algorithms towards better positions'
@@ -102,6 +83,7 @@ def mergePosition(desire,positions):
                     cash += abs(positions[pos]['Shares'])*positions[pos]['Price']
                     cash += (-1)*positions[pos]['Shares']*priceDiff
                     cash -= abs(stockDiff)*(desire[pos]['Price'])
+                    cash -= 9.95                                         # Need this since Closing and Opening.
                     positions[pos]['Price'] = desire[pos]['Price']
                 positions[pos]['Shares'] += desire[pos]['Shares']
                 if positions[pos]['Shares'] == 0:
@@ -118,7 +100,7 @@ def mergePosition(desire,positions):
             positions[pos] = {'Shares' : desire[pos]['Shares'],
                               'Price'  : desire[pos]['Price'],
                               'Value'  : desire[pos]['Value']}
-        cash -= 9.95                                           # Must subtract trade commission
+        cash -= 9.95                                                     # Must subtract trade commission.
     return cash, positions
 
 def closeoutPositions(step):
@@ -132,15 +114,15 @@ def closeoutPositions(step):
         price = meSchema.memGet(meSchema.stck,pricekey,priority=0).quote
         prices[symbol] = price
     for alg in algstats:
-        desires[alg] = loads(algstats[alg].Positions)
+        desires[alg] = eval(algstats[alg].Positions)
         for stck in desires[alg]:
             desires[alg][stck]['Shares'] *= -1
             desires[alg][stck]['Price']   = prices[stck]
             desires[alg][stck]['Value']   = prices[stck]*(desires[alg][stck]['Shares'])
-        cash,positions = mergePosition(desires[alg],loads(algstats[alg].Positions))
+        cash,positions = mergePosition(desires[alg],eval(algstats[alg].Positions))
         cash += algstats[alg].Cash
         algstats[alg].Cash = cash
-        algstats[alg].Positions = dumps(positions)
+        algstats[alg].Positions = repr(positions)
         alglist[alg] = algstats[alg]
     return alglist
     
@@ -148,18 +130,20 @@ def closeoutPositions(step):
 def initializeAlgStats():
     meList = []
     meDict = {}
-    algs = db.GqlQuery("Select * from meAlg order by __key__").fetch(5000)
-    for alg in algs:
-        key = alg.key().name()
-        algstat = meSchema.algStats(key_name  = key,
-                                    Cash      = alg.Cash,
-                                    CashDelta = dumps([]),
-                                    Positions = dumps({}))
-        meDict[key] = algstat
+    count = 1000
+    cursor = None
+    while count == 1000:
+        query = meSchema.meAlg.all()
+        if cursor is not None:
+            query.with_cursor(cursor)
+        algs = query.fetch(1000)
+        for alg in algs:
+            key = alg.key().name()
+            algstat = meSchema.algStats(key_name  = key,
+                                        Cash      = alg.Cash,
+                                        CashDelta = repr([]),
+                                        Positions = repr({}))
+            meDict[key] = algstat
+        cursor = query.cursor()
+        count = len(algs)
     meSchema.memPut_multi(meDict)
-
-def main():
-    print 'Nothing'
-
-if __name__ == "__main__":
-    main()

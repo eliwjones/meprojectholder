@@ -92,7 +92,6 @@ def buySell(tradesize,buy,sell,cue):
     
 def makeDesire(stckID,keyname,step,buysell,tradesize,cash):
     from math import floor
-    from pickle import dumps
     symbol = meSchema.getStckSymbol(stckID)
     pricekey = str(stckID)+"_"+str(step)
     price = meSchema.memGet(meSchema.stck,pricekey,priority=0).quote
@@ -103,7 +102,8 @@ def makeDesire(stckID,keyname,step,buysell,tradesize,cash):
     desire[symbol] = {'Shares' : shares,
                       'Price'  : price,
                       'Value'  : price*shares}
-    meDesire = meSchema.desire(key_name = key_name, desire = dumps(desire))
+    desire = repr(desire)
+    meDesire = meSchema.desire(key_name = key_name, desire = desire)
     return meDesire
 
 

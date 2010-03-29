@@ -37,7 +37,7 @@ class go(webapp.RequestHandler):
             else:
                 self.response.out.write('Done with step %s!\n'%n)
         elif task == 'loop' and not inDev:
-            self.response.out.write('I refuse to loop when not in Dev!')
+            self.response.out.write('I refuse to loop when not in Dev!\n')
         else:
             startAlg = int(self.request.get('start'))
             stopAlg  = int(self.request.get('stop'))
