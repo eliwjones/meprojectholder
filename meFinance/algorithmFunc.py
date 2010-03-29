@@ -3,19 +3,16 @@ import cachepy
 from google.appengine.ext import db
 
 def doAlgs(step,startAlg,stopAlg):
-    meList = []
+    medesires = {}
     count = 0
     for i in range(startAlg,stopAlg + 1):
         desire = algorithmDo(str(i),step)
         if desire is not None:
-            meList.append(desire)
-            count += 1
-            if count == 100:
-                db.put(meList)
-                meList = []
-                count = 0
-    if count > 0:
-        db.put(meList)
+            medesires[desire.key().name()] = desire
+        else:
+            desirekey = meSchema.buildDesireKey(step,str(i))
+            medesires[desirekey] = None
+    meSchema.memPut_multi(meSchema.desire,medesires)
 
 def algorithmDo(keyname,step):
     keyname = meSchema.buildAlgKey(keyname)

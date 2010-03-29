@@ -20,7 +20,7 @@ def updateAlgStats(step,alphaAlg=1,omegaAlg=2400):
             pass
             # alglist.append(algstats[alg])
             # Deal only with modified algStats.
-    #meSchema.memPut_multi(alglist)
+    meSchema.memPut_multi(meSchema.algStats,alglist)
 
 def moveAlgorithms():
     print 'move algorithms towards better positions'
@@ -146,4 +146,4 @@ def initializeAlgStats():
             meDict[key] = algstat
         cursor = query.cursor()
         count = len(algs)
-    meSchema.memPut_multi(meDict)
+    meSchema.memPut_multi(meSchema.algStats,meDict)

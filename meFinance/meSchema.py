@@ -160,12 +160,13 @@ def memGet_multi(model,keylist):
         EntityDict[newkey] = memEntities[key]
     return EntityDict
 
-def memPut_multi(entities, priority=0):                     # Must add in code to handle protobuff for memcache set_multi? (or drop protobuff technique?)
+def memPut_multi(model, entities, priority=0):                     # Must add in code to handle protobuff for memcache set_multi? (or drop protobuff technique?)
     putlist = []
     cachedict = {}
     for key in entities:
-        putlist.append(entities[key])
-        memkey = entities[key].kind() + key
+        if entities[key] is not None:
+            putlist.append(entities[key])
+        memkey = model.kind() + key
         cachedict[memkey] = entities[key]
         if len(putlist) > 100:
             db.put(putlist)
