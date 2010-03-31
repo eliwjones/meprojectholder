@@ -19,9 +19,9 @@ class go(webapp.RequestHandler):
         if task == 'true':
             globalstop = int(globalstop)
             uniquifier = str(self.request.get('uniquifier'))
-            for i in range(1,1602,800): 
-                taskAdd("Algs-"+str(i)+"-"+str(i+799)+"-step-"+str(step)+"-"+uniquifier,
-                        step, globalstop, uniquifier, i, i+799, 0)
+            for i in range(1,2002,400): 
+                taskAdd("Algs-"+str(i)+"-"+str(i+399)+"-step-"+str(step)+"-"+uniquifier,
+                        step, globalstop, uniquifier, i, i+399, 0)
         elif task == 'loop' and inDev:
             globalstop = int(globalstop)
             n = str(self.request.get('n'))

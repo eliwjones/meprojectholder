@@ -22,7 +22,7 @@ import logging
 import os
 import medict
 
-CACHE = medict.SizedDict(4000000)
+CACHE = medict.SizedDict(1500000)
 PRIORITY_CACHE = medict.SizedDict(10000)
 CACHES = [CACHE,PRIORITY_CACHE]
 
