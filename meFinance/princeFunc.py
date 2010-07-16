@@ -1,6 +1,7 @@
 import meSchema
 from google.appengine.ext import db
 from google.appengine.api.datastore import Key
+from collections import deque
 
 def updateAlgStats(step,alphaAlg=1,omegaAlg=2400):
     algstats = getAlgStats(alphaAlg,omegaAlg)
@@ -9,12 +10,20 @@ def updateAlgStats(step,alphaAlg=1,omegaAlg=2400):
     for alg in algstats:
         desireKey = meSchema.buildDesireKey(step,alg)
         if desires[desireKey] is not None:
-            cash, position = mergePosition(eval(desires[desireKey].desire),eval(algstats[alg].Positions))
+            tradeCash, PandL, position = mergePosition(eval(desires[desireKey].desire),eval(algstats[alg].Positions))
             # Must change alg.CashDelta to collection so can append to front of list.
-            cash += algstats[alg].Cash
+            cash = tradeCash + algstats[alg].Cash
             if cash > 0:
+                from zlib import decompress, compress
+                cashdelta = eval(decompress(algstats[alg].CashDelta))  # Get CashDelta collection
+                cashdelta.appendleft({'value': tradeCash,
+                                      'PandL': PandL,
+                                      'step':  step})
+                cashdelta.pop()
+                
                 algstats[alg].Cash = cash
                 algstats[alg].Positions = repr(position)
+                algstats[alg].CashDelta = compress(repr(cashdelta),9)
                 alglist[alg] = algstats[alg]
         else:
             pass
@@ -69,6 +78,7 @@ def getAlgQueryStr(alphaAlg='0',omegaAlg='999999'):
 
 def mergePosition(desire,positions):
     cash = 0
+    PandL = 0
     for pos in desire:
         if pos in positions:
             signDes = cmp(desire[pos]['Shares'], 0)
@@ -76,15 +86,25 @@ def mergePosition(desire,positions):
             if signDes != signPos:
                 stockDiff = abs(positions[pos]['Shares']) - abs(desire[pos]['Shares'])
                 priceDiff = positions[pos]['Price'] - desire[pos]['Price']
-                if stockDiff >= 0:
+                posValue = abs(positions[pos]['Shares'])*positions[pos]['Price']
+                desValue = abs(desire[pos]['Shares'])*desire[pos]['Price']
+                tradeDistance = abs((posValue - desValue)/posValue)
+                # Check if tradeDistance is less than 20%
+                if tradeDistance < 0.2:
+                    # Set desire[pos] to -positions[pos] to close out entire position.
+                    desire[pos]['Shares'] = (-1)*positions[pos]['Shares']
                     cash += abs(desire[pos]['Shares'])*positions[pos]['Price']
-                    cash += desire[pos]['Shares']*priceDiff
+                    PandL = desire[pos]['Shares']*priceDiff
+                    cash += PandL
                 else:
                     cash += abs(positions[pos]['Shares'])*positions[pos]['Price']
-                    cash += (-1)*positions[pos]['Shares']*priceDiff
+                    PandL = (-1)*positions[pos]['Shares']*priceDiff
+                    cash += PandL
                     cash -= abs(stockDiff)*(desire[pos]['Price'])
                     cash -= 9.95                                         # Need this since Closing and Opening.
                     positions[pos]['Price'] = desire[pos]['Price']
+                # Must subtract commission from PandL
+                PandL -= 9.95
                 positions[pos]['Shares'] += desire[pos]['Shares']
                 if positions[pos]['Shares'] == 0:
                     del positions[pos]
@@ -101,7 +121,7 @@ def mergePosition(desire,positions):
                               'Price'  : desire[pos]['Price'],
                               'Value'  : desire[pos]['Value']}
         cash -= 9.95                                                     # Must subtract trade commission.
-    return cash, positions
+    return cash, PandL, positions
 
 def closeoutPositions(step):
     algstats = getAlgStats()
@@ -128,8 +148,18 @@ def closeoutPositions(step):
     
 
 def initializeAlgStats():
+    from zlib import compress
     meList = []
     meDict = {}
+
+    # Initialize cashdelta value to hold 800 trades.
+    # Must make quasi realistic to ensure I'm not exceeding entity size
+    cashdelta = deque()
+    for i in range(800):
+        value = ((1000)*i)%5001
+        step = -5199 + i
+        cashdelta.append({'step': step, 'value': value, 'PandL': 0})
+        
     count = 1000
     cursor = None
     while count == 1000:
@@ -141,7 +171,7 @@ def initializeAlgStats():
             key = alg.key().name()
             algstat = meSchema.algStats(key_name  = key,
                                         Cash      = alg.Cash,
-                                        CashDelta = repr([]),
+                                        CashDelta = compress(repr(cashdelta),9),
                                         Positions = repr({}))
             meDict[key] = algstat
         cursor = query.cursor()

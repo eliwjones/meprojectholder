@@ -32,6 +32,21 @@ class meAlg(db.Model):                                          # Need to implem
     TimeDelta = db.IntegerProperty(required=True,indexed=False)
     Cash      = db.FloatProperty(required=True,indexed=False)
 
+'''
+  Desire class has key that is combination of
+  the step and algorithm key of the alg that
+  expressed the desire on a given step.
+  
+  desire property of Desire class is a single valued
+  dictionary with the stock symbol as the key.
+
+  'Value' was originally included as a convenience.
+  Not sure if needed or even used.
+  
+  desire[symbol] = {'Shares' : shares,
+                    'Price'  : price,
+                    'Value'  : price*shares}
+'''
 class desire(db.Model):                                         # key_name = step + "_" + meAlg.key().name()
     desire = db.BlobProperty(required=True)                     # Serialized dict() with appropriate desire.
 
@@ -206,6 +221,27 @@ def decompCval(deltakey):
                 result = None
             memcache.set(memkey,result)
         cachepy.set(memkey,result)     
+    return result
+
+def decompCashDelta(keyname):
+    memkey = "CashDelta" + keyname
+    multiget = cachepy.get_multi([memkey])
+    if memkey in multiget:
+        result = multiget[memkey]
+    else:
+        multiget = memcache.get_multi([memkey])
+        if memkey in multiget:
+            result = multiget[memkey]
+        else:
+            cashdelta = algStats.get_by_key_name(keyname)
+            if cashdelta is not None:
+                from zlib import decompress
+                from collections import deque  # Needed so eval() understands what CashDelta is.
+                result = eval(decompress(cashdelta.CashDelta))
+            else:
+                result = None
+            memcache.set(memkey, result)
+        cachepy.set(memkey, result)
     return result
 
 def getStckID(stock):
