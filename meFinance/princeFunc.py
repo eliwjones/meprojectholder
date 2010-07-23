@@ -89,10 +89,17 @@ def mergePosition(desire,positions):
                 posValue = abs(positions[pos]['Shares'])*positions[pos]['Price']
                 desValue = abs(desire[pos]['Shares'])*desire[pos]['Price']
                 tradeDistance = abs((posValue - desValue)/posValue)
-                # Check if tradeDistance is less than 20%
-                if tradeDistance < 0.2:
+                # Check if tradeDistance is less than 35%
+                if tradeDistance < 0.35:
                     # Set desire[pos] to -positions[pos] to close out entire position.
                     desire[pos]['Shares'] = (-1)*positions[pos]['Shares']
+                    cash += abs(desire[pos]['Shares'])*positions[pos]['Price']
+                    PandL = desire[pos]['Shares']*priceDiff
+                    cash += PandL
+                elif stockDiff >= 0:
+                    # # Using floor/ceil to estimate "proper" percentage of position to close out.
+                    # Changing to use round() to see difference.
+                    desire[pos]['Shares'] = round(positions[pos]['Shares']/round(positions[pos]['Shares']/float(desire[pos]['Shares'])))
                     cash += abs(desire[pos]['Shares'])*positions[pos]['Price']
                     PandL = desire[pos]['Shares']*priceDiff
                     cash += PandL
@@ -104,20 +111,20 @@ def mergePosition(desire,positions):
                     cash -= 9.95                                         # Need this since Closing and Opening.
                     positions[pos]['Price'] = desire[pos]['Price']
                 # Must subtract commission from PandL
-                PandL -= 9.95
-                positions[pos]['Shares'] += desire[pos]['Shares']
+                PandL -= 20.00
+                positions[pos]['Shares'] += float(desire[pos]['Shares'])
                 if positions[pos]['Shares'] == 0:
                     del positions[pos]
                 else:
                     positions[pos]['Value'] = positions[pos]['Shares']*positions[pos]['Price']
             else:
                 cash += -abs(desire[pos]['Value'])
-                positions[pos]['Shares'] += desire[pos]['Shares']
+                positions[pos]['Shares'] += float(desire[pos]['Shares'])
                 positions[pos]['Value'] += desire[pos]['Value']
                 positions[pos]['Price'] = (positions[pos]['Value'])/(positions[pos]['Shares'])
         else:
             cash += -abs(desire[pos]['Value'])
-            positions[pos] = {'Shares' : desire[pos]['Shares'],
+            positions[pos] = {'Shares' : float(desire[pos]['Shares']),
                               'Price'  : desire[pos]['Price'],
                               'Value'  : desire[pos]['Value']}
         cash -= 9.95                                                     # Must subtract trade commission.
@@ -146,6 +153,20 @@ def closeoutPositions(step):
         alglist[alg] = algstats[alg]
     return alglist
     
+def wipeoutDesires():
+    total = 0
+    count = 100
+    cursor = None
+
+    while count == 100:
+        query = meSchema.desire.all()
+        if cursor is not None:
+            query.with_cursor(cursor)
+        desire = query.fetch(100)
+        count = len(desire)
+        db.delete(desire)
+        cursor = query.cursor()
+        total += count
 
 def initializeAlgStats():
     from zlib import compress

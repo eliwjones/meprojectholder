@@ -31,7 +31,8 @@ class go(webapp.RequestHandler):
                 n = int(n)
             if n < globalstop:
                 algorithmFunc.doAlgs(n,1,2400)     # Algorithms express desires
-                princeFunc.updateAlgStats(n)       # Prince processes desires and updates algStats
+                #commenting out so can just record desires.
+                #princeFunc.updateAlgStats(n)       # Prince processes desires and updates algStats
                 n += 1
                 self.redirect('/algorithms/go?task=loop&n=%s&globalstop=%s'%(n,globalstop))
             else:
@@ -52,7 +53,8 @@ class go(webapp.RequestHandler):
         stopAlg    = int(self.request.get('stop'))
 
         algorithmFunc.doAlgs(step,startAlg,stopAlg)
-        princeFunc.updateAlgStats(step,startAlg,stopAlg)
+        # Commenting out so can just record desires
+        #princeFunc.updateAlgStats(step,startAlg,stopAlg)
         if step < globalstop:
             step += 1
             taskAdd("Algs-"+str(startAlg)+"-"+str(stopAlg)+"-step-"+str(step)+"-"+uniquifier,
