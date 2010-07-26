@@ -56,9 +56,10 @@ class meDesire(db.Model):                                       # Used for stuct
     Price  = db.FloatProperty(required=True)
 
 class algStats(db.Model):                                       # key_name = meAlg.key().name()
-    Cash      = db.FloatProperty(required=True)
-    CashDelta = db.BlobProperty(required=True)                  # Last N values returned by mergePostion() or 0.
-    Positions = db.BlobProperty(required=True)                  # Serialized dict() of stock positions.
+    Cash      = db.FloatProperty(required=False)
+    CashDelta = db.BlobProperty(required=False)                  # Last N values returned by mergePostion() or 0.
+    PandL     = db.FloatProperty(required=False)                # total sum of all PandL from trades.
+    Positions = db.BlobProperty(required=False)                  # Serialized dict() of stock positions.
 
 def batchPut(entities, cache=False, memkey=None, time=0):
     batch = []

@@ -25,3 +25,4 @@ start  = int(sys.argv[1])
 stop   = int(sys.argv[2])
 
 openIt(strUrl,start,stop)
+print 'DONE'

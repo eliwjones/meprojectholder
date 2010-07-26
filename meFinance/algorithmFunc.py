@@ -97,7 +97,8 @@ def makeDesire(stckID,keyname,step,buysell,tradesize,cash):
 
     key_name = meSchema.buildDesireKey(step,keyname)
     desire = {}
-    shares = int((buysell)*floor((tradesize*cash)/price))
+    # Must subtract out Commission so that desire isn't expressed that cannot be cleared.
+    shares = int((buysell)*floor(((tradesize*cash) - 10.00)/price))
     desire[symbol] = {'Shares' : shares,
                       'Price'  : price,
                       'Value'  : price*shares}

@@ -23,6 +23,7 @@ def updateAlgStats(step,alphaAlg=1,omegaAlg=2400):
                 
                 algstats[alg].Cash = cash
                 algstats[alg].Positions = repr(position)
+                algstats[alg].PandL = PandL
                 algstats[alg].CashDelta = compress(repr(cashdelta),9)
                 alglist[alg] = algstats[alg]
         else:
@@ -168,6 +169,21 @@ def wipeoutDesires():
         cursor = query.cursor()
         total += count
 
+def wipeoutAlgStats():
+    total = 0
+    count = 100
+    cursor = None
+
+    while count == 100:
+        query = meSchema.algStats.all()
+        if cursor is not None:
+            query.with_cursor(cursor)
+        stats = query.fetch(100)
+        count = len(stats)
+        db.delete(stats)
+        cursor = query.cursor()
+        total += count
+
 def initializeAlgStats():
     from zlib import compress
     meList = []
@@ -176,10 +192,10 @@ def initializeAlgStats():
     # Initialize cashdelta value to hold 800 trades.
     # Must make quasi realistic to ensure I'm not exceeding entity size
     cashdelta = deque()
-    for i in range(800):
-        value = ((1000)*i)%5001
-        step = -5199 + i
-        cashdelta.append({'step': step, 'value': value, 'PandL': 0})
+    #for i in range(800):
+    #    value = ((1000)*i)%5001
+    #    step = -5199 + i
+    #    cashdelta.append({'step': step, 'value': value, 'PandL': 0})
         
     count = 1000
     cursor = None
@@ -193,6 +209,7 @@ def initializeAlgStats():
             algstat = meSchema.algStats(key_name  = key,
                                         Cash      = alg.Cash,
                                         CashDelta = compress(repr(cashdelta),9),
+                                        PandL     = 0.0,
                                         Positions = repr({}))
             meDict[key] = algstat
         cursor = query.cursor()
