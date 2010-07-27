@@ -131,6 +131,64 @@ def mergePosition(desire,positions):
         cash -= 9.95                                                     # Must subtract trade commission.
     return cash, PandL, positions
 
+def analyzeAlgPerformance():
+    stats = db.GqlQuery("Select * from algStats Order By PandL Desc").fetch(2500)
+    algkeys = []
+
+    for r in stats:
+        algkeys.append(r.key().name())
+
+    algs = meSchema.meAlg.get_by_key_name(algkeys)
+    algDict = {}
+    for alg in algs:
+        algDict[alg.key().name()] = alg
+
+    fingerprints = {}
+    fingerprints['pos_pos'] = { 'count' : 0, 'median': [], 'cash' : 0.0 }
+    fingerprints['pos_neg'] = { 'count' : 0, 'median': [], 'cash' : 0.0 }
+    fingerprints['neg_neg'] = { 'count' : 0, 'median': [], 'cash' : 0.0 }
+    fingerprints['neg_pos'] = { 'count' : 0, 'median': [], 'cash' : 0.0 }
+    for r in stats:
+        alg = algDict[r.key().name()]
+        if alg.BuyDelta > 0 and alg.SellDelta > 0:
+            fingerprints['pos_pos']['cash'] += r.PandL
+            if r.PandL != 0.0:
+                fingerprints['pos_pos']['median'].append(r.PandL)
+                fingerprints['pos_pos']['count'] += 1
+        if alg.BuyDelta > 0 and alg.SellDelta < 0:
+            fingerprints['pos_neg']['cash'] += r.PandL
+            if r.PandL != 0.0:
+                fingerprints['pos_neg']['median'].append(r.PandL)
+                fingerprints['pos_neg']['count'] += 1
+        if alg.BuyDelta < 0 and alg.SellDelta < 0:
+            fingerprints['neg_neg']['cash'] += r.PandL
+            if r.PandL != 0.0:
+                fingerprints['neg_neg']['median'].append(r.PandL)
+                fingerprints['neg_neg']['count'] += 1
+        if alg.BuyDelta < 0 and alg.SellDelta > 0:
+            fingerprints['neg_pos']['cash'] += r.PandL
+            if r.PandL != 0.0:
+                fingerprints['neg_pos']['median'].append(r.PandL)
+                fingerprints['neg_pos']['count'] += 1
+
+    for key in fingerprints:
+        fingerprints[key]['median'].sort()
+        print key
+        print "avg: " + str(fingerprints[key]['cash']/fingerprints[key]['count'])
+        print "med: " + str(fingerprints[key]['median'][len(fingerprints[key]['median'])/2])
+        print "traders: " + str(len(fingerprints[key]['median']))
+        print fingerprints[key]['cash']
+        print "--------------------------------------"
+    print "********************************"
+    for r in stats:
+        if len(eval(decompress(r.CashDelta))) > 40:
+            print r.key().name() + " : " + str(r.PandL)
+            print "trades: " + str(len(eval(decompress(r.CashDelta))))
+            alg = algDict[r.key().name()]
+            print "BuyDelta: " + str(alg.BuyDelta) + " SellDelta: " + str(alg.SellDelta) + " TradeSize: " + str(alg.TradeSize) + " TimeDelta: " + str(alg.TimeDelta)
+            print "----------------------------------------"
+
+
 def closeoutPositions(step):
     algstats = getAlgStats()
     alglist = {}
