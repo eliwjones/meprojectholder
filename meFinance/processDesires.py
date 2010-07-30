@@ -15,7 +15,10 @@ def updateAllAlgStats(alphaAlg=1,omegaAlg=2400):
 def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpacked_"):
     stats = memcache.get(memprefix + algKey)
     desires = getAlgDesires(algKey)
-    # timedelta = meSchema.meAlg.get_by_key_name(algKey).TimeDelta
+    # Grab timedelta and set memcache last buy and last sell to -10000
+    timedelta = meSchema.meAlg.get_by_key_name(algKey).TimeDelta
+    memcache.set(algKey + '_-1',-10000)
+    memcache.set(algKey + '_1', -10000)
     # Must order desire keys so that trades are executed in correct sequence.
     orderDesires = []
     for key in desires:
@@ -26,9 +29,14 @@ def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpack
             orderDesires.append(key)            
     orderDesires.sort()
     for key in orderDesires:
+        currentDesire = eval(desires[key].desire)
+        desireStep = int(key.replace('_'+algKey,''))
+        for des in currentDesire:
+            buysell = cmp(currentDesire[des]['Shares'],0)
         tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key].desire), eval(repr(stats['Positions'])))
         cash = tradeCash + eval(repr(stats['Cash']))
-        if cash > 0:
+        if cash > 0 and (memcache.get(algKey + '_' + str(buysell)) + timedelta) <= desireStep:
+            memcache.set(algKey + '_' + str(buysell), desireStep)
             stats['CashDelta'].appendleft({'value' : tradeCash,
                                            'PandL' : PandL,
                                            'step'  : key.replace('_'+algKey,'')})
@@ -38,6 +46,21 @@ def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpack
             stats['PandL'] += PandL
             stats['Positions'] = position
     memcache.set(memprefix + algKey, stats)
+
+def runBackTests(alglist):
+    # alglist is [] of algorithm key_names.
+    stop = 13715
+    monthList = [str(stop-1760*2),str(stop-1760*3),str(stop-1760*4),str(stop-1760*5),str(stop-1760*6),str(1)]
+    for alg in alglist:
+        for startMonth in monthList:
+            resetAlgstats(startMonth + "_",int(alg),int(alg))
+            updateAlgStat(alg,startMonth,str(stop),startMonth + "_")
+    keylist = []
+    for memprefix in monthList:
+        for algkey in alglist:
+            keylist.append(memprefix + '_' + algkey)
+    princeFunc.analyzeAlgPerformance(keylist)
+    
         
 
 def unpackAlgstats(memprefix = "unpacked_",alphaAlg=1,omegaAlg=2400):
@@ -78,7 +101,7 @@ def resetAlgstats(memprefix = "unpacked_",alphaAlg=1,omegaAlg=2400):
         cashdelta[key] = deque()
         #for i in range(800):
         #    cashdelta[key].append({'step' : -1, 'value' : 0.0, 'PandL' : 0.0})
-        statDict[key] = { 'Cash'      : 10000.0,
+        statDict[key] = { 'Cash'      : 20000.0,
                           'CashDelta' : cashdelta[key],
                           'PandL'     : 0.0,
                           'Positions' : {} }

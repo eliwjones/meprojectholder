@@ -2,6 +2,8 @@ import meSchema
 from google.appengine.ext import db
 from google.appengine.api.datastore import Key
 from collections import deque
+from google.appengine.api import memcache
+from zlib import compress, decompress
 
 def updateAlgStats(step,alphaAlg=1,omegaAlg=2400):
     algstats = getAlgStats(alphaAlg,omegaAlg)
@@ -14,12 +16,13 @@ def updateAlgStats(step,alphaAlg=1,omegaAlg=2400):
             # Must change alg.CashDelta to collection so can append to front of list.
             cash = tradeCash + algstats[alg].Cash
             if cash > 0:
-                from zlib import decompress, compress
                 cashdelta = eval(decompress(algstats[alg].CashDelta))  # Get CashDelta collection
                 cashdelta.appendleft({'value': tradeCash,
                                       'PandL': PandL,
                                       'step':  step})
-                cashdelta.pop()
+                # Must check len() before pop() since not padding cashdelta.
+                if len(cashdelta) > 800:
+                    cashdelta.pop()
                 
                 algstats[alg].Cash = cash
                 algstats[alg].Positions = repr(position)
@@ -131,12 +134,27 @@ def mergePosition(desire,positions):
         cash -= 9.95                                                     # Must subtract trade commission.
     return cash, PandL, positions
 
-def analyzeAlgPerformance():
-    stats = db.GqlQuery("Select * from algStats Order By PandL Desc").fetch(2500)
+def analyzeAlgPerformance(memkeylist=None):
+    stats = {}
+    if memkeylist is None:
+        dbstats = db.GqlQuery("Select * from algStats Order By PandL Desc").fetch(2500)
+        for stat in dbstats:
+            key = stat.key().name()
+            stats[key] = {'PandL'     : stat.PandL,
+                          'CashDelta' : stat.CashDelta}
+    else:
+        memstats = memcache.get_multi(memkeylist)
+        for key in memstats:
+            stats[key] = {'PandL'     : memstats[key]['PandL'],
+                          'CashDelta' : memstats[key]['CashDelta']}
+        # Must reconfigure stats into algStat model holder.
+    
     algkeys = []
 
-    for r in stats:
-        algkeys.append(r.key().name())
+    for key in stats:
+        # Must do split to handle case that I am working with memkeylist.
+        key_name = key.split('_')[-1]
+        algkeys.append(key_name)
 
     algs = meSchema.meAlg.get_by_key_name(algkeys)
     algDict = {}
@@ -144,41 +162,70 @@ def analyzeAlgPerformance():
         algDict[alg.key().name()] = alg
 
     fingerprints = {}
-    fingerprints['pos_pos'] = { 'count' : 0, 'median': [], 'cash' : 0.0 }
-    fingerprints['pos_neg'] = { 'count' : 0, 'median': [], 'cash' : 0.0 }
-    fingerprints['neg_neg'] = { 'count' : 0, 'median': [], 'cash' : 0.0 }
-    fingerprints['neg_pos'] = { 'count' : 0, 'median': [], 'cash' : 0.0 }
-    for r in stats:
-        alg = algDict[r.key().name()]
-        if alg.BuyDelta > 0 and alg.SellDelta > 0:
-            fingerprints['pos_pos']['cash'] += r.PandL
-            if r.PandL != 0.0:
-                fingerprints['pos_pos']['median'].append(r.PandL)
-                fingerprints['pos_pos']['count'] += 1
-        if alg.BuyDelta > 0 and alg.SellDelta < 0:
-            fingerprints['pos_neg']['cash'] += r.PandL
-            if r.PandL != 0.0:
-                fingerprints['pos_neg']['median'].append(r.PandL)
-                fingerprints['pos_neg']['count'] += 1
-        if alg.BuyDelta < 0 and alg.SellDelta < 0:
-            fingerprints['neg_neg']['cash'] += r.PandL
-            if r.PandL != 0.0:
-                fingerprints['neg_neg']['median'].append(r.PandL)
-                fingerprints['neg_neg']['count'] += 1
-        if alg.BuyDelta < 0 and alg.SellDelta > 0:
-            fingerprints['neg_pos']['cash'] += r.PandL
-            if r.PandL != 0.0:
-                fingerprints['neg_pos']['median'].append(r.PandL)
-                fingerprints['neg_pos']['count'] += 1
 
+    for r in stats:
+        algkey = r.split('_')[-1]
+        alg = algDict[algkey]
+        if stats[r]['PandL'] != 0.0:
+            dictKey = str(alg.BuyDelta) + "_" + str(alg.SellDelta) + "_" + str(alg.TimeDelta)
+            if memkeylist is None:
+                cashdelta = eval(decompress(stats[r]['CashDelta']))
+            else:
+                # Uncomment only when want to see individual monthly results
+                dictKey = dictKey + "_" + r
+                cashdelta = stats[r]['CashDelta']
+            numtrades = len(cashdelta)
+            if not fingerprints.__contains__(dictKey):
+                fingerprints[dictKey] = {}
+            if not fingerprints[dictKey].__contains__('cash'):
+                fingerprints[dictKey]['cash'] = stats[r]['PandL']
+            else:
+                fingerprints[dictKey]['cash'] += stats[r]['PandL']
+            if not fingerprints[dictKey].__contains__('PandLs'):
+                fingerprints[dictKey]['PandLs'] = [stats[r]['PandL']]
+            else:
+                fingerprints[dictKey]['PandLs'].append(stats[r]['PandL'])
+            if not fingerprints[dictKey].__contains__('numTrades'):
+                fingerprints[dictKey]['numTrades'] = numtrades
+            else:
+                fingerprints[dictKey]['numTrades'] += numtrades
+
+    keylist = []
     for key in fingerprints:
-        fingerprints[key]['median'].sort()
-        print key
-        print "avg: " + str(fingerprints[key]['cash']/fingerprints[key]['count'])
-        print "med: " + str(fingerprints[key]['median'][len(fingerprints[key]['median'])/2])
-        print "traders: " + str(len(fingerprints[key]['median']))
-        print fingerprints[key]['cash']
-        print "--------------------------------------"
+        keylist.append(key)
+        fingerprints[key]['PandLs'].sort()
+        fingerprints[key]['avg'] = fingerprints[key]['cash']/len(fingerprints[key]['PandLs'])
+        fingerprints[key]['min'] = fingerprints[key]['PandLs'][0]
+        fingerprints[key]['max'] = fingerprints[key]['PandLs'][-1]
+        fingerprints[key]['avgTrade'] = fingerprints[key]['cash']/fingerprints[key]['numTrades']
+        fingerprints[key]['traders'] =  len(fingerprints[key]['PandLs'])
+    keylist.sort()
+    
+    for key in keylist:
+        #if fingerprints[key]['cash'] > 0 and fingerprints[key]['min'] > 0 and fingerprints[key]['numTrades'] > 100:
+        if fingerprints[key]['cash'] != 0:
+            print key
+            print "avg: " + str(fingerprints[key]['avg'])
+            print "min: " + str(fingerprints[key]['min'])
+            print "max: " + str(fingerprints[key]['max'])
+            print "trades: " + str(fingerprints[key]['numTrades'])
+            print "avg cash per trade: " + str(fingerprints[key]['avgTrade'])
+            print "traders: " + str(fingerprints[key]['traders'])
+            print "$" + str(fingerprints[key]['cash'])
+            print "-------------------------------"
+            '''
+    for key in keylist:
+        if fingerprints[key]['cash'] < 0 and fingerprints[key]['max'] < 0 and fingerprints[key]['numTrades'] > 100:
+            print key
+            print "avg: " + str(fingerprints[key]['avg'])
+            print "min: " + str(fingerprints[key]['min'])
+            print "max: " + str(fingerprints[key]['max'])
+            print "trades: " + str(fingerprints[key]['numTrades'])
+            print "avg cash per trade: " + str(fingerprints[key]['avgTrade'])
+            print "traders: " + str(fingerprints[key]['traders'])
+            print "$" + str(fingerprints[key]['cash'])
+            print "-------------------------------"
+    
     print "********************************"
     for r in stats:
         if len(eval(decompress(r.CashDelta))) > 40:
@@ -186,7 +233,7 @@ def analyzeAlgPerformance():
             print "trades: " + str(len(eval(decompress(r.CashDelta))))
             alg = algDict[r.key().name()]
             print "BuyDelta: " + str(alg.BuyDelta) + " SellDelta: " + str(alg.SellDelta) + " TradeSize: " + str(alg.TradeSize) + " TimeDelta: " + str(alg.TimeDelta)
-            print "----------------------------------------"
+            print "----------------------------------------" '''
 
 
 def closeoutPositions(step):
@@ -243,7 +290,6 @@ def wipeoutAlgStats():
         total += count
 
 def initializeAlgStats():
-    from zlib import compress
     meList = []
     meDict = {}
 
