@@ -296,7 +296,7 @@ def wipeOutCreds():
 
 def buildDesireKey(step,algKey):
     newstep   = str(step).rjust(7,'0')
-    newalgKey = algKey.rjust(6,'0')
+    newalgKey = str(algKey).rjust(6,'0')
     keyname   = newstep + '_' + newalgKey
     return keyname
 

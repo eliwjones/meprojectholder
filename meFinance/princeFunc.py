@@ -59,6 +59,12 @@ def getAlgStats(alphaAlg=1,omegaAlg=2400):
     algs = meSchema.memGet_multi(model,keylist)
     return algs
 
+def getDesireQueryStr(startStep,stopStep):
+    alpha = meSchema.buildDesireKey(startStep,0)
+    omega = meSchema.buildDesireKey(stopStep,2401)
+    model = 'desire'
+    query = "Select * from %s Where __key__ > Key('%s','%s') AND __key__ < Key('%s','%s')" % (model,model,alpha,model,omega)
+
 def getAlgQueryStr(alphaAlg='0',omegaAlg='999999'):
     alpha = meSchema.buildAlgKey(alphaAlg)
     omega = meSchema.buildAlgKey(omegaAlg)
