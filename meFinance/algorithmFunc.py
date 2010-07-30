@@ -42,25 +42,23 @@ def algorithmDo(keyname,step):
 
 def primeDesireCache(step):
     # Function to pull out last 400 steps of potential desires.
+    import princeFunc
     from google.appengine.api import memcache
     keylist = []
     memdict = {}
-    for i in range(step-405,step):
-        for j in range(1,2401):
-            key_name = meSchema.buildDesireKey(i,str(j))
-            keylist.append(key_name)
-    desires = meSchema.desire.get_by_key_name(keylist)
+    queryStr = princeFunc.getDesireQueryStr(max(step-405,0),step)
+    desires = db.GqlQuery(queryStr).fetch(20000)
     for desire in desires:
-        if desire is not None:
-            # eval desire and pull out cmp(shares,0) and symbol for memcache
-            desirekey = desire.key().name()
-            desireDict = eval(desire.desire)
-            for stock in desireDict:
-                # Must convert symbol to id for memcaching.
-                stckID = meSchema.getStckID(stock)
-                buysell = cmp(desireDict[stock]['Shares'],0)
-            memkey = desirekey + "_" + str(buysell) + "_" + str(stckID)
-            memdict[memkey] = 1
+        # eval desire and pull out cmp(shares,0) and symbol for memcache
+        desirekey = desire.key().name()
+        desireDict = eval(desire.desire)
+        for stock in desireDict:
+            # Must convert symbol to id for memcaching.
+            stckID = meSchema.getStckID(stock)
+            buysell = cmp(desireDict[stock]['Shares'],0)
+        memkey = desirekey + "_" + str(buysell) + "_" + str(stckID)
+        print memkey
+        memdict[memkey] = 1
     memcache.set_multi(memdict) 
 
 def recency(keyname,step,stckID,buysell,timedelta):
@@ -74,20 +72,26 @@ def recency(keyname,step,stckID,buysell,timedelta):
     return result
 
 def checkdesires(keys):
+    # Removing cachepy functionality to reduce memory fingerprint in dev.
     retval = False
+    '''
     desires = cachepy.get_multi(keys)
     for key in desires:
         if desires[key] == 1:
             return True
     missingkeys = meSchema.getMissingKeys(keys,desires)
+    '''
+    missingkeys = keys
     if len(missingkeys) > 0:
         desires = meSchema.memcacheGetMulti(missingkeys)
         for key in missingkeys:
             if key in desires:
                 retval = True
-                cachepy.set(key,1)
+                return retval
+                #cachepy.set(key,1)
             else:
-                cachepy.set(key,0)
+                pass
+                #cachepy.set(key,0)
     return retval 
 
 def buySell(tradesize,buy,sell,cue):

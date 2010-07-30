@@ -17,6 +17,8 @@ def openIt(url,start,stop):
     except urllib2.HTTPError, e:
         newUrl = e.geturl()
         start,stop = extractStartStop(newUrl)
+        # Must remove '&fillcache=true' part of string
+        url = url.replace('&fillcache=true','')
         openIt(url,start+1,stop)
 
 

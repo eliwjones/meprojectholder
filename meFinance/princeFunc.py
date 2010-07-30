@@ -64,6 +64,7 @@ def getDesireQueryStr(startStep,stopStep):
     omega = meSchema.buildDesireKey(stopStep,2401)
     model = 'desire'
     query = "Select * from %s Where __key__ > Key('%s','%s') AND __key__ < Key('%s','%s')" % (model,model,alpha,model,omega)
+    return query
 
 def getAlgQueryStr(alphaAlg='0',omegaAlg='999999'):
     alpha = meSchema.buildAlgKey(alphaAlg)
