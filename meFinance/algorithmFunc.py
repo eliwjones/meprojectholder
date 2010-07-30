@@ -40,6 +40,29 @@ def algorithmDo(keyname,step):
                 return action    # add action/desire to list and return list ?
     return None
 
+def primeDesireCache(step):
+    # Function to pull out last 400 steps of potential desires.
+    from google.appengine.api import memcache
+    keylist = []
+    memdict = {}
+    for i in range(step-405,step):
+        for j in range(1,2401):
+            key_name = meSchema.buildDesireKey(i,str(j))
+            keylist.append(key_name)
+    desires = meSchema.desire.get_by_key_name(keylist)
+    for desire in desires:
+        if desire is not None:
+            # eval desire and pull out cmp(shares,0) and symbol for memcache
+            desirekey = desire.key().name()
+            desireDict = eval(desire.desire)
+            for stock in desireDict:
+                # Must convert symbol to id for memcaching.
+                stckID = meSchema.getStckID(stock)
+                buysell = cmp(desireDict[stock]['Shares'],0)
+            memkey = desirekey + "_" + str(buysell) + "_" + str(stckID)
+            memdict[memkey] = 1
+    memcache.set_multi(memdict) 
+
 def recency(keyname,step,stckID,buysell,timedelta):
     keys = []
     # Changing memkey to include stckID to prevent abandoned positions.
