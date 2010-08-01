@@ -179,7 +179,9 @@ def analyzeAlgPerformance(memkeylist=None):
                 cashdelta = eval(decompress(stats[r]['CashDelta']))
             else:
                 # Uncomment only when want to see individual monthly results
-                dictKey = dictKey + "_" + r
+                #dictKey = dictKey + "_" + r
+                # Use this key to get aggregate performance by stepstart
+                dictKey = r.split("_")[-2] 
                 cashdelta = stats[r]['CashDelta']
             numtrades = len(cashdelta)
             if not fingerprints.__contains__(dictKey):
@@ -209,7 +211,7 @@ def analyzeAlgPerformance(memkeylist=None):
     keylist.sort()
     
     for key in keylist:
-        #if fingerprints[key]['cash'] > 0 and fingerprints[key]['min'] > 0 and fingerprints[key]['numTrades'] > 100:
+        #if fingerprints[key]['avg'] > 0 and fingerprints[key]['min'] > -300 and fingerprints[key]['numTrades'] > 100:
         if fingerprints[key]['cash'] != 0:
             print key
             print "avg: " + str(fingerprints[key]['avg'])

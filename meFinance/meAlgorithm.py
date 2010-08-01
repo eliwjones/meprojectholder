@@ -30,9 +30,9 @@ class go(webapp.RequestHandler):
             else:
                 n = int(n)
             fillcache = str(self.request.get('fillcache'))
-            #if fillcache == 'true':
+            if fillcache == 'true':
                 # Run function to put last 400 steps of desires into memcache.
-            #    algorithmFunc.primeDesireCache(n)
+                algorithmFunc.primeDesireCache(n)
             if n < globalstop:
                 algorithmFunc.doAlgs(n,1,2400)     # Algorithms express desires
                 #commenting out so can just record desires.

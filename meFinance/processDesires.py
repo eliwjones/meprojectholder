@@ -50,7 +50,7 @@ def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpack
 def runBackTests(alglist):
     # alglist is [] of algorithm key_names.
     stop = 13715
-    monthList = [str(stop-1760*2),str(stop-1760*3),str(stop-1760*4),str(stop-1760*5),str(stop-1760*6),str(1)]
+    monthList = [str(stop-1760),str(stop-1760*2),str(stop-1760*3),str(stop-1760*4),str(stop-1760*5),str(stop-1760*6),str(1)]
     for alg in alglist:
         for startMonth in monthList:
             resetAlgstats(startMonth + "_",int(alg),int(alg))

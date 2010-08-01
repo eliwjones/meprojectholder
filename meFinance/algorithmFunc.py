@@ -1,5 +1,6 @@
 import meSchema
 import cachepy
+from google.appengine.api import memcache
 from google.appengine.ext import db
 
 def doAlgs(step,startAlg,stopAlg):
@@ -35,16 +36,15 @@ def algorithmDo(keyname,step):
             recent = recency(keyname,step,stckID,buysell,dna.TimeDelta)
             if not recent:
                 action = makeDesire(stckID,keyname,step,buysell,tradesize,dna.Cash)
-                # Changing memkey to include stckID to prevent abandoned positions.
-                meSchema.memcacheSet(action.key().name() + "_" + str(buysell) + "_" + str(stckID),1)
+                recency_key = "desire_" + keyname + "_" + str(buysell) + "_" + str(stckID)
+                value = step
+                meSchema.memcacheSet(recency_key, value)
                 return action    # add action/desire to list and return list ?
     return None
 
 def primeDesireCache(step):
     # Function to pull out last 400 steps of potential desires.
     import princeFunc
-    from google.appengine.api import memcache
-    keylist = []
     memdict = {}
     queryStr = princeFunc.getDesireQueryStr(max(step-405,0),step)
     desires = db.GqlQuery(queryStr).fetch(20000)
@@ -56,43 +56,22 @@ def primeDesireCache(step):
             # Must convert symbol to id for memcaching.
             stckID = meSchema.getStckID(stock)
             buysell = cmp(desireDict[stock]['Shares'],0)
-        memkey = desirekey + "_" + str(buysell) + "_" + str(stckID)
-        print memkey
-        memdict[memkey] = 1
+        algKey = desirekey.split("_")[-1]      # Extract algKey from end.
+        memkey = "desire_" + algKey + "_" + str(buysell) + "_" + str(stckID)
+        step = int(desirekey.split("_")[0])    # Extract step from front part of desirekey.
+        if not memdict.__contains__(memkey):
+            memdict[memkey] = step
+        elif memdict[memkey] < step:
+            memdict[memkey] = step
     memcache.set_multi(memdict) 
 
 def recency(keyname,step,stckID,buysell,timedelta):
-    keys = []
-    # Changing memkey to include stckID to prevent abandoned positions.
-    desire = str(buysell) + "_" + str(stckID)
-    for i in range(step-timedelta,step):
-        desireKey = meSchema.buildDesireKey(i,keyname)
-        keys.append(desireKey + "_" + desire)
-    result = checkdesires(keys)
+    result = False
+    recency_key = "desire_" + keyname + "_" + str(buysell) + "_" + str(stckID)
+    lastStep = memcache.get(recency_key)
+    if lastStep >= step - timedelta:
+        result = True
     return result
-
-def checkdesires(keys):
-    # Removing cachepy functionality to reduce memory fingerprint in dev.
-    retval = False
-    '''
-    desires = cachepy.get_multi(keys)
-    for key in desires:
-        if desires[key] == 1:
-            return True
-    missingkeys = meSchema.getMissingKeys(keys,desires)
-    '''
-    missingkeys = keys
-    if len(missingkeys) > 0:
-        desires = meSchema.memcacheGetMulti(missingkeys)
-        for key in missingkeys:
-            if key in desires:
-                retval = True
-                return retval
-                #cachepy.set(key,1)
-            else:
-                pass
-                #cachepy.set(key,0)
-    return retval 
 
 def buySell(tradesize,buy,sell,cue):
     buysell = 0
