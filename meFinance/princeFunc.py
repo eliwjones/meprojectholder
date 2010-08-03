@@ -141,7 +141,7 @@ def mergePosition(desire,positions):
         cash -= 9.95                                                     # Must subtract trade commission.
     return cash, PandL, positions
 
-def analyzeAlgPerformance(memkeylist=None):
+def analyzeAlgPerformance(aggregateType=None,memkeylist=None):
     stats = {}
     if memkeylist is None:
         dbstats = db.GqlQuery("Select * from algStats Order By PandL Desc").fetch(2500)
@@ -174,14 +174,22 @@ def analyzeAlgPerformance(memkeylist=None):
         algkey = r.split('_')[-1]
         alg = algDict[algkey]
         if stats[r]['PandL'] != 0.0:
-            dictKey = str(alg.BuyDelta) + "_" + str(alg.SellDelta) + "_" + str(alg.TimeDelta)
+            if aggregateType is None:
+                dictKey = str(alg.BuyDelta) + "_" + str(alg.SellDelta) + "_" + str(alg.TimeDelta)
+            elif aggregateType == "step":
+                # Use this key to get aggregate performance by stepstart 
+                dictKey = r.split("_")[-2]
+            elif aggregateType == "family_step":
+                dictKey = str(alg.BuyDelta) + "_" + str(alg.SellDelta) + "_" + str(alg.TimeDelta) + "_" + r.split("_")[-2]
+            elif aggregateType == "alg_step":
+                dictKey = str(alg.BuyDelta) + "_" + str(alg.SellDelta) + "_" + str(alg.TimeDelta) + "_" + str(alg.TradeSize)
+                dictKey = dictKey + "_" + r.split("_")[-2]
+                
             if memkeylist is None:
                 cashdelta = eval(decompress(stats[r]['CashDelta']))
             else:
                 # Uncomment only when want to see individual monthly results
                 #dictKey = dictKey + "_" + r
-                # Use this key to get aggregate performance by stepstart
-                dictKey = r.split("_")[-2] 
                 cashdelta = stats[r]['CashDelta']
             numtrades = len(cashdelta)
             if not fingerprints.__contains__(dictKey):

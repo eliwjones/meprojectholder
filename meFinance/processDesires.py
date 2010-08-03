@@ -47,7 +47,7 @@ def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpack
             stats['Positions'] = position
     memcache.set(memprefix + algKey, stats)
 
-def runBackTests(alglist):
+def runBackTests(alglist, aggregateType = "step"):
     # alglist is [] of algorithm key_names.
     stop = 13715
     monthList = [str(stop-1760),str(stop-1760*2),str(stop-1760*3),str(stop-1760*4),str(stop-1760*5),str(stop-1760*6),str(1)]
@@ -59,7 +59,7 @@ def runBackTests(alglist):
     for memprefix in monthList:
         for algkey in alglist:
             keylist.append(memprefix + '_' + algkey)
-    princeFunc.analyzeAlgPerformance(keylist)
+    princeFunc.analyzeAlgPerformance(aggregateType,keylist)
     
         
 
