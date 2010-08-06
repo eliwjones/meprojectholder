@@ -128,8 +128,6 @@ def resetAlgstats(memprefix = "unpacked_",algCash=20000.0,alphaAlg=1,omegaAlg=24
         memkeylist.append(memkey)
     for key in memkeylist:
         cashdelta[key] = deque()
-        #for i in range(800):
-        #    cashdelta[key].append({'step' : -1, 'value' : 0.0, 'PandL' : 0.0})
         statDict[key] = { 'Cash'      : algCash,
                           'CashDelta' : cashdelta[key],
                           'PandL'     : 0.0,
@@ -138,7 +136,6 @@ def resetAlgstats(memprefix = "unpacked_",algCash=20000.0,alphaAlg=1,omegaAlg=24
     return statDict
 
 def repackAlgstats(memprefix = "unpacked_", alphaAlg=1, omegaAlg=2400):
-    # Probably should just rewrite to build keys and grab directly from memcache.
     statDict = {}
     meDict = {}
     memkeylist = []
@@ -165,7 +162,6 @@ def getAlgDesires(algKey,startStep=1,stopStep=13715):
         key_name = meSchema.buildDesireKey(i,algKey)
         keylist.append(key_name)
 
-    #desires = meSchema.memGet_multi(meSchema.desire, keylist)
     desires = meSchema.desire.get_by_key_name(keylist)
     for key in desires:
         if key is not None:

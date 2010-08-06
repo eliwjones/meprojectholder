@@ -13,7 +13,6 @@ def updateAlgStats(step,alphaAlg=1,omegaAlg=2400):
         desireKey = meSchema.buildDesireKey(step,alg)
         if desires[desireKey] is not None:
             tradeCash, PandL, position = mergePosition(eval(desires[desireKey].desire),eval(algstats[alg].Positions))
-            # Must change alg.CashDelta to collection so can append to front of list.
             cash = tradeCash + algstats[alg].Cash
             if cash > 0:
                 cashdelta = eval(decompress(algstats[alg].CashDelta))  # Get CashDelta collection
@@ -31,8 +30,6 @@ def updateAlgStats(step,alphaAlg=1,omegaAlg=2400):
                 alglist[alg] = algstats[alg]
         else:
             pass
-            # alglist.append(algstats[alg])
-            # Deal only with modified algStats.
     meSchema.memPut_multi(meSchema.algStats,alglist)
 
 def moveAlgorithms():
@@ -156,7 +153,6 @@ def analyzeAlgPerformance(aggregateType=None,memkeylist=None,stopStep=13715):
             stats[key] = {'PandL'     : memstats[key]['PandL'],
                           'CashDelta' : memstats[key]['CashDelta'],
                           'Positions' : memstats[key]['Positions']}
-        # Must reconfigure stats into algStat model holder.
     
     algkeys = []
 
@@ -182,6 +178,7 @@ def analyzeAlgPerformance(aggregateType=None,memkeylist=None,stopStep=13715):
                 dictKey = str(alg.BuyDelta) + "_" + str(alg.SellDelta) + "_" + str(alg.TimeDelta)
             elif aggregateType == "step":
                 # Use this key to get aggregate performance by stepstart
+                # Since backTest key is of form:  stufff_step_stuff
                 dictKey = r.split("_")[-2]
             elif aggregateType == "family_step":
                 dictKey = str(alg.BuyDelta) + "_" + str(alg.SellDelta) + "_" + str(alg.TimeDelta) + "_" + r.split("_")[-2]
@@ -248,27 +245,6 @@ def analyzeAlgPerformance(aggregateType=None,memkeylist=None,stopStep=13715):
             print "Total$: " + str(fingerprints[key]['cash'] + fingerprints[key]['positionValue'])
             print str((fingerprints[key]['cash'] + fingerprints[key]['positionValue'])/(fingerprints[key]['traders']*20000.0)) + "%"
             print "-------------------------------"
-            '''
-    for key in keylist:
-        if fingerprints[key]['cash'] < 0 and fingerprints[key]['max'] < 0 and fingerprints[key]['numTrades'] > 100:
-            print key
-            print "avg: " + str(fingerprints[key]['avg'])
-            print "min: " + str(fingerprints[key]['min'])
-            print "max: " + str(fingerprints[key]['max'])
-            print "trades: " + str(fingerprints[key]['numTrades'])
-            print "avg cash per trade: " + str(fingerprints[key]['avgTrade'])
-            print "traders: " + str(fingerprints[key]['traders'])
-            print "$" + str(fingerprints[key]['cash'])
-            print "-------------------------------"
-    
-    print "********************************"
-    for r in stats:
-        if len(eval(decompress(r.CashDelta))) > 40:
-            print r.key().name() + " : " + str(r.PandL)
-            print "trades: " + str(len(eval(decompress(r.CashDelta))))
-            alg = algDict[r.key().name()]
-            print "BuyDelta: " + str(alg.BuyDelta) + " SellDelta: " + str(alg.SellDelta) + " TradeSize: " + str(alg.TradeSize) + " TimeDelta: " + str(alg.TimeDelta)
-            print "----------------------------------------" '''
 
 def getStepQuotes(step):
     stckKeyList = []
@@ -338,14 +314,7 @@ def initializeAlgStats():
     meList = []
     meDict = {}
 
-    # Initialize cashdelta value to hold 800 trades.
-    # Must make quasi realistic to ensure I'm not exceeding entity size
     cashdelta = deque()
-    #for i in range(800):
-    #    value = ((1000)*i)%5001
-    #    step = -5199 + i
-    #    cashdelta.append({'step': step, 'value': value, 'PandL': 0})
-        
     count = 1000
     cursor = None
     while count == 1000:
