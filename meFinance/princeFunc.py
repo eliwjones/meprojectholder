@@ -141,19 +141,21 @@ def mergePosition(desire,positions):
         cash -= 9.95                                                     # Must subtract trade commission.
     return cash, PandL, positions
 
-def analyzeAlgPerformance(aggregateType=None,memkeylist=None):
+def analyzeAlgPerformance(aggregateType=None,memkeylist=None,stopStep=13715):
     stats = {}
     if memkeylist is None:
         dbstats = db.GqlQuery("Select * from algStats Order By PandL Desc").fetch(2500)
         for stat in dbstats:
             key = stat.key().name()
             stats[key] = {'PandL'     : stat.PandL,
-                          'CashDelta' : stat.CashDelta}
+                          'CashDelta' : stat.CashDelta,
+                          'Positions' : stat.Positions}
     else:
         memstats = memcache.get_multi(memkeylist)
         for key in memstats:
             stats[key] = {'PandL'     : memstats[key]['PandL'],
-                          'CashDelta' : memstats[key]['CashDelta']}
+                          'CashDelta' : memstats[key]['CashDelta'],
+                          'Positions' : memstats[key]['Positions']}
         # Must reconfigure stats into algStat model holder.
     
     algkeys = []
@@ -168,6 +170,8 @@ def analyzeAlgPerformance(aggregateType=None,memkeylist=None):
     for alg in algs:
         algDict[alg.key().name()] = alg
 
+    stopStepQuotes = getStepQuotes(stopStep)
+
     fingerprints = {}
 
     for r in stats:
@@ -177,7 +181,7 @@ def analyzeAlgPerformance(aggregateType=None,memkeylist=None):
             if aggregateType is None:
                 dictKey = str(alg.BuyDelta) + "_" + str(alg.SellDelta) + "_" + str(alg.TimeDelta)
             elif aggregateType == "step":
-                # Use this key to get aggregate performance by stepstart 
+                # Use this key to get aggregate performance by stepstart
                 dictKey = r.split("_")[-2]
             elif aggregateType == "family_step":
                 dictKey = str(alg.BuyDelta) + "_" + str(alg.SellDelta) + "_" + str(alg.TimeDelta) + "_" + r.split("_")[-2]
@@ -188,10 +192,17 @@ def analyzeAlgPerformance(aggregateType=None,memkeylist=None):
             if memkeylist is None:
                 cashdelta = eval(decompress(stats[r]['CashDelta']))
             else:
-                # Uncomment only when want to see individual monthly results
-                #dictKey = dictKey + "_" + r
                 cashdelta = stats[r]['CashDelta']
             numtrades = len(cashdelta)
+            
+            positionValue = 0.0
+            
+            for key in stats[r]['Positions']:
+                currentPrice = stopStepQuotes[key]
+                posPrice = stats[r]['Positions'][key]['Price']
+                shares = stats[r]['Positions'][key]['Shares']
+                positionValue += (currentPrice - posPrice)*shares
+                
             if not fingerprints.__contains__(dictKey):
                 fingerprints[dictKey] = {}
             if not fingerprints[dictKey].__contains__('cash'):
@@ -206,6 +217,10 @@ def analyzeAlgPerformance(aggregateType=None,memkeylist=None):
                 fingerprints[dictKey]['numTrades'] = numtrades
             else:
                 fingerprints[dictKey]['numTrades'] += numtrades
+            if not fingerprints[dictKey].__contains__('positionValue'):
+                fingerprints[dictKey]['positionValue'] = positionValue
+            else:
+                fingerprints[dictKey]['positionValue'] += positionValue
 
     keylist = []
     for key in fingerprints:
@@ -220,7 +235,7 @@ def analyzeAlgPerformance(aggregateType=None,memkeylist=None):
     
     for key in keylist:
         #if fingerprints[key]['avg'] > 0 and fingerprints[key]['min'] > -300 and fingerprints[key]['numTrades'] > 100:
-        if fingerprints[key]['cash'] != 0:
+        if fingerprints[key]['cash'] != 0.0:
             print key
             print "avg: " + str(fingerprints[key]['avg'])
             print "min: " + str(fingerprints[key]['min'])
@@ -229,6 +244,9 @@ def analyzeAlgPerformance(aggregateType=None,memkeylist=None):
             print "avg cash per trade: " + str(fingerprints[key]['avgTrade'])
             print "traders: " + str(fingerprints[key]['traders'])
             print "$" + str(fingerprints[key]['cash'])
+            print "Position Value: " + str(fingerprints[key]['positionValue'])
+            print "Total$: " + str(fingerprints[key]['cash'] + fingerprints[key]['positionValue'])
+            print str((fingerprints[key]['cash'] + fingerprints[key]['positionValue'])/(fingerprints[key]['traders']*20000.0)) + "%"
             print "-------------------------------"
             '''
     for key in keylist:
@@ -252,6 +270,16 @@ def analyzeAlgPerformance(aggregateType=None,memkeylist=None):
             print "BuyDelta: " + str(alg.BuyDelta) + " SellDelta: " + str(alg.SellDelta) + " TradeSize: " + str(alg.TradeSize) + " TimeDelta: " + str(alg.TimeDelta)
             print "----------------------------------------" '''
 
+def getStepQuotes(step):
+    stckKeyList = []
+    for i in range(1,5):
+        stckKeyList.append(str(i) + "_" + str(step))
+    quotes = meSchema.memGet_multi(meSchema.stck, stckKeyList)
+    stepQuotes = {}
+    for quote in quotes:
+        symbol = meSchema.getStckSymbol(quotes[quote].ID)
+        stepQuotes[symbol] = quotes[quote].quote
+    return stepQuotes
 
 def closeoutPositions(step):
     algstats = getAlgStats()

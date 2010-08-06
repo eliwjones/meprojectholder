@@ -1,5 +1,6 @@
 import meSchema
 import princeFunc
+from google.appengine.ext import db
 from google.appengine.api import memcache
 from zlib import compress,decompress
 from collections import deque
@@ -13,6 +14,10 @@ def updateAllAlgStats(alphaAlg=1,omegaAlg=2400):
         updateAlgStat(key_name)
 
 def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpacked_"):
+    if stopStep is None:
+        lastStep = db.GqlQuery("Select * From stepDate Order by step desc").fetch(1)[0].step
+    else:
+        lastStep = stopStep
     stats = memcache.get(memprefix + algKey)
     desires = getAlgDesires(algKey)
     # Grab timedelta and set memcache last buy and last sell to -10000
@@ -46,14 +51,21 @@ def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpack
             stats['PandL'] += PandL
             stats['Positions'] = position
     memcache.set(memprefix + algKey, stats)
+    return lastStep
 
-def runBackTests(alglist, aggregateType = "step"):
+def runBackTests(alglist, aggregateType = "step", stepRange=None):
     # alglist is [] of algorithm key_names.
     stop = 13715
-    monthList = [str(stop-1760),str(stop-1760*2),str(stop-1760*3),str(stop-1760*4),str(stop-1760*5),str(stop-1760*6),str(1)]
+    monthList = []
+    if stepRange is None:
+        monthList = [str(stop-1760),str(stop-1760*2),str(stop-1760*3),str(stop-1760*4),str(stop-1760*5),str(stop-1760*6),str(stop-1760*7),str(1)]
+    else:
+        for step in stepRange:
+            monthList.append(str(stop - step))
+            
     for alg in alglist:
         for startMonth in monthList:
-            resetAlgstats(startMonth + "_",int(alg),int(alg))
+            resetAlgstats(startMonth + "_", 20000.0, int(alg), int(alg))
             updateAlgStat(alg,startMonth,str(stop),startMonth + "_")
     keylist = []
     for memprefix in monthList:
@@ -61,6 +73,23 @@ def runBackTests(alglist, aggregateType = "step"):
             keylist.append(memprefix + '_' + algkey)
     princeFunc.analyzeAlgPerformance(aggregateType,keylist)
     
+def algMaxCashTest(algKey,memprefix="millionaire_",cash=100000.0):
+    # Test for max alg trading performance.
+    resetAlgstats(memprefix,cash,int(algKey),int(algKey))
+    lastStep = updateAlgStat(algKey,None,None,memprefix)
+    lastQuotes = princeFunc.getStepQuotes(lastStep)
+    # Close out positions using stock quotes from lastStep
+    algStats = memcache.get(memprefix + algKey)
+    positionsCash = 0.0
+    for key in algStats['Positions']:
+        currentPrice = lastQuotes[key]
+        posPrice = algStats['Positions'][key]['Price']
+        shares = algStats['Positions'][key]['Shares']
+        positionsCash += (currentPrice - posPrice)*shares
+    PLcash = 0.0
+    for trade in algStats['CashDelta']:
+        PLcash += trade['PandL']
+    return PLcash + positionsCash
         
 
 def unpackAlgstats(memprefix = "unpacked_",alphaAlg=1,omegaAlg=2400):
@@ -89,7 +118,7 @@ def unpackAlgstats(memprefix = "unpacked_",alphaAlg=1,omegaAlg=2400):
     return statDict
 
 
-def resetAlgstats(memprefix = "unpacked_",alphaAlg=1,omegaAlg=2400):
+def resetAlgstats(memprefix = "unpacked_",algCash=20000.0,alphaAlg=1,omegaAlg=2400):
     memkeylist = []
     cashdelta = {}
     statDict = {}
@@ -101,7 +130,7 @@ def resetAlgstats(memprefix = "unpacked_",alphaAlg=1,omegaAlg=2400):
         cashdelta[key] = deque()
         #for i in range(800):
         #    cashdelta[key].append({'step' : -1, 'value' : 0.0, 'PandL' : 0.0})
-        statDict[key] = { 'Cash'      : 20000.0,
+        statDict[key] = { 'Cash'      : algCash,
                           'CashDelta' : cashdelta[key],
                           'PandL'     : 0.0,
                           'Positions' : {} }
