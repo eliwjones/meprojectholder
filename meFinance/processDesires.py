@@ -19,9 +19,11 @@ def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpack
     else:
         lastStep = stopStep
     stats = memcache.get(memprefix + algKey)
+    # Consider implementing caching since this part is slowww.. (4 seconds)
+    # Possibly precache all desires?  (too big?)
     desires = getAlgDesires(algKey)
     # Grab timedelta and set memcache last buy and last sell to -10000
-    timedelta = meSchema.meAlg.get_by_key_name(algKey).TimeDelta
+    timedelta = meSchema.memGet(meSchema.meAlg,algKey).TimeDelta
     memcache.set(algKey + '_-1',-10000)
     memcache.set(algKey + '_1', -10000)
     # Must order desire keys so that trades are executed in correct sequence.
@@ -53,6 +55,75 @@ def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpack
     memcache.set(memprefix + algKey, stats)
     return lastStep
 
+def bestAlgSearch(startStep,stopStep):
+    allAlgs = meSchema.meAlg.all().fetch(2400)
+    testAlgKeys = []
+    for alg in allAlgs:
+        if alg.TradeSize == 0.25:
+            testAlgKeys.append(alg.key().name())
+    testAlgKeys.sort()
+    # Create check to see if any of the stats have been updated before running
+    memprefix = str(startStep) + "_" + str(stopStep) + "_"
+    memkeys = []
+    for algKey in testAlgKeys:
+        memkeys.append(memprefix + algKey)
+    algStats = memcache.get_multi(memkeys)
+    updated = False
+    if len(algStats) == len(memkeys):
+        for key in algStats:
+            if algStats[key]['PandL'] != 0.0 or len(algStats[key]['Positions']) > 0:
+                updated = True
+                break
+    if not updated:
+        resetAlgstats(memprefix)
+        for algKey in testAlgKeys:
+            updateAlgStat(algKey, startStep, stopStep, memprefix)
+        algStats = memcache.get_multi(memkeys)
+    # Stats updated.. must calculate total PandL and position values.
+    posPandLs = calculatePositionPandLs(testAlgKeys,memprefix,stopStep,algStats)
+    totalValDict = {}
+    numTradeList = []
+    for key in algStats:
+        totalVal = algStats[key]['PandL'] + posPandLs[key]
+        trades = len(algStats[key]['CashDelta'])
+        if totalVal > 0.0 and trades > 20:
+            numTradeList.append(trades)
+            if totalValDict.__contains__(totalVal):
+                totalValDict[totalVal].append(key)
+            else:
+                totalValDict[totalVal] = [key]
+    numTradeList.sort()
+    print "Median Trades: " + str(numTradeList[int(len(numTradeList)/2)])
+    print "Max Trades: " + str(numTradeList[-1])
+    print "Min Trades: " + str(numTradeList[0])
+    avgTrades = str(float(sum(numTradeList))/len(numTradeList))
+    print "Avg Trades: " + avgTrades
+    totalValKeys = totalValDict.keys()
+    totalValKeys.sort()
+    for i in range(1,101):
+        key = totalValKeys[(-1)*i]
+        print str(key) + ": " + str(totalValDict[key])
+            
+def calculatePositionPandLs(algKeys,memprefix,stopStep,algStats=None):
+    memkeys = []
+    for algKey in algKeys:
+        memkeys.append(memprefix + algKey)
+    if algStats is None:
+        algStats = memcache.get_multi(memkeys)
+    stopStepQuotes = princeFunc.getStepQuotes(stopStep)
+    algPosValues = {}
+    for memkey in algStats:
+        positions = algStats[memkey]['Positions']
+        positionsValue = 0.0
+        for symbol in positions:
+            currentPrice = stopStepQuotes[symbol]
+            posPrice = positions[symbol]['Price']
+            shares = positions[symbol]['Shares']
+            positionsValue += (currentPrice - posPrice)*shares
+        algPosValues[memkey] = positionsValue
+    return algPosValues
+        
+
 def runBackTests(alglist, aggregateType = "step", stepRange=None):
     # alglist is [] of algorithm key_names.
     stop = 13715
@@ -62,7 +133,6 @@ def runBackTests(alglist, aggregateType = "step", stepRange=None):
     else:
         for step in stepRange:
             monthList.append(str(stop - step))
-            
     for alg in alglist:
         for startMonth in monthList:
             resetAlgstats(startMonth + "_", 20000.0, int(alg), int(alg))
@@ -89,8 +159,7 @@ def algMaxCashTest(algKey,memprefix="millionaire_",cash=100000.0):
     PLcash = 0.0
     for trade in algStats['CashDelta']:
         PLcash += trade['PandL']
-    return PLcash + positionsCash
-        
+    return PLcash + positionsCash     
 
 def unpackAlgstats(memprefix = "unpacked_",alphaAlg=1,omegaAlg=2400):
     statDict = {}
@@ -155,17 +224,20 @@ def repackAlgstats(memprefix = "unpacked_", alphaAlg=1, omegaAlg=2400):
     meSchema.memPut_multi(meSchema.algStats, meDict)
 
 
-def getAlgDesires(algKey,startStep=1,stopStep=13715):
+def getAlgDesires(algKey,resetCache=False,startStep=1,stopStep=13715):
     keylist = []
     desireDict = {}
     for i in range(startStep,stopStep+1):
         key_name = meSchema.buildDesireKey(i,algKey)
         keylist.append(key_name)
 
-    desires = meSchema.desire.get_by_key_name(keylist)
-    for key in desires:
-        if key is not None:
-            desireDict[key.key().name()] = key
+    desireDict = memcache.get_multi(keylist)
+    if desireDict == {} or resetCache == True:
+        desires = meSchema.desire.get_by_key_name(keylist)
+        for key in desires:
+            if key is not None:
+                desireDict[key.key().name()] = key
+        memcache.set_multi(desireDict)
     return desireDict
 
 def populatePandL():
