@@ -94,23 +94,6 @@ def buySell(tradesize,buy,sell,cue):
     elif doSell:
         buysell = -1
     return buysell
-    
-def makeDesire(stckID,keyname,step,buysell,tradesize,cash):
-    from math import floor
-    symbol = meSchema.getStckSymbol(stckID)
-    pricekey = str(stckID)+"_"+str(step)
-    price = meSchema.memGet(meSchema.stck,pricekey,priority=0).quote
-
-    key_name = meSchema.buildDesireKey(step,keyname)
-    desire = {}
-    # Must subtract out Commission so that desire isn't expressed that cannot be cleared.
-    shares = int((buysell)*floor(((tradesize*cash) - 10.00)/price))
-    desire[symbol] = {'Shares' : shares,
-                      'Price'  : price,
-                      'Value'  : price*shares}
-    desire = repr(desire)
-    meDesire = meSchema.desire(key_name = key_name, desire = desire)
-    return meDesire
 
 
 

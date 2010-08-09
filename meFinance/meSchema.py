@@ -33,6 +33,18 @@ class meAlg(db.Model):                                          # Need to implem
     Cash      = db.FloatProperty(required=True,indexed=False)
 
 '''
+  tradeCue class will replace BuyDelta, SellDelta, TimeDelta pairs from meAlg
+  to allow for independent buy and sell time periods.
+
+  tradeCues will be used to calculate desires and the resultant desires
+  will be merged together for particular algorithms when princeFunc
+  does updateAlgStats().
+'''
+class tradeCue(db.Model):
+    QuoteDelta = db.FloatProperty(required=True)               # Percent difference in stock quotes
+    TimeDelta = db.IntegerProperty(required=True)              # Time period between stock quotes.
+
+'''
   Desire class has key that is combination of
   the step and algorithm key of the alg that
   expressed the desire on a given step.
@@ -57,9 +69,9 @@ class meDesire(db.Model):                                       # Used for stuct
 
 class algStats(db.Model):                                       # key_name = meAlg.key().name()
     Cash      = db.FloatProperty(required=False)
-    CashDelta = db.BlobProperty(required=False)                  # Last N values returned by mergePostion() or 0.
+    CashDelta = db.BlobProperty(required=False)                 # Last N values returned by mergePostion() or 0.
     PandL     = db.FloatProperty(required=False)                # total sum of all PandL from trades.
-    Positions = db.BlobProperty(required=False)                  # Serialized dict() of stock positions.
+    Positions = db.BlobProperty(required=False)                 # Serialized dict() of stock positions.
 
 def batchPut(entities, cache=False, memkey=None, time=0):
     batch = []
@@ -302,6 +314,10 @@ def buildDesireKey(step,algKey):
 
 def buildAlgKey(id):
     keyname = str(id).rjust(6,'0')
+    return keyname
+
+def buildTradeCueKey(id):
+    keyname = str(id).rjust(4,'0')
     return keyname
 
 def convertAlgKeys():

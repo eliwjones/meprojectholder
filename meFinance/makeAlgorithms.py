@@ -34,3 +34,26 @@ def makeAlgs():
                             count = 0
     if count > 0:
         db.put(meList)
+
+def makeTradeCues():
+    TimeDelta = [1,80,160,240,320,400]
+    QuoteDelta = [-0.07,-0.05,-0.03,-0.02,-0.01,0.01,0.02,0.03,0.05,0.07]
+    cueID = 0
+    count = 0
+    meList = []
+
+    for tdelta in TimeDelta:
+        for qdelta in QuoteDelta:
+            cueID += 1
+            key_name = meSchema.buildTradeCueKey(cueID)
+            tradeCue = meSchema.tradeCue(key_name   = key_name,
+                                         QuoteDelta = qdelta,
+                                         TimeDelta  = tdelta)
+            meList.append(tradeCue)
+            count+=1
+            if count == 100:
+                db.put(meList)
+                meList = []
+                count = 0
+    if count > 0:
+        db.put(meList)
