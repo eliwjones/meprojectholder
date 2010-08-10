@@ -23,7 +23,13 @@ def openIt(url,start,stop):
 
 
 # Added fillcache=true to primeDesireCache at start of each batch.
-strUrl = 'http://localhost:8080/algorithms/go?task=loop&fillcache=true'
+# Added port option so can feed in alternate port as third arg if needed.
+try:
+    port = str(sys.argv[3])
+except:
+    port = '8080'
+    
+strUrl = 'http://localhost:' + port + '/algorithms/go?task=loop&fillcache=true'
 start  = int(sys.argv[1])
 stop   = int(sys.argv[2])
 

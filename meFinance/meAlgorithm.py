@@ -1,7 +1,7 @@
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.api.labs import taskqueue
-import algorithmFunc
+import desireFunc
 import princeFunc
 
 class go(webapp.RequestHandler):
@@ -32,9 +32,9 @@ class go(webapp.RequestHandler):
             fillcache = str(self.request.get('fillcache'))
             if fillcache == 'true':
                 # Run function to put last 400 steps of desires into memcache.
-                algorithmFunc.primeDesireCache(n)
+                desireFunc.primeDesireCache(n)
             if n < globalstop:
-                algorithmFunc.doAlgs(n,1,2400)     # Algorithms express desires
+                desireFunc.doDesires(n)     # TradeCues express desires
                 #commenting out so can just record desires.
                 #princeFunc.updateAlgStats(n)       # Prince processes desires and updates algStats
                 n += 1
@@ -56,7 +56,7 @@ class go(webapp.RequestHandler):
         startAlg   = int(self.request.get('start'))
         stopAlg    = int(self.request.get('stop'))
 
-        algorithmFunc.doAlgs(step,startAlg,stopAlg)
+        desireFunc.doDesires(step,startAlg,stopAlg)
         # Commenting out so can just record desires
         #princeFunc.updateAlgStats(step,startAlg,stopAlg)
         if step < globalstop:
