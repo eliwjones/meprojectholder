@@ -11,9 +11,9 @@ def doDesires(step, startKey=1, stopKey=60):
     count = 0
     for i in range(startKey, stopKey + 1):
         cuekey = meSchema.buildTradeCueKey(i)
-        desire = doDesire(step, cuekey)
-        if desire is not None:
-            medesires.append(desire)
+        desires = doDesire(step, cuekey)
+        if len(desires) != 0:
+            medesires.extend(desires)
             count += 1
             if count > 100:
                 db.put(medesires)
@@ -25,12 +25,13 @@ def doDesires(step, startKey=1, stopKey=60):
 
 def doDesire(step, cuekey):
     # see if tradeCue for key results in a new desire.
+    desires = []
     tradecue = meSchema.memGet(meSchema.tradeCue, cuekey)
     for stckID in [1,2,3,4]:
         deltakey = str(stckID) + "_" + str(step)
         cval = meSchema.decompCval(deltakey)
         if cval is None or len(cval) < tradecue.TimeDelta + 1:
-            return None
+            return desires
         cue = cval[tradecue.TimeDelta]
         qDelta = tradecue.QuoteDelta
         if (qDelta > 0 and cmp(cue,qDelta) == 1) or (qDelta < 0 and cmp(cue,qDelta) == -1):
@@ -39,8 +40,8 @@ def doDesire(step, cuekey):
                 action = makeDesire(stckID, cuekey, step)
                 recency_key = "desire_" + tradecue.key().name() + "_" + str(stckID)
                 memcache.set(recency_key, step)
-                return action
-    return None
+                desires.append(action)
+    return desires
 
 def recency(tradecue,step,stckID):
     result = False
@@ -54,7 +55,7 @@ def makeDesire(stckID,keyname,step):
     symbol = meSchema.getStckSymbol(stckID)
     pricekey = str(stckID) + "_" + str(step)
     price = meSchema.memGet(meSchema.stck,pricekey,priority=0).quote
-    key_name = meSchema.buildDesireKey(step,keyname)
+    key_name = meSchema.buildDesireKey(step,keyname,stckID)
     meDesire = meSchema.desire(key_name = key_name, Symbol = symbol, Quote = price)
     return meDesire
 
@@ -67,7 +68,7 @@ def primeDesireCache(step):
     for desire in desires:
         desirekey = desire.key().name()
         stckID = meSchema.getStckID(desire.Symbol)
-        cueKey = desirekey.split("_")[-1]      # Extract cueKey from end.
+        cueKey = desirekey.split("_")[-2]      # Extract cueKey from middle.
         memkey = "desire_" + cueKey + "_" + str(stckID)
         step = int(desirekey.split("_")[0])    # Extract step from front part of desirekey.
         if not memdict.__contains__(memkey):

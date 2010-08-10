@@ -57,7 +57,7 @@ class tradeCue(db.Model):
   when tradeCue is processed by princeFunc.
 '''
 class desire(db.Model):                                         # key_name = step + "_" + tradeCue.key().name()
-    Symbol = db.StringProperty(required=True)
+    Symbol = db.StringProperty(required=True)                   #            + "_" + stckID
     Quote  = db.FloatProperty(required=True,indexed=False)
 
 class meDesire(db.Model):                                       # Used for stucturing desire.  Needed anymore?
@@ -304,10 +304,10 @@ def wipeOutCreds():
     results = db.GqlQuery("Select __key__ From GDATACredentials").fetch(100)
     db.delete(results)
 
-def buildDesireKey(step,cueKey):
+def buildDesireKey(step,cueKey,stckID):
     newstep   = str(step).rjust(7,'0')
     cueKey = buildTradeCueKey(cueKey)
-    keyname   = newstep + '_' + cueKey
+    keyname   = newstep + '_' + cueKey + '_' + str(stckID).rjust(2,'0')
     return keyname
 
 def buildAlgKey(id):
