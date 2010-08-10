@@ -46,21 +46,19 @@ class tradeCue(db.Model):
 
 '''
   Desire class has key that is combination of
-  the step and algorithm key of the alg that
+  the step and tradeCue key that
   expressed the desire on a given step.
   
-  desire property of Desire class is a single valued
-  dictionary with the stock symbol as the key.
+  Symbol is the stock to be taded.
+  Price is the price that triggered the trade.
 
-  'Value' was originally included as a convenience.
-  Not sure if needed or even used.
-  
-  desire[symbol] = {'Shares' : shares,
-                    'Price'  : price,
-                    'Value'  : price*shares}
+  Old desire blob no longer used.
+  Shares, Value and trade size to be determined
+  when tradeCue is processed by princeFunc.
 '''
-class desire(db.Model):                                         # key_name = step + "_" + meAlg.key().name()
-    desire = db.BlobProperty(required=True)                     # Serialized dict() with appropriate desire.
+class desire(db.Model):                                         # key_name = step + "_" + tradeCue.key().name()
+    Symbol = db.StringProperty(required=True)
+    Quote  = db.FloatProperty(required=True,indexed=False)
 
 class meDesire(db.Model):                                       # Used for stucturing desire.  Needed anymore?
     Symbol = db.StringProperty(required=True)
@@ -306,10 +304,10 @@ def wipeOutCreds():
     results = db.GqlQuery("Select __key__ From GDATACredentials").fetch(100)
     db.delete(results)
 
-def buildDesireKey(step,algKey):
+def buildDesireKey(step,cueKey):
     newstep   = str(step).rjust(7,'0')
-    newalgKey = str(algKey).rjust(6,'0')
-    keyname   = newstep + '_' + newalgKey
+    cueKey = buildTradeCueKey(cueKey)
+    keyname   = newstep + '_' + cueKey
     return keyname
 
 def buildAlgKey(id):

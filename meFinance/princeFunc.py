@@ -58,7 +58,7 @@ def getAlgStats(alphaAlg=1,omegaAlg=2400):
 
 def getDesireQueryStr(startStep,stopStep):
     alpha = meSchema.buildDesireKey(startStep,0)
-    omega = meSchema.buildDesireKey(stopStep,2401)
+    omega = meSchema.buildDesireKey(stopStep,2401)    # Technically, this value should now be 60 since there are only 60 tradeCues.
     model = 'desire'
     query = "Select * from %s Where __key__ > Key('%s','%s') AND __key__ < Key('%s','%s')" % (model,model,alpha,model,omega)
     return query
