@@ -5,7 +5,7 @@ from collections import deque
 from google.appengine.api import memcache
 from zlib import compress, decompress
 
-def updateAlgStats(step,alphaAlg=1,omegaAlg=2400):
+def updateAlgStats(step,alphaAlg=1,omegaAlg=3540):
     algstats = getAlgStats(alphaAlg,omegaAlg)
     desires = getDesires(step,alphaAlg,omegaAlg)
     alglist = {}
@@ -38,7 +38,7 @@ def moveAlgorithms():
 def processDesires(desires):
     print 'merge desires into positions and adjust cash level'
 
-def getDesires(step,alphaAlg=1,omegaAlg=2400):
+def getDesires(step,alphaAlg=1,omegaAlg=3540):
     keylist = []
     model = meSchema.desire
     for i in range(alphaAlg,omegaAlg+1):
@@ -47,7 +47,7 @@ def getDesires(step,alphaAlg=1,omegaAlg=2400):
     desires = meSchema.memGet_multi(model,keylist)
     return desires
 
-def getAlgStats(alphaAlg=1,omegaAlg=2400):
+def getAlgStats(alphaAlg=1,omegaAlg=3540):
     keylist = []
     model = meSchema.algStats
     for i in range(alphaAlg,omegaAlg+1):

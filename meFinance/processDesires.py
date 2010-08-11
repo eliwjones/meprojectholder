@@ -5,7 +5,7 @@ from google.appengine.api import memcache
 from zlib import compress,decompress
 from collections import deque
 
-def updateAllAlgStats(alphaAlg=1,omegaAlg=2400):
+def updateAllAlgStats(alphaAlg=1,omegaAlg=3540):
     # Way too slow to be useful.
     # Must implement looping method similar to process for desires.
     # resetAlgstats()
@@ -23,30 +23,43 @@ def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpack
     # Possibly precache all desires?  (too big?)
     desires = getAlgDesires(algKey)
     # Grab timedelta and set memcache last buy and last sell to -10000
-    timedelta = meSchema.memGet(meSchema.meAlg,algKey).TimeDelta
+    alginfo = meSchema.memGet(meSchema.meAlg,algKey)
+    buydelta = meSchema.memGet(meSchema.tradeCue,alginfo.BuyCue).TimeDelta
+    selldelta = meSchema.memGet(meSchema.tradeCue,alginfo.SellCue).TimeDelta
     memcache.set(algKey + '_-1',-10000)
     memcache.set(algKey + '_1', -10000)
     # Must order desire keys so that trades are executed in correct sequence.
     orderDesires = []
     for key in desires:
-        desireStep = int(key.replace('_'+algKey,''))
+        # desireStep = int(key.replace('_'+algKey,''))
+        # Since desire key has changed, must make sure to just grab front part of key to get step.
+        desireStep = int(key.split('_')[0])
         if stopStep is None and startStep is None:
             orderDesires.append(key)
         elif desireStep >= int(startStep) and desireStep <= int(stopStep):
             orderDesires.append(key)            
     orderDesires.sort()
     for key in orderDesires:
-        currentDesire = eval(desires[key].desire)
-        desireStep = int(key.replace('_'+algKey,''))
+        currentDesire = eval(desires[key])
+        # desireStep = int(key.replace('_'+algKey,''))
+        desireStep = int(key.split('_')[0])
         for des in currentDesire:
             buysell = cmp(currentDesire[des]['Shares'],0)
-        tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key].desire), eval(repr(stats['Positions'])))
+            
+        tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(repr(stats['Positions'])))
         cash = tradeCash + eval(repr(stats['Cash']))
-        if cash > 0 and (memcache.get(algKey + '_' + str(buysell)) + timedelta) <= desireStep:
+        
+        lastTradeStep = memcache.get(algKey + '_' + str(buysell))
+        if buysell == -1:
+            timedelta = selldelta
+        elif buysell == 1:
+            timedelta = buydelta
+        
+        if cash > 0 and (lastTradeStep + timedelta) <= desireStep:
             memcache.set(algKey + '_' + str(buysell), desireStep)
             stats['CashDelta'].appendleft({'value' : tradeCash,
                                            'PandL' : PandL,
-                                           'step'  : key.replace('_'+algKey,'')})
+                                           'step'  : desireStep})
             if len(stats['CashDelta']) > 800:
                 stats['CashDelta'].pop()
             stats['Cash'] = cash
@@ -56,7 +69,7 @@ def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpack
     return lastStep
 
 def bestAlgSearch(startStep,stopStep):
-    allAlgs = meSchema.meAlg.all().fetch(2400)
+    allAlgs = meSchema.meAlg.all().fetch(3540)
     testAlgKeys = []
     for alg in allAlgs:
         if alg.TradeSize == 0.25:
@@ -161,7 +174,7 @@ def algMaxCashTest(algKey,memprefix="millionaire_",cash=100000.0):
         PLcash += trade['PandL']
     return PLcash + positionsCash     
 
-def unpackAlgstats(memprefix = "unpacked_",alphaAlg=1,omegaAlg=2400):
+def unpackAlgstats(memprefix = "unpacked_",alphaAlg=1,omegaAlg=3540):
     statDict = {}
     memkeylist = []
     entitykeylist = []
@@ -187,7 +200,7 @@ def unpackAlgstats(memprefix = "unpacked_",alphaAlg=1,omegaAlg=2400):
     return statDict
 
 
-def resetAlgstats(memprefix = "unpacked_",algCash=20000.0,alphaAlg=1,omegaAlg=2400):
+def resetAlgstats(memprefix = "unpacked_",algCash=20000.0,alphaAlg=1,omegaAlg=3540):
     memkeylist = []
     cashdelta = {}
     statDict = {}
@@ -204,7 +217,7 @@ def resetAlgstats(memprefix = "unpacked_",algCash=20000.0,alphaAlg=1,omegaAlg=24
         memcache.set(key,statDict[key])
     return statDict
 
-def repackAlgstats(memprefix = "unpacked_", alphaAlg=1, omegaAlg=2400):
+def repackAlgstats(memprefix = "unpacked_", alphaAlg=1, omegaAlg=3540):
     statDict = {}
     meDict = {}
     memkeylist = []
@@ -225,20 +238,58 @@ def repackAlgstats(memprefix = "unpacked_", alphaAlg=1, omegaAlg=2400):
 
 
 def getAlgDesires(algKey,resetCache=False,startStep=1,stopStep=13715):
-    keylist = []
+    buyList = []
+    sellList = []
     desireDict = {}
-    for i in range(startStep,stopStep+1):
-        key_name = meSchema.buildDesireKey(i,algKey)
-        keylist.append(key_name)
+    alginfo = meSchema.memGet(meSchema.meAlg,algKey)
+    buyCue = alginfo.BuyCue
+    sellCue = alginfo.SellCue
+    # Must use algKey to get buyCue and sellCue to then
+    # grab underlying desires.
+    buyQuery = "Select * from desire Where CueKey = '%s'" % (buyCue)
+    sellQuery = "Select * from desire Where CueKey = '%s'" % (sellCue)
+    buyList = memcache.get(buyQuery)
+    if buyList is None:
+        buyList = db.GqlQuery(buyQuery).fetch(4000)
+        memcache.set(buyQuery,buyList)
+    sellList = memcache.get(sellQuery)
+    if sellList is None:
+        sellList = db.GqlQuery(sellQuery).fetch(4000)
+        memcache.set(sellQuery,sellList)
 
-    desireDict = memcache.get_multi(keylist)
-    if desireDict == {} or resetCache == True:
-        desires = meSchema.desire.get_by_key_name(keylist)
-        for key in desires:
-            if key is not None:
-                desireDict[key.key().name()] = key
-        memcache.set_multi(desireDict)
+    if len(buyList) > len(sellList):
+        # If there are more buys than sells, fill dict with buys first
+        # Then overwrite with sells.  Else, do reverse.
+        # If there is a buy and a sell for a given stock on a certain step,
+        # the less frequent action will be given precedence.
+        for buy in buyList:
+            keyname = buy.key().name()
+            keyname = keyname.replace('_' + buyCue + '_', '_' + algKey + '_')
+            desireDict[keyname] = convertDesireToDict(buy,1)
+        for sell in sellList:
+            keyname = sell.key().name()
+            keyname = keyname.replace('_' + sellCue + '_', '_' + algKey + '_')
+            desireDict[keyname] = convertDesireToDict(sell,-1)
+    else:
+        for sell in sellList:
+            keyname = sell.key().name()
+            keyname = keyname.replace('_' + sellCue + '_', '_' + algKey + '_')
+            desireDict[keyname] = convertDesireToDict(sell,-1)
+        for buy in buyList:
+            keyname = buy.key().name()
+            keyname = keyname.replace('_' + buyCue + '_', '_' + algKey + '_')
+            desireDict[keyname] = convertDesireToDict(buy,1)
     return desireDict
+
+def convertDesireToDict(desire,buysell,tradesize = 0.25, cash = 20000.0):
+    # Right now just using default tradesize and cash to get working.
+    from math import floor
+    meDict = {}
+    shares = int((buysell)*floor(((tradesize*cash) - 10.00)/desire.Quote))
+    meDict[desire.Symbol] = {'Shares' : shares,
+                             'Price'  : desire.Quote,
+                             'Value'  : desire.Quote*shares}
+    return repr(meDict)
 
 def populatePandL():
     algstats = meSchema.algStats().all().fetch(5000)

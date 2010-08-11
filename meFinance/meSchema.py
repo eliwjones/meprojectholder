@@ -58,6 +58,7 @@ class tradeCue(db.Model):
 class desire(db.Model):                                         # key_name = step + "_" + tradeCue.key().name()
     Symbol = db.StringProperty(required=True)                   #            + "_" + stckID
     Quote  = db.FloatProperty(required=True,indexed=False)
+    CueKey = db.StringProperty(required=False)                  # Adding so can easily extract all desires for given cue.
 
 class meDesire(db.Model):                                       # Used for stucturing desire.  Needed anymore?
     Symbol = db.StringProperty(required=True)
