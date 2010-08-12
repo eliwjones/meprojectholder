@@ -175,15 +175,15 @@ def analyzeAlgPerformance(aggregateType=None,memkeylist=None,stopStep=13715):
         alg = algDict[algkey]
         if stats[r]['PandL'] != 0.0:
             if aggregateType is None:
-                dictKey = str(alg.BuyDelta) + "_" + str(alg.SellDelta) + "_" + str(alg.TimeDelta)
+                dictKey = str(alg.BuyCue) + "_" + str(alg.SellCue)
             elif aggregateType == "step":
                 # Use this key to get aggregate performance by stepstart
                 # Since backTest key is of form:  stufff_step_stuff
                 dictKey = r.split("_")[-2]
             elif aggregateType == "family_step":
-                dictKey = str(alg.BuyDelta) + "_" + str(alg.SellDelta) + "_" + str(alg.TimeDelta) + "_" + r.split("_")[-2]
+                dictKey = str(alg.BuyCue) + "_" + str(alg.SellCue) + "_" + r.split("_")[-2]
             elif aggregateType == "alg_step":
-                dictKey = str(alg.BuyDelta) + "_" + str(alg.SellDelta) + "_" + str(alg.TimeDelta) + "_" + str(alg.TradeSize)
+                dictKey = str(alg.BuyCue) + "_" + str(alg.SellCue) + "_" + str(alg.TradeSize)
                 dictKey = dictKey + "_" + r.split("_")[-2]
                 
             if memkeylist is None:
