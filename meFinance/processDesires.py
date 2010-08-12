@@ -95,27 +95,23 @@ def bestAlgSearch(startStep,stopStep):
     # Stats updated.. must calculate total PandL and position values.
     posPandLs = calculatePositionPandLs(testAlgKeys,memprefix,stopStep,algStats)
     totalValDict = {}
-    numTradeList = []
     for key in algStats:
         totalVal = algStats[key]['PandL'] + posPandLs[key]
         trades = len(algStats[key]['CashDelta'])
         if totalVal > 0.0 and trades > 20:
-            numTradeList.append(trades)
             if totalValDict.__contains__(totalVal):
                 totalValDict[totalVal].append(key)
             else:
                 totalValDict[totalVal] = [key]
-    numTradeList.sort()
-    print "Median Trades: " + str(numTradeList[int(len(numTradeList)/2)])
-    print "Max Trades: " + str(numTradeList[-1])
-    print "Min Trades: " + str(numTradeList[0])
-    avgTrades = str(float(sum(numTradeList))/len(numTradeList))
-    print "Avg Trades: " + avgTrades
     totalValKeys = totalValDict.keys()
     totalValKeys.sort()
+    backTestCandidates = []
     for i in range(1,101):
         key = totalValKeys[(-1)*i]
-        print str(key) + ": " + str(totalValDict[key])
+        backTestCandidates.append(totalValDict[key][0].split('_')[-1])
+    backTestKeyList = runBackTests(backTestCandidates)
+    backTestReturns = getBackTestReturns(backTestKeyList,stopStep)
+    return backTestReturns
             
 def calculatePositionPandLs(algKeys,memprefix,stopStep,algStats=None):
     memkeys = []
@@ -154,7 +150,61 @@ def runBackTests(alglist, aggregateType = "step", stepRange=None):
     for memprefix in monthList:
         for algkey in alglist:
             keylist.append(memprefix + '_' + algkey)
-    princeFunc.analyzeAlgPerformance(aggregateType,keylist)
+    # princeFunc.analyzeAlgPerformance(aggregateType,keylist)
+    return keylist
+
+def getBackTestReturns(memkeylist, stopStep):
+    stats = memcache.get_multi(memkeylist)
+    algkeys = {}
+    for key in stats:
+        key_name = key.split('_')[-1]  # Pull algkey from end of memkey
+        algkeys[key_name] = None       # So I don't have to check if algkey already there.
+    algkeys = algkeys.keys()           # Turn dictionary keys into list of keys.
+    algs = meSchema.memGet_multi(meSchema.meAlg,algkeys)
+    cuekeys = {}
+    for key in algs:
+        key_name = algs[key].BuyCue
+        cuekeys[key_name] = None
+        key_name = algs[key].SellCue
+        cuekeys[key_name] = None
+    cuekeys = cuekeys.keys()
+    tradecues = meSchema.memGet_multi(meSchema.tradeCue,cuekeys)
+    stopStepQuotes = princeFunc.getStepQuotes(stopStep)
+    backTestReturns = {}
+    # Pre-populate dict to avoid doing __contains__ on every key.
+    for memkey in stats:
+        algkey = memkey.split('_')[-1]
+        startMonth = memkey.split('_')[0]
+        if not backTestReturns.__contains__(algkey):
+            buycue = tradecues[algs[algkey].BuyCue]
+            sellcue = tradecues[algs[algkey].SellCue]
+            fingerprint = 'buy = ' + str(buycue.QuoteDelta) + '%, ' + str(buycue.TimeDelta) + '  '
+            fingerprint = fingerprint + 'sell = ' + str(sellcue.QuoteDelta) + '%, ' + str(sellcue.TimeDelta)
+            backTestReturns[algkey] = {'fingerprint' : fingerprint, 'returns' : {} }
+        
+    for memkey in stats:
+        algkey = memkey.split('_')[-1]
+        startMonth = memkey.split('_')[0]
+        positionsValue = 0.0
+        for key in stats[memkey]['Positions']:
+            currentPrice = stopStepQuotes[key]
+            posPrice = stats[memkey]['Positions'][key]['Price']
+            shares = stats[memkey]['Positions'][key]['Shares']
+            positionsValue += (currentPrice-posPrice)*shares
+        stepReturn = (positionsValue + stats[memkey]['PandL'])/algs[algkey].Cash
+        # 'algKey' : 
+        #    { 'fingerprint' :  'buy = TradeCue, TimeDelta : sell = TradeCue, TimeDelta',
+        #      'returns'     :
+        #              { 'startMonth(1)' :
+        #                              { 'return' : 'x1%', 'PandL' : '$y1', 'PosVal' : '$z1'},
+        #                'startMonth(2)' :
+        #                              { 'return' : 'x2%', 'PandL' : '$y2', 'PosVal' : '$z2'}
+        #               }
+        backTestReturns[algkey]['returns'][int(startMonth)] = {'return': str(round(100*stepReturn,1)) + '%',
+                                                          'PandL' : '$' + str(stats[memkey]['PandL']),
+                                                          'PosVal': '$' + str(positionsValue)}
+    return backTestReturns
+        
     
 def algMaxCashTest(algKey,memprefix="millionaire_",cash=100000.0):
     # Test for max alg trading performance.
