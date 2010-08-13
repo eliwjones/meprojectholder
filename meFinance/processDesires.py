@@ -178,8 +178,8 @@ def getBackTestReturns(memkeylist, stopStep):
         if not backTestReturns.__contains__(algkey):
             buycue = tradecues[algs[algkey].BuyCue]
             sellcue = tradecues[algs[algkey].SellCue]
-            fingerprint = 'buy = ' + str(buycue.QuoteDelta) + '%, ' + str(buycue.TimeDelta) + '  '
-            fingerprint = fingerprint + 'sell = ' + str(sellcue.QuoteDelta) + '%, ' + str(sellcue.TimeDelta)
+            fingerprint = { 'buy'  : [buycue.QuoteDelta, buycue.TimeDelta],
+                            'sell' : [sellcue.QuoteDelta, sellcue.TimeDelta] }
             backTestReturns[algkey] = {'fingerprint' : fingerprint, 'returns' : {} }
         
     for memkey in stats:
