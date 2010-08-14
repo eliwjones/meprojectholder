@@ -98,7 +98,7 @@ def bestAlgSearch(startStep,stopStep):
     for key in algStats:
         totalVal = algStats[key]['PandL'] + posPandLs[key]
         trades = len(algStats[key]['CashDelta'])
-        if totalVal > 0.0 and trades > 20:
+        if totalVal > 0.0 and trades > ((stopStep - startStep)*0.002):     # A little more than .002 trades per step.
             if totalValDict.__contains__(totalVal):
                 totalValDict[totalVal].append(key)
             else:
@@ -106,12 +106,16 @@ def bestAlgSearch(startStep,stopStep):
     totalValKeys = totalValDict.keys()
     totalValKeys.sort()
     backTestCandidates = []
-    for i in range(1,101):
+    for i in range(1,min(501,len(totalValKeys))):
         key = totalValKeys[(-1)*i]
         backTestCandidates.append(totalValDict[key][0].split('_')[-1])
-    backTestKeyList = runBackTests(backTestCandidates)
-    backTestReturns = getBackTestReturns(backTestKeyList,stopStep)
-    return backTestReturns
+    # Returning candidate list so can get multiple sets of candidates from
+    # different starting points.
+    return backTestCandidates
+    
+    #backTestKeyList = runBackTests(backTestCandidates)
+    #backTestReturns = getBackTestReturns(backTestKeyList,stopStep)
+    #return backTestReturns
             
 def calculatePositionPandLs(algKeys,memprefix,stopStep,algStats=None):
     memkeys = []
@@ -133,23 +137,24 @@ def calculatePositionPandLs(algKeys,memprefix,stopStep,algStats=None):
     return algPosValues
         
 
-def runBackTests(alglist, aggregateType = "step", stepRange=None):
+def runBackTests(alglist, aggregateType = "step", stepRange=None, stop=13715):
     # alglist is [] of algorithm key_names.
-    stop = 13715
     monthList = []
     if stepRange is None:
         monthList = [str(stop-1760),str(stop-1760*2),str(stop-1760*3),str(stop-1760*4),str(stop-1760*5),str(stop-1760*6),str(stop-1760*7),str(1)]
     else:
         for step in stepRange:
-            monthList.append(str(stop - step))
+            monthList.append(str(step))  # Simply want it to test the range I give it.
     for alg in alglist:
         for startMonth in monthList:
-            resetAlgstats(startMonth + "_", 20000.0, int(alg), int(alg))
-            updateAlgStat(alg,startMonth,str(stop),startMonth + "_")
+            memprefix = startMonth + "_" + str(stop) + "_"
+            resetAlgstats(memprefix, 20000.0, int(alg), int(alg))
+            updateAlgStat(alg,startMonth,str(stop),memprefix)
     keylist = []
-    for memprefix in monthList:
+    for startMonth in monthList:
         for algkey in alglist:
-            keylist.append(memprefix + '_' + algkey)
+            memprefix = startMonth + "_" + str(stop) + "_"
+            keylist.append(memprefix + algkey)
     # princeFunc.analyzeAlgPerformance(aggregateType,keylist)
     return keylist
 
