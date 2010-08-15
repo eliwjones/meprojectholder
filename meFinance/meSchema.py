@@ -71,12 +71,14 @@ class algStats(db.Model):                                       # key_name = meA
     PandL     = db.FloatProperty(required=False)                # total sum of all PandL from trades.
     Positions = db.BlobProperty(required=False)                 # Serialized dict() of stock positions.
 
-class backTestResults(db.Model):                                # Model to use for sifting through Back Test Results.
+class backTestResult(db.Model):                                # Model to use for sifting through Back Test Results.
     algKey        = db.StringProperty(required=True)            # Used to create intersecting sets.
     startStep     = db.IntegerProperty(required=True)
-    stopStep      = db.IntegerProprety(required=True)
+    stopStep      = db.IntegerProperty(required=True)
     percentReturn = db.FloatProperty(required=True)
     numTrades     = db.IntegerProperty(required=True)
+    PandL         = db.FloatProperty(required=True)
+    PosVal        = db.FloatProperty(required=True)
 
 def batchPut(entities, cache=False, memkey=None, time=0):
     batch = []

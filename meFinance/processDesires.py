@@ -188,8 +188,9 @@ def getBackTestReturns(memkeylist, stopStep):
             backTestReturns[algkey] = {'fingerprint' : fingerprint, 'returns' : {} }
         
     for memkey in stats:
-        algkey = memkey.split('_')[-1]
+        algkey = memkey.split('_')[-1]    # Memkey has form: startStep_stopStep_algKey
         startMonth = memkey.split('_')[0]
+        testStopStep   = memkey.split('_')[1]
         positionsValue = 0.0
         for key in stats[memkey]['Positions']:
             currentPrice = stopStepQuotes[key]
@@ -205,11 +206,30 @@ def getBackTestReturns(memkeylist, stopStep):
         #                'startMonth(2)' :
         #                              { 'return' : 'x2%', 'PandL' : '$y2', 'PosVal' : '$z2'}
         #               }
-        backTestReturns[algkey]['returns'][int(startMonth)] = {'return': str(round(100*stepReturn,1)) + '%',
-                                                          'PandL' : '$' + str(stats[memkey]['PandL']),
-                                                          'PosVal': '$' + str(positionsValue)}
+        backTestReturns[algkey]['returns'][int(startMonth)] = {'return'    : stepReturn,
+                                                               'numTrades' : len(stats[memkey]['CashDelta']),
+                                                               'PandL'     : stats[memkey]['PandL'],
+                                                               'PosVal'    : positionsValue,
+                                                               'stopStep'  : int(testStopStep)}
     return backTestReturns
-        
+
+def persistBackTestReturns(backTestReturns):
+    putList = []
+    for algKey in backTestReturns:
+        for startMonth in backTestReturns[algKey]['returns']:
+            currentResult = backTestReturns[algKey]['returns'][startMonth]
+            resultKey = algKey + "_" + str(startMonth).rjust(7,'0') + "_" + str(currentResult['stopStep']).rjust(7,'0')
+            backTestResult = meSchema.backTestResult(key_name      = resultKey,
+                                                     algKey        = algKey,
+                                                     startStep     = startMonth,
+                                                     stopStep      = currentResult['stopStep'],
+                                                     percentReturn = currentResult['return'],
+                                                     numTrades     = currentResult['numTrades'],
+                                                     PandL         = currentResult['PandL'],
+                                                     PosVal        = currentResult['PosVal'])
+            putList.append(backTestResult)
+    meSchema.batchPut(putList)
+                                                      
     
 def algMaxCashTest(algKey,memprefix="millionaire_",cash=100000.0):
     # Test for max alg trading performance.
