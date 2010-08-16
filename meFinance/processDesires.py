@@ -381,14 +381,27 @@ def populatePandL():
     meSchema.batchPut(algstats)
 
 def getAlgDistance(alg1Key,alg2Key):
-    print "calculate normalized distance between algorithms"
+    alg1 = meSchema.memGet(meSchema.meAlg,alg1Key)
+    alg2 = meSchema.memGet(meSchema.meAlg,alg2Key)
+    buycue1 = meSchema.memGet(meSchema.tradeCue,alg1.BuyCue)
+    sellcue1 = meSchema.memGet(meSchema.tradeCue,alg1.SellCue)
+    buycue2 = meSchema.memGet(meSchema.tradeCue,alg2.BuyCue)
+    sellcue2 = meSchema.memGet(meSchema.tradeCue,alg2.SellCue)
+
+    # Packing normalized Deltas into A1, A2 vectors.
+    A1 = [normalizeQuoteDelta(buycue1.QuoteDelta), normalizeTimeDelta(buycue1.TimeDelta), normalizeQuoteDelta(sellcue1.QuoteDelta), normalizeTimeDelta(sellcue1.TimeDelta)]
+    A2 = [normalizeQuoteDelta(buycue2.QuoteDelta), normalizeTimeDelta(buycue2.TimeDelta), normalizeQuoteDelta(sellcue2.QuoteDelta), normalizeTimeDelta(sellcue2.TimeDelta)]
+    # Using naive distance since the actual numerical value is meaningless to me.
+    # abs() works faster than **2 and sqrt()
+    distance = abs(A1[0] - A2[0]) + abs(A1[1] - A2[1]) + abs(A1[2] - A2[2]) + abs(A1[3] - A2[3])
+    return distance
 
 def normalizeTimeDelta(TD):
     TD = (float(TD)-1.0)/399.0
     return TD
     
 def normalizeQuoteDelta(QD):
-    QD = (float(QD) + 0.07)/0.14
+    QD = (float(QD) + 0.05)/0.1    # Normalizing for 0.05 instead of 0.07 since 0.07 does not show up in any frequent traders.
     return QD
         
 
