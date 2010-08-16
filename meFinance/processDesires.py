@@ -106,7 +106,7 @@ def bestAlgSearch(startStep,stopStep):
     totalValKeys = totalValDict.keys()
     totalValKeys.sort()
     backTestCandidates = []
-    for i in range(1,min(501,len(totalValKeys))):
+    for i in range(1,len(totalValKeys)):  # Sending all keys since will do filtering later.
         key = totalValKeys[(-1)*i]
         backTestCandidates.append(totalValDict[key][0].split('_')[-1])
     # Returning candidate list so can get multiple sets of candidates from
