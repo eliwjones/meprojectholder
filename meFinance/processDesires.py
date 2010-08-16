@@ -379,6 +379,17 @@ def populatePandL():
         alg.PandL = summer
         alg.CashDelta = compress(repr(cashdelta),9)
     meSchema.batchPut(algstats)
+
+def getAlgDistance(alg1Key,alg2Key):
+    print "calculate normalized distance between algorithms"
+
+def normalizeTimeDelta(TD):
+    TD = (float(TD)-1.0)/399.0
+    return TD
+    
+def normalizeQuoteDelta(QD):
+    QD = (float(QD) + 0.07)/0.14
+    return QD
         
 
 
