@@ -380,6 +380,58 @@ def populatePandL():
         alg.CashDelta = compress(repr(cashdelta),9)
     meSchema.batchPut(algstats)
 
+def getMaxMinDistance(algList,subSetSize=5):
+    subsets = combinations(algList,subSetSize)
+    MaxMinDistance = 0.0
+    MaxMinDistanceSet = []
+    for subset in subsets:
+        subset = list(subset)
+        minDistance = getMinDistance(subset)
+        if minDistance > MaxMinDistance:
+            MaxMinDistance = minDistance
+            MaxMinDistanceSet = subset
+    return MaxMinDistanceSet
+    
+
+def combinations(algList, r):
+    '''
+        Returns all possible r-member subsets from the algList.
+    '''
+    pool = tuple(algList)
+    n = len(pool)
+    if r>n:
+        return
+    indices = range(r)
+    yield tuple(pool[i] for i in indices)
+    while True:
+        for i in reversed(range(r)):
+            if indices[i] != i + n - r:
+                break
+        else:
+            return
+        indices[i] += 1
+        for j in range(i+1,r):
+            indices[j] = indices[j-1] + 1
+        yield tuple(pool[i] for i in indices)
+
+def getMinDistance(algList):
+    minDistance = 1000.0
+    for i in range(len(algList)-1):
+        for j in range(i+1, len(algList)):
+            distance = getAlgDistance(algList[i], algList[j])
+            if distance < minDistance:
+                minDistance = distance
+    return minDistance
+
+def getMaxDistance(algList):
+    maxDistance = 0.0
+    for i in range(len(algList)-1):
+        for j in range(i+1, len(algList)):
+            distance = getAlgDistance(algList[i], algList[j])
+            if distance > maxDistance:
+                maxDistance = distance
+    return maxDistance
+
 def getAlgDistance(alg1Key,alg2Key):
     alg1 = meSchema.memGet(meSchema.meAlg,alg1Key)
     alg2 = meSchema.memGet(meSchema.meAlg,alg2Key)
