@@ -382,15 +382,34 @@ def populatePandL():
 
 def getMaxMinDistance(algList,subSetSize=5):
     subsets = combinations(algList,subSetSize)
+    MaxMinDistanceSets = {}
     MaxMinDistance = 0.0
     MaxMinDistanceSet = []
     for subset in subsets:
         subset = list(subset)
         minDistance = getMinDistance(subset)
         if minDistance > MaxMinDistance:
+            MaxMinDistanceSets = appendSetByMinKey(MaxMinDistanceSets,minDistance,subset)
             MaxMinDistance = minDistance
             MaxMinDistanceSet = subset
+    MaxMaxDistance = 0.0
+    for subset in MaxMinDistanceSets[MaxMinDistance]:  # In case more than one subset had same MaxMinDistance.
+        maxDistance = getMaxDistance(subset)
+        if maxDistance > MaxMaxDistance:
+            MaxMaxDistance = maxDistance
+            MaxMinDistanceSet = subset
     return MaxMinDistanceSet
+
+def appendSetByMinKey(setDict,minKey,minKeySet):
+    # If minKey is not in the Dict, then it is a new MaxMin,
+    # Reset dict with minKeySet.
+    # If minKey is there, append minKeySet to list.
+    if not setDict.__contains__(minKey):
+        setDict = {}
+        setDict[minKey] = [minKeySet]
+    else:
+        setDict[minKey].append(minKeySet)
+    return setDict
     
 
 def combinations(algList, r):
@@ -433,6 +452,7 @@ def getMaxDistance(algList):
     return maxDistance
 
 def getAlgDistance(alg1Key,alg2Key):
+    from math import sqrt
     alg1 = meSchema.memGet(meSchema.meAlg,alg1Key)
     alg2 = meSchema.memGet(meSchema.meAlg,alg2Key)
     buycue1 = meSchema.memGet(meSchema.tradeCue,alg1.BuyCue)
@@ -443,9 +463,8 @@ def getAlgDistance(alg1Key,alg2Key):
     # Packing normalized Deltas into A1, A2 vectors.
     A1 = [normalizeQuoteDelta(buycue1.QuoteDelta), normalizeTimeDelta(buycue1.TimeDelta), normalizeQuoteDelta(sellcue1.QuoteDelta), normalizeTimeDelta(sellcue1.TimeDelta)]
     A2 = [normalizeQuoteDelta(buycue2.QuoteDelta), normalizeTimeDelta(buycue2.TimeDelta), normalizeQuoteDelta(sellcue2.QuoteDelta), normalizeTimeDelta(sellcue2.TimeDelta)]
-    # Using naive distance since the actual numerical value is meaningless to me.
-    # abs() works faster than **2 and sqrt()
-    distance = abs(A1[0] - A2[0]) + abs(A1[1] - A2[1]) + abs(A1[2] - A2[2]) + abs(A1[3] - A2[3])
+    distance = (A1[0] - A2[0])**2 + (A1[1] - A2[1])**2 + (A1[2] - A2[2])**2 + (A1[3] - A2[3])**2
+    distance = sqrt(distance)
     return distance
 
 def normalizeTimeDelta(TD):
