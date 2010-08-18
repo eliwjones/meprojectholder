@@ -141,7 +141,9 @@ def runBackTests(alglist, aggregateType = "step", stepRange=None, stop=13715):
     # alglist is [] of algorithm key_names.
     monthList = []
     if stepRange is None:
-        monthList = [str(stop-1760),str(stop-1760*2),str(stop-1760*3),str(stop-1760*4),str(stop-1760*5),str(stop-1760*6),str(stop-1760*7),str(1)]
+        #monthList = [str(stop-1760),str(stop-1760*2),str(stop-1760*3),str(stop-1760*4),str(stop-1760*5),str(stop-1760*6),str(stop-1760*7),str(1)]
+        for i in range(1,4):    # Create monthList with last three months as startsteps. Need max in case we hit step 1.
+            monthList.append(str(max(stop - 1760*i, 1)))
     else:
         for step in stepRange:
             monthList.append(str(step))  # Simply want it to test the range I give it.
@@ -321,6 +323,7 @@ def getAlgDesires(algKey,resetCache=False,startStep=1,stopStep=13715):
     sellCue = alginfo.SellCue
     # Must use algKey to get buyCue and sellCue to then
     # grab underlying desires.
+    # TODO! : Better add a damned step value and compound index on (CueKey,step) for easy range grab.
     buyQuery = "Select * from desire Where CueKey = '%s'" % (buyCue)
     sellQuery = "Select * from desire Where CueKey = '%s'" % (sellCue)
     buyList = memcache.get(buyQuery)
