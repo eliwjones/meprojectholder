@@ -56,7 +56,7 @@ def makeDesire(stckID,keyname,step):
     pricekey = str(stckID) + "_" + str(step)
     price = meSchema.memGet(meSchema.stck,pricekey,priority=0).quote
     key_name = meSchema.buildDesireKey(step,keyname,stckID)
-    meDesire = meSchema.desire(key_name = key_name, Symbol = symbol, Quote = price)
+    meDesire = meSchema.desire(key_name = key_name, CueKey = keyname, Symbol = symbol, Quote = price)
     return meDesire
 
 def primeDesireCache(step):

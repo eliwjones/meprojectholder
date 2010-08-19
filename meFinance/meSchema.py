@@ -26,10 +26,10 @@ class stepDate(db.Model):
     date = db.DateTimeProperty(required=True)
 
 class meAlg(db.Model):                                          # Need to implement 0-padded key_name for consistency.
-    TradeSize = db.FloatProperty(required=False)
-    BuyCue    = db.StringProperty(required=False)               # Contains tradeCue key that triggers Buy.
-    SellCue   = db.StringProperty(required=False)               # Contains tradeCue key that triggers Sell.
-    Cash      = db.FloatProperty(required=False)
+    TradeSize = db.FloatProperty(required=True)
+    BuyCue    = db.StringProperty(required=True)               # Contains tradeCue key that triggers Buy.
+    SellCue   = db.StringProperty(required=True)               # Contains tradeCue key that triggers Sell.
+    Cash      = db.FloatProperty(required=True)
 
 '''
   tradeCue class will replace BuyDelta, SellDelta, TimeDelta pairs from meAlg
@@ -56,9 +56,9 @@ class tradeCue(db.Model):
   when tradeCue is processed by princeFunc.
 '''
 class desire(db.Model):                                         # key_name = step + "_" + tradeCue.key().name()
-    Symbol = db.StringProperty(required=False)                   #            + "_" + stckID
-    Quote  = db.FloatProperty(required=False,indexed=False)
-    CueKey = db.StringProperty(required=False)                  # Adding so can easily extract all desires for given cue.
+    Symbol = db.StringProperty(required=True)                   #            + "_" + stckID
+    Quote  = db.FloatProperty(required=True,indexed=False)
+    CueKey = db.StringProperty(required=True)                  # Adding so can easily extract all desires for given cue.
 
 class meDesire(db.Model):                                       # Used for stucturing desire.  Needed anymore?
     Symbol = db.StringProperty(required=True)
