@@ -79,6 +79,8 @@ class backTestResult(db.Model):                                # Model to use fo
     numTrades     = db.IntegerProperty(required=True)
     PandL         = db.FloatProperty(required=True)
     PosVal        = db.FloatProperty(required=True)
+    CashDelta     = db.TextProperty(required=False)
+    Positions     = db.TextProperty(required=False)
 
 def batchPut(entities, cache=False, memkey=None, time=0):
     batch = []

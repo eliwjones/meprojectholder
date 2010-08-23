@@ -45,6 +45,7 @@ def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpack
         desireStep = int(key.split('_')[0])
         for des in currentDesire:
             buysell = cmp(currentDesire[des]['Shares'],0)
+            Symbol = des
             
         tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(repr(stats['Positions'])))
         cash = tradeCash + eval(repr(stats['Cash']))
@@ -57,9 +58,11 @@ def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpack
         
         if cash > 0 and (lastTradeStep + timedelta) <= desireStep:
             memcache.set(algKey + '_' + str(buysell), desireStep)
-            stats['CashDelta'].appendleft({'value' : tradeCash,
-                                           'PandL' : PandL,
-                                           'step'  : desireStep})
+            stats['CashDelta'].appendleft({'Symbol'  : Symbol,
+                                           'buysell' : buysell,
+                                           'value'   : tradeCash,
+                                           'PandL'   : PandL,
+                                           'step'    : desireStep})
             if len(stats['CashDelta']) > 800:
                 stats['CashDelta'].pop()
             stats['Cash'] = cash
@@ -212,7 +215,9 @@ def getBackTestReturns(memkeylist, stopStep):
                                                                'numTrades' : len(stats[memkey]['CashDelta']),
                                                                'PandL'     : stats[memkey]['PandL'],
                                                                'PosVal'    : positionsValue,
-                                                               'stopStep'  : int(testStopStep)}
+                                                               'stopStep'  : int(testStopStep),
+                                                               'CashDelta' : repr(stats[memkey]['CashDelta']),
+                                                               'Positions' : repr(stats[memkey]['Positions'])}
     return backTestReturns
 
 def persistBackTestReturns(backTestReturns):
@@ -228,7 +233,9 @@ def persistBackTestReturns(backTestReturns):
                                                      percentReturn = currentResult['return'],
                                                      numTrades     = currentResult['numTrades'],
                                                      PandL         = currentResult['PandL'],
-                                                     PosVal        = currentResult['PosVal'])
+                                                     PosVal        = currentResult['PosVal'],
+                                                     CashDelta     = currentResult['CashDelta'],
+                                                     Positions     = currentResult['Positions'])
             putList.append(backTestResult)
     meSchema.batchPut(putList)
                                                       
