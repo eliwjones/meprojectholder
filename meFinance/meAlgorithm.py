@@ -19,9 +19,8 @@ class go(webapp.RequestHandler):
         if task == 'true':
             globalstop = int(globalstop)
             uniquifier = str(self.request.get('uniquifier'))
-            for i in range(1,2002,400): 
-                taskAdd("Algs-"+str(i)+"-"+str(i+399)+"-step-"+str(step)+"-"+uniquifier,
-                        step, globalstop, uniquifier, i, i+399, 0)
+            taskAdd("Desires-"+str(1)+"-"+str(60)+"-step-"+str(step)+"-"+uniquifier,
+                    step, globalstop, uniquifier, 1, 60, 0)
         elif task == 'loop' and inDev:
             globalstop = int(globalstop)
             n = str(self.request.get('n'))
@@ -53,32 +52,32 @@ class go(webapp.RequestHandler):
         step       = int(self.request.get('step'))
         globalstop = int(self.request.get('globalstop'))
         uniquifier = str(self.request.get('uniquifier'))
-        startAlg   = int(self.request.get('start'))
-        stopAlg    = int(self.request.get('stop'))
+        startDesire   = int(self.request.get('start'))
+        stopDesire    = int(self.request.get('stop'))
 
-        desireFunc.doDesires(step,startAlg,stopAlg)
+        desireFunc.doDesires(step,startDesire,stopDesire)
         # Commenting out so can just record desires
         #princeFunc.updateAlgStats(step,startAlg,stopAlg)
         if step < globalstop:
             step += 1
-            taskAdd("Algs-"+str(startAlg)+"-"+str(stopAlg)+"-step-"+str(step)+"-"+uniquifier,
-                    step, globalstop, uniquifier, startAlg, stopAlg, 0)
+            taskAdd("Desires-"+str(startDesire)+"-"+str(stopDesire)+"-step-"+str(step)+"-"+uniquifier,
+                    step, globalstop, uniquifier, startDesire, stopDesire, 0)
 
-def taskAdd(name,step,globalstop,uniquifier,startAlg,stopAlg,delay,wait=.5):
+def taskAdd(name,step,globalstop,uniquifier,startDesire,stopDesire,delay,wait=.5):
     try:
         taskqueue.add(url = '/algorithms/go', countdown = delay,
                       name = name,
                       params = {'step'      : step,
                                 'globalstop': globalstop,
                                 'uniquifier': uniquifier,
-                                'start'     : startAlg,
-                                'stop'      : stopAlg} )
+                                'start'     : startDesire,
+                                'stop'      : stopDesire} )
     except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
         pass
     except:
         from time import sleep
         sleep(wait)
-        taskAdd(name,step,globalstop,uniquifier,startAlg,stopAlg,delay,2*wait)
+        taskAdd(name,step,globalstop,uniquifier,startDesire,stopDesire,delay,2*wait)
 
 
 application = webapp.WSGIApplication([('/algorithms/go',go)],
