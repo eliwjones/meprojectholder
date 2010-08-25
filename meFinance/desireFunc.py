@@ -15,7 +15,8 @@ def doDesires(step, startKey=1, stopKey=60):
         desires = doDesire(step, cuekey)
         if len(desires) != 0:
             medesires.extend(desires)
-    meSchema.batchPut(medesires)
+    # Commenting out to see speed without puts.
+    #meSchema.batchPut(medesires)
             
 def doDesire(step, cuekey):
     # see if tradeCue for key results in a new desire.
