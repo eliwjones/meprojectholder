@@ -14,20 +14,24 @@ def updateAllAlgStats(alphaAlg=1,omegaAlg=3540):
         updateAlgStat(key_name)
 
 def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpacked_"):
+    # Possibly modify function to wrap itself in Try,Except for DeadlineExceeded Error?
+    # runBackTests calls it like so:  updateAlgStat(alg,startMonth,str(stop),memprefix)
     if stopStep is None:
         lastStep = db.GqlQuery("Select * From stepDate Order by step desc").fetch(1)[0].step
     else:
         lastStep = stopStep
-    stats = memcache.get(memprefix + algKey)
-    # Consider implementing caching since this part is slowww.. (4 seconds)
-    # Possibly precache all desires?  (too big?)
+    # resetAlgstats() returns statDict so can grab by memprefix + algKey
+    stats = resetAlgstats(memprefix, 20000.0, int(algKey), int(algKey))[memprefix + algKey]
     desires = getAlgDesires(algKey)
     # Grab timedelta and set memcache last buy and last sell to -10000
     alginfo = meSchema.memGet(meSchema.meAlg,algKey)
     buydelta = meSchema.memGet(meSchema.tradeCue,alginfo.BuyCue).TimeDelta
     selldelta = meSchema.memGet(meSchema.tradeCue,alginfo.SellCue).TimeDelta
-    memcache.set(algKey + '_-1',-10000)
-    memcache.set(algKey + '_1', -10000)
+    # change lastTrade info to just be dict, not memcache.
+    lastTradeStep = {memprefix + '_' + algKey + '_-1': -10000,
+                     memprefix + '_' + algKey + '_1' : -10000}
+    #memcache.set(memprefix + '_' + algKey + '_-1',-10000)
+    #memcache.set(memprefix + '_' + algKey + '_1', -10000)
     # Must order desire keys so that trades are executed in correct sequence.
     orderDesires = []
     for key in desires:
@@ -50,14 +54,14 @@ def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpack
         tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(repr(stats['Positions'])))
         cash = tradeCash + eval(repr(stats['Cash']))
         
-        lastTradeStep = memcache.get(algKey + '_' + str(buysell))
+        # lastTradeStep = memcache.get(memprefix + '_' + algKey + '_' + str(buysell))
         if buysell == -1:
             timedelta = selldelta
         elif buysell == 1:
             timedelta = buydelta
         
-        if cash > 0 and (lastTradeStep + timedelta) <= desireStep:
-            memcache.set(algKey + '_' + str(buysell), desireStep)
+        if cash > 0 and lastTradeStep[memprefix + '_' + algKey + '_' + str(buysell)] <= desireStep - timedelta:
+            lastTradeStep[memprefix + '_' + algKey + '_' + str(buysell)] = desireStep
             stats['CashDelta'].appendleft({'Symbol'  : Symbol,
                                            'buysell' : buysell,
                                            'value'   : tradeCash,
@@ -68,8 +72,10 @@ def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpack
             stats['Cash'] = cash
             stats['PandL'] += PandL
             stats['Positions'] = position
-    memcache.set(memprefix + algKey, stats)
-    return lastStep
+    # memcache.set(memprefix + algKey, stats)
+    # Passing statDict directly into getBackTestReturns() for formatting.
+    bTestReturns = getBackTestReturns([memprefix + algKey],stopStep, {memprefix + algKey: stats})
+    persistBackTestReturns(bTestReturns)
 
 def bestAlgSearch(startStep,stopStep):
     allAlgs = meSchema.meAlg.all().fetch(3540)
@@ -141,10 +147,8 @@ def calculatePositionPandLs(algKeys,memprefix,stopStep,algStats=None):
         
 
 def runBackTests(alglist, aggregateType = "step", stepRange=None, stop=13715):
-    # alglist is [] of algorithm key_names.
     monthList = []
     if stepRange is None:
-        #monthList = [str(stop-1760),str(stop-1760*2),str(stop-1760*3),str(stop-1760*4),str(stop-1760*5),str(stop-1760*6),str(stop-1760*7),str(1)]
         for i in range(1,4):    # Create monthList with last three months as startsteps. Need max in case we hit step 1.
             monthList.append(str(max(stop - 1760*i, 1)))
     else:
@@ -153,18 +157,21 @@ def runBackTests(alglist, aggregateType = "step", stepRange=None, stop=13715):
     for alg in alglist:
         for startMonth in monthList:
             memprefix = startMonth + "_" + str(stop) + "_"
-            resetAlgstats(memprefix, 20000.0, int(alg), int(alg))
+            # Wrap in one deferrable function? or merge resetAlgstats into updateAlgStat?
+            #resetAlgstats(memprefix, 20000.0, int(alg), int(alg))
             updateAlgStat(alg,startMonth,str(stop),memprefix)
     keylist = []
     for startMonth in monthList:
         for algkey in alglist:
             memprefix = startMonth + "_" + str(stop) + "_"
             keylist.append(memprefix + algkey)
-    # princeFunc.analyzeAlgPerformance(aggregateType,keylist)
     return keylist
 
-def getBackTestReturns(memkeylist, stopStep):
-    stats = memcache.get_multi(memkeylist)
+def getBackTestReturns(memkeylist, stopStep, stats=None):
+    # If want can pass in stats dict with appropriate data.
+    if stats is None:
+        stats = memcache.get_multi(memkeylist)
+
     algkeys = {}
     for key in stats:
         key_name = key.split('_')[-1]  # Pull algkey from end of memkey
@@ -239,7 +246,8 @@ def persistBackTestReturns(backTestReturns):
             putList.append(backTestResult)
     meSchema.batchPut(putList)
                                                       
-    
+ '''
+ # Deprecating this function since it is nonsensical.
 def algMaxCashTest(algKey,memprefix="millionaire_",cash=100000.0):
     # Test for max alg trading performance.
     resetAlgstats(memprefix,cash,int(algKey),int(algKey))
@@ -256,7 +264,7 @@ def algMaxCashTest(algKey,memprefix="millionaire_",cash=100000.0):
     PLcash = 0.0
     for trade in algStats['CashDelta']:
         PLcash += trade['PandL']
-    return PLcash + positionsCash     
+    return PLcash + positionsCash      '''
 
 def unpackAlgstats(memprefix = "unpacked_",alphaAlg=1,omegaAlg=3540):
     statDict = {}
