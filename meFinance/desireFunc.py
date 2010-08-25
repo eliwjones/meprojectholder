@@ -15,13 +15,7 @@ def doDesires(step, startKey=1, stopKey=60):
         desires = doDesire(step, cuekey)
         if len(desires) != 0:
             medesires.extend(desires)
-            count += 1
-            if count > 100:
-                db.put(medesires)
-                medesires = []
-                count = 0
-    if count > 0:
-        db.put(medesires)
+    meSchema.batchPut(medesires)
             
 def doDesire(step, cuekey):
     # see if tradeCue for key results in a new desire.
