@@ -19,6 +19,7 @@ class go(webapp.RequestHandler):
         if task == 'true':
             globalstop = int(globalstop)
             uniquifier = str(self.request.get('uniquifier'))
+            desireFunc.primeDesireCache(step)    # Must prime cache before starting tasks for first time.
             taskAdd("Desires-"+str(1)+"-"+str(60)+"-step-"+str(step)+"-"+uniquifier,
                     step, globalstop, uniquifier, 1, 60, 0)
         elif task == 'loop' and inDev:

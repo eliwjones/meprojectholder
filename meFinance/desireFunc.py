@@ -1,12 +1,13 @@
 import meSchema
 from google.appengine.api import memcache
 from google.appengine.ext import db
+import cachepy
 
 # New Desire calculation function.
 
 def doDesires(step, startKey=1, stopKey=60):
-    # No longer using old memPut_multi() method with dict object.
-    # Just straight putting to datatstore with no caching.
+    # Check cachepy clock and sync with memcache if necessary.
+    syncProcessCache(step,startKey,stopKey)
     medesires = []
     count = 0
     for i in range(startKey, stopKey + 1):
@@ -22,7 +23,6 @@ def doDesires(step, startKey=1, stopKey=60):
     if count > 0:
         db.put(medesires)
             
-
 def doDesire(step, cuekey):
     # see if tradeCue for key results in a new desire.
     desires = []
@@ -38,18 +38,36 @@ def doDesire(step, cuekey):
             recent = recency(tradecue,step,stckID)
             if not recent:
                 action = makeDesire(stckID, cuekey, step)
-                recency_key = "desire_" + tradecue.key().name() + "_" + str(stckID)
+                recency_key = 'desire_' + tradecue.key().name() + '_' + str(stckID)
+                # Maybe combine this into function?
                 memcache.set(recency_key, step)
+                cachepy.set(recency_key, step, priority=1)
+                
                 desires.append(action)
     return desires
 
 def recency(tradecue,step,stckID):
     result = False
-    recency_key = "desire_" + tradecue.key().name() + "_" + str(stckID)
-    lastStep = memcache.get(recency_key)
+    recency_key = 'desire_' + tradecue.key().name() + '_' + str(stckID)
+    lastStep = cachepy.get(recency_key, priority=1)
     if lastStep >= step - tradecue.TimeDelta:
         result = True
     return result
+
+def syncProcessCache(step,startKey,stopKey):
+    clockKey = 'stepclock_' + str(startKey) + '_' + str(stopKey)
+    stepclock = cachepy.get(clockKey, priority=1)
+    memkeylist = []
+    if stepclock != step-1:
+        for i in range(startKey,stopKey + 1):
+            for stckID in [1,2,3,4]:
+                cuekey = meSchema.buildTradeCueKey(i)
+                recency_key = 'desire_' + cuekey + '_' + str(stckID)
+                memkeylist.append(recency_key)
+        recentDesires = memcache.get_multi(memkeylist)
+        for des in recentDesires:
+            cachepy.set(des, recentDesires[des], priority=1)
+    cachepy.set(clockKey,step,priority=1)   # Set cachepy clockKey to current step since synced with Memcache.
 
 def makeDesire(stckID,keyname,step):
     symbol = meSchema.getStckSymbol(stckID)
@@ -69,7 +87,7 @@ def primeDesireCache(step):
         desirekey = desire.key().name()
         stckID = meSchema.getStckID(desire.Symbol)
         cueKey = desirekey.split("_")[-2]      # Extract cueKey from middle.
-        memkey = "desire_" + cueKey + "_" + str(stckID)
+        memkey = 'desire_' + cueKey + '_' + str(stckID)
         step = int(desirekey.split("_")[0])    # Extract step from front part of desirekey.
         if not memdict.__contains__(memkey):
             memdict[memkey] = step
