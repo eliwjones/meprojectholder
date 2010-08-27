@@ -77,7 +77,8 @@ def updateAlgStat(algKey, startStep = None, stopStep = None, memprefix = "unpack
     # memcache.set(memprefix + algKey, stats)
     # Passing statDict directly into getBackTestReturns() for formatting.
     bTestReturns = getBackTestReturns([memprefix + algKey],stopStep, {memprefix + algKey: stats})
-    persistBackTestReturns(bTestReturns)
+    return bTestReturns
+    #persistBackTestReturns(bTestReturns)
 
 def bestAlgSearch(startStep,stopStep):
     allAlgs = meSchema.meAlg.all().fetch(3540)
@@ -147,9 +148,23 @@ def calculatePositionPandLs(algKeys,memprefix,stopStep,algStats=None):
         algPosValues[memkey] = positionsValue
     return algPosValues
         
+def backTestBatch(algBatch,monthBatch,stopStep):
+    backTestReturnDict = {}
+    for alg in algBatch:
+        for startMonth in monthBatch:
+            memprefix = startMonth + '_' + stopStep + '_'
+            batchReturns = updateAlgStat(alg, startMonth, stopStep, memprefix)
+            for key in batchReturns:
+                if key in backTestReturnDict:
+                    backTestReturnDict[key]['returns'].update(batchReturns[key]['returns'])
+                else:
+                    backTestReturnDict[key] = batchReturns[key]                        
+    persistBackTestReturns(backTestReturnDict)
 
 def runBackTests(alglist, stop, stepRange=None):
     monthList = []
+    algBatch = []
+    monthBatch = []
     if stepRange is None:
         for i in range(1,4):    # Create monthList with last three months as startsteps. Need max in case we hit step 1.
             monthList.append(str(max(stop - 1760*i, 1)))
@@ -157,9 +172,17 @@ def runBackTests(alglist, stop, stepRange=None):
         for step in stepRange:
             monthList.append(str(step))  # Simply want it to test the range I give it.
     for alg in alglist:
+        algBatch.append(alg)
         for startMonth in monthList:
-            memprefix = startMonth + "_" + str(stop) + "_"
-            deferred.defer(updateAlgStat, alg,startMonth,str(stop),memprefix)
+            monthBatch.append(startMonth)
+        if len(monthBatch) > 100:
+            deferred.defer(backTestBatch, algBatch, monthBatch, str(stop))
+            algBatch = []
+            monthBatch = []
+    if len(monthBatch) > 0:
+        deferred.defer(backTestBatch, algBatch, monthBatch, str(stop))
+        algBatch = []
+        monthBatch = []
     keylist = []
     for startMonth in monthList:
         for algkey in alglist:

@@ -86,7 +86,7 @@ def batchPut(entities, cache=False, memkey=None, time=0):
     batch = []
     for entity in entities:
         batch.append(entity)
-        if len(batch) > 100:
+        if len(batch) > 112:
             db.put(batch)
             batch=[]
     if len(batch) > 0:
