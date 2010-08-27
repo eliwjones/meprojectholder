@@ -310,6 +310,18 @@ def wipeoutAlgStats():
         cursor = query.cursor()
         total += count
 
+def wipeoutBackTests():
+    count = 100
+    cursor = None
+    while count == 100:
+        query = db.Query(meSchema.backTestResult, keys_only=True)
+        if cursor is not None:
+            query.with_cursor(cursor)
+        btests = query.fetch(100)
+        count = len(btests)
+        db.delete(btests)
+        cursor = query.cursor()
+
 def wipeoutDeltas():
     count = 100
     cursor = None

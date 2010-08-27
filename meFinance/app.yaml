@@ -16,6 +16,10 @@ handlers:
   script: $PYTHON_LIB/google/appengine/ext/deferred/handler.py
   login: admin
 
+- url: /backtest/.*
+  script: doBackTests.py
+  login: admin
+
 - url: /config/.*
   script: meFinance.py
   login: admin

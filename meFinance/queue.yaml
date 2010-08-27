@@ -2,3 +2,8 @@ queue:
 - name: default
   rate: 50/s
   bucket_size: 50
+
+- name: backTestQueue
+  rate: 50/s
+  bucket_size: 50
+
