@@ -9,7 +9,6 @@ from google.appengine.api import memcache
 from datetime import datetime, date
 from pytz import timezone
 import meSchema
-import deltaFunc
 
 
 class putStats(webapp.RequestHandler):
@@ -69,7 +68,6 @@ def putEm(step):
 
     for stock in meList:
         memcache.set("stck" + stock.key().name(),db.model_to_protobuf(stock).Encode())
-        deltaFunc.doMeDeltas(stock.ID,step,step)
         
     meStepDate = meSchema.stepDate(key_name = str(step),step = step, date = meDatetime)
     meList.append(meStepDate)
