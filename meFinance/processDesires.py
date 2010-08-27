@@ -245,26 +245,7 @@ def persistBackTestReturns(backTestReturns):
                                                      Positions     = currentResult['Positions'])
             putList.append(backTestResult)
     meSchema.batchPut(putList)
-                                                      
- '''
- # Deprecating this function since it is nonsensical.
-def algMaxCashTest(algKey,memprefix="millionaire_",cash=100000.0):
-    # Test for max alg trading performance.
-    resetAlgstats(memprefix,cash,int(algKey),int(algKey))
-    lastStep = updateAlgStat(algKey,None,None,memprefix)
-    lastQuotes = princeFunc.getStepQuotes(lastStep)
-    # Close out positions using stock quotes from lastStep
-    algStats = memcache.get(memprefix + algKey)
-    positionsCash = 0.0
-    for key in algStats['Positions']:
-        currentPrice = lastQuotes[key]
-        posPrice = algStats['Positions'][key]['Price']
-        shares = algStats['Positions'][key]['Shares']
-        positionsCash += (currentPrice - posPrice)*shares
-    PLcash = 0.0
-    for trade in algStats['CashDelta']:
-        PLcash += trade['PandL']
-    return PLcash + positionsCash      '''
+
 
 def unpackAlgstats(memprefix = "unpacked_",alphaAlg=1,omegaAlg=3540):
     statDict = {}
@@ -309,6 +290,7 @@ def resetAlgstats(memprefix = "unpacked_",algCash=20000.0,alphaAlg=1,omegaAlg=35
         memcache.set(key,statDict[key])
     return statDict
 
+
 def repackAlgstats(memprefix = "unpacked_", alphaAlg=1, omegaAlg=3540):
     statDict = {}
     meDict = {}
@@ -329,7 +311,7 @@ def repackAlgstats(memprefix = "unpacked_", alphaAlg=1, omegaAlg=3540):
     meSchema.memPut_multi(meSchema.algStats, meDict)
 
 
-def getAlgDesires(algKey,resetCache=False,startStep=1,stopStep=13715):
+def getAlgDesires(algKey,resetCache=False,startStep=None,stopStep=None):
     buyList = []
     sellList = []
     desireDict = {}
@@ -341,14 +323,21 @@ def getAlgDesires(algKey,resetCache=False,startStep=1,stopStep=13715):
     # TODO! : Better add a damned step value and compound index on (CueKey,step) for easy range grab.
     buyQuery = "Select * from desire Where CueKey = '%s'" % (buyCue)
     sellQuery = "Select * from desire Where CueKey = '%s'" % (sellCue)
-    buyList = memcache.get(buyQuery)
+    
+    buyList = meSchema.cachepy.get(buyQuery)
     if buyList is None:
-        buyList = db.GqlQuery(buyQuery).fetch(4000)
-        memcache.set(buyQuery,buyList)
-    sellList = memcache.get(sellQuery)
+        buyList = memcache.get(buyQuery)
+        if buyList is None:
+            buyList = db.GqlQuery(buyQuery).fetch(4000)
+            memcache.set(buyQuery,buyList)
+        meSchema.cachepy.set(buyQuery,buyList)
+    sellList = meSchema.cachepy.get(sellQuery)
     if sellList is None:
-        sellList = db.GqlQuery(sellQuery).fetch(4000)
-        memcache.set(sellQuery,sellList)
+        sellList = memcache.get(sellQuery)
+        if sellList is None:
+            sellList = db.GqlQuery(sellQuery).fetch(4000)
+            memcache.set(sellQuery,sellList)
+        meSchema.cachepy.set(sellQuery,sellList)
 
     if len(buyList) > len(sellList):
         # If there are more buys than sells, fill dict with buys first
