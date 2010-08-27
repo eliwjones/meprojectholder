@@ -4,6 +4,8 @@ from google.appengine.ext import db
 from google.appengine.api import memcache
 from zlib import compress,decompress
 from collections import deque
+from google.appengine.ext import deferred
+
 
 def updateAllAlgStats(alphaAlg=1,omegaAlg=3540):
     # Way too slow to be useful.
@@ -146,7 +148,7 @@ def calculatePositionPandLs(algKeys,memprefix,stopStep,algStats=None):
     return algPosValues
         
 
-def runBackTests(alglist, aggregateType = "step", stepRange=None, stop=13715):
+def runBackTests(alglist, stop, stepRange=None):
     monthList = []
     if stepRange is None:
         for i in range(1,4):    # Create monthList with last three months as startsteps. Need max in case we hit step 1.
@@ -157,9 +159,7 @@ def runBackTests(alglist, aggregateType = "step", stepRange=None, stop=13715):
     for alg in alglist:
         for startMonth in monthList:
             memprefix = startMonth + "_" + str(stop) + "_"
-            # Wrap in one deferrable function? or merge resetAlgstats into updateAlgStat?
-            #resetAlgstats(memprefix, 20000.0, int(alg), int(alg))
-            updateAlgStat(alg,startMonth,str(stop),memprefix)
+            deferred.defer(updateAlgStat, alg,startMonth,str(stop),memprefix)
     keylist = []
     for startMonth in monthList:
         for algkey in alglist:

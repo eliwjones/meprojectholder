@@ -310,6 +310,18 @@ def wipeoutAlgStats():
         cursor = query.cursor()
         total += count
 
+def wipeoutDeltas():
+    count = 100
+    cursor = None
+    while count == 100:
+        query = db.Query(meSchema.delta, keys_only=True)
+        if cursor is not None:
+            query.with_cursor(cursor)
+        delts = query.fetch(100)
+        count = len(delts)
+        db.delete(delts)
+        cursor = query.cursor()
+
 def initializeAlgStats():
     meList = []
     meDict = {}
