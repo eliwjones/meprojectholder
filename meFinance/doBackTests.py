@@ -22,11 +22,13 @@ class doBackTests(webapp.RequestHandler):
             startAlg = int(startAlg)
             stopAlg = int(stopAlg)
             alglist = [meSchema.buildAlgKey(i) for i in range(startAlg, stopAlg+1)]
+            stepRange = [stopStep - i*400 for i in range(6,13,2)]  # Creates range every 2 weeks starting 6 weeks out to 12 weeks
             try:
-                deferred.defer(processDesires.runBackTests, alglist, stopStep,
+                deferred.defer(processDesires.runBackTests, alglist, stopStep, 5, stepRange,
                                _name = unique + '-' + str(startAlg) + '-' + str(stopAlg) + '-' + str(stopStep))
             except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError):
                 self.response.out.write('Job already added for these Algs and stopStep')
+            self.response.out.write('Added job!\n')
 
 application = webapp.WSGIApplication([('/backtest/doBackTests',doBackTests)],
                                      debug = True)
