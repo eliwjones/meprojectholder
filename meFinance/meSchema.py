@@ -89,7 +89,7 @@ class liveAlg(db.Model):
     percentReturn = db.FloatProperty(required=True)
     Positions     = db.TextProperty(required=True)
     PosVal        = db.FloatProperty(required=True)
-    PandL         = db.FloatProperty(requred=True)
+    PandL         = db.FloatProperty(required=True)
     CashDelta     = db.TextProperty(required=True)
     Cash          = db.FloatProperty(required=True)
     numTrades     = db.IntegerProperty(required=True)
