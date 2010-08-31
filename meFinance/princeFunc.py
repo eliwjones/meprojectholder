@@ -322,6 +322,21 @@ def wipeoutBackTests():
         db.delete(btests)
         cursor = query.cursor()
 
+def getBackTestResultCount(stopStep):
+    count = 200
+    total = 0
+    cursor = None
+    while count == 200:
+        query = db.GqlQuery("Select __key__ from backTestResult Where stopStep = :1",stopStep)
+        if cursor is not None:
+            query.with_cursor(cursor)
+        btests = query.fetch(200)
+        count = len(btests)
+        total += count
+        cursor = query.cursor()
+    return total
+
+
 def wipeoutDeltas():
     count = 100
     cursor = None

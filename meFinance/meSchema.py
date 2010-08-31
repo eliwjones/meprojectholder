@@ -82,6 +82,18 @@ class backTestResult(db.Model):                                # Model to use fo
     CashDelta     = db.TextProperty(required=False)
     Positions     = db.TextProperty(required=False)
 
+class liveAlg(db.Model):
+    lastStep      = db.IntegerProperty(required=True)
+    lastBuy       = db.IntegerProperty(required=True)
+    lastSell      = db.IntegerProperty(required=True)
+    percentReturn = db.FloatProperty(required=True)
+    Positions     = db.TextProperty(required=True)
+    PosVal        = db.FloatProperty(required=True)
+    PandL         = db.FloatProperty(requred=True)
+    CashDelta     = db.TextProperty(required=True)
+    Cash          = db.FloatProperty(required=True)
+    numTrades     = db.IntegerProperty(required=True)
+
 def batchPut(entities, cache=False, memkey=None, time=0):
     batch = []
     for entity in entities:
