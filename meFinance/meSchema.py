@@ -93,6 +93,7 @@ class liveAlg(db.Model):
     CashDelta     = db.TextProperty(required=True)
     Cash          = db.FloatProperty(required=True)
     numTrades     = db.IntegerProperty(required=True)
+    algKey        = db.StringProperty(required=True)
 
 def batchPut(entities, cache=False, memkey=None, time=0):
     batch = []
