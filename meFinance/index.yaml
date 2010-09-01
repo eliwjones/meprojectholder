@@ -1,1 +1,7 @@
 indexes:
+- kind: backTestResult
+  properties:
+  - name: startStep
+  - name: stopStep
+  - name: percentReturn
+    direction: desc
