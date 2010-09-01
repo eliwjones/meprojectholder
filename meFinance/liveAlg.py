@@ -14,6 +14,7 @@
 
 import meSchema
 import processDesires
+import princeFunc
 from collections import deque
 from google.appengine.ext import db
 
@@ -22,18 +23,33 @@ def processLiveAlgStepRange(start,stop):
     stopStepList = buildStopStepList(start,stop)
     liveAlgInfo = getLiveAlgInfo()
     # populate liveAlgsDict with datastore info
-    for i in len(stopStepList):
+    for i in range(len(stopStepList)):
         lastBackTestStop = stopStepList[i]
         bestAlgs = getBestAlgs(lastBackTestStop)
         # bestAlg now filled with four stepRange algs that were best in last test period.
         # Must get lastBuy, lastSell info and get desires for bestAlg[stepRange] for start -> stop steps.
-        if i < len(stopStep)-1:
+        if i < len(stopStepList)-1:
             lastStep = stopStepList[i+1]
         else:
             lastStep = stop
         liveAlgInfo = processStepRangeDesires(currentStep,lastStep,bestAlgs,liveAlgInfo)
         currentStep = lastStep + 1
     # Write liveAlgInfo info back datatstore
+    stopStepQuotes = princeFunc.getStepQuotes(currentStep)
+    putList = []
+    for liveAlgKey in liveAlgInfo:
+        # Must calculate PosVal.
+        positions = eval(liveAlgInfo[liveAlgKey].Positions)
+        positionsValue = 0.0
+        for symbol in positions:
+            currentPrice = stopStepQuotes[symbol]
+            posPrice = positions[symbol]['Price']
+            shares = positions[symbol]['Shares']
+            positionsValue += (currentPrice - posPrice)*shares
+        liveAlgInfo[liveAlgKey].PosVal = positionsValue
+        putList.append(liveAlgInfo[liveAlgKey])
+    db.put(putList)
+        
 
 def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
     # For each bestAlg, get desires, process, merge into liveAlgInfo and return.
@@ -63,7 +79,10 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
                 timedelta = buydelta
                 lastTradeStep = liveAlgInfo[liveAlgKey].lastBuy
             if cash > 0 and lastTradeStep <= desireStep - timedelta:
-                lastTradeStep = desireStep
+                if buysell == -1:
+                    liveAlgInfo[liveAlgKey].lastSell = desireStep
+                elif buysell == 1:
+                    liveAlgInfo[liveAlgKey].lastBuy = desireStep
                 CashDelta = eval(liveAlgInfo[liveAlgKey].CashDelta)
                 CashDelta.appendleft({'Symbol' : Symbol,
                                       'buysell': buysell,
@@ -74,7 +93,7 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
                 liveAlgInfo[liveAlgKey].Cash      = cash
                 liveAlgInfo[liveAlgKey].PandL    += PandL
                 liveAlgInfo[liveAlgKey].Positions = repr(position)
-                liveAlgInfo[liveAlgKey].lastStep  = stop
+        liveAlgInfo[liveAlgKey].lastStep  = stop
     return liveAlgInfo
 
 def getLiveAlgInfo():
@@ -162,7 +181,7 @@ def initializeLiveAlgs():
     for stepRange in [6,8,10,12]:
         liveAlg = meSchema.liveAlg(key_name = str(stepRange), lastStep = recentStep, lastBuy = 0, lastSell = 0,
                                    percentReturn = 0.0, Positions = repr({}), PosVal = 0.0, PandL = 0.0,
-                                   CashDelta = repr(deque([])), Cash = 0.0, numTrades = 0,
+                                   CashDelta = repr(deque([])), Cash = 20000.0, numTrades = 0,
                                    algKey = bestAlg[stepRange].algKey)
         liveAlgs.append(liveAlg)
     db.put(liveAlgs)
