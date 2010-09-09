@@ -22,10 +22,12 @@ def processLiveAlgStepRange(start,stop):
     currentStep = start
     stopStepList = buildStopStepList(start,stop)
     liveAlgInfo = getLiveAlgInfo()
+    liveAlgKeys = [int(key) for key in liveAlgInfo.keys()]
+    liveAlgKeys.sort()
     # populate liveAlgsDict with datastore info
     for i in range(len(stopStepList)):
         lastBackTestStop = stopStepList[i]
-        bestAlgs = getBestAlgs(lastBackTestStop)
+        bestAlgs = getBestAlgs(lastBackTestStop, liveAlgKeys)
         # bestAlg now filled with four stepRange algs that were best in last test period.
         # Must get lastBuy, lastSell info and get desires for bestAlg[stepRange] for start -> stop steps.
         if i < len(stopStepList)-1:
@@ -99,18 +101,16 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
     return liveAlgInfo
 
 def getLiveAlgInfo():
-    # Returns dict with keyname in [6,8,10,12]
-    liveAlgs = meSchema.liveAlg.all().fetch(4)
+    liveAlgs = meSchema.liveAlg.all().fetch(20)
     liveAlgInfo = {}
     for alg in liveAlgs:
         liveAlgInfo[alg.key().name()] = alg
     return liveAlgInfo
 
-def getBestAlgs(stopStep):
-    # Returns dict with keyname in [6,8,10,12]
+def getBestAlgs(stopStep,backSteps):
     bestAlgs = {}
     topAlgs = []
-    for stepRange in [6,8,10,12]:
+    for stepRange in backSteps:
         stepBack = stepRange*400
         topAlgs = meSchema.backTestResult.all().filter("stopStep =", stopStep).filter("startStep =", stopStep - stepBack)
         topAlgs = topAlgs.order("-percentReturn").fetch(20)
@@ -179,14 +179,14 @@ def initializeLiveAlgs():
     result = meSchema.backTestResult.all().filter("stopStep <=",currentStep).order("-stopStep").get()
     recentStep = result.stopStep
     bestAlg = {}
-    for stepRange in [6,8,10,12]:
+    for stepRange in [2,3,4,5,6,8,10,12]:
         stepBack = stepRange*400
         bestAlg[stepRange] = meSchema.backTestResult.all().filter("stopStep =",recentStep)
         bestAlg[stepRange] = bestAlg[stepRange].filter("startStep =", recentStep - stepBack)
         bestAlg[stepRange] = bestAlg[stepRange].order("-percentReturn").get()
 
     liveAlgs = []
-    for stepRange in [6,8,10,12]:
+    for stepRange in bestAlg.keys():
         liveAlg = meSchema.liveAlg(key_name = str(stepRange), lastStep = recentStep, lastBuy = 0, lastSell = 0,
                                    percentReturn = 0.0, Positions = repr({}), PosVal = 0.0, PandL = 0.0,
                                    CashDelta = repr(deque([])), Cash = 20000.0, numTrades = 0,
