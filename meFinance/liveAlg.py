@@ -47,6 +47,8 @@ def processLiveAlgStepRange(start,stop):
             shares = positions[symbol]['Shares']
             positionsValue += (currentPrice - posPrice)*shares
         liveAlgInfo[liveAlgKey].PosVal = positionsValue
+        liveAlgInfo[liveAlgKey].percentReturn = (liveAlgInfo[liveAlgKey].PosVal + liveAlgInfo[liveAlgKey].PandL)/20000.0
+        liveAlgInfo[liveAlgKey].numTrades = len(eval(liveAlgInfo[liveAlgKey].CashDelta))
         putList.append(liveAlgInfo[liveAlgKey])
     db.put(putList)
         
@@ -107,11 +109,17 @@ def getLiveAlgInfo():
 def getBestAlgs(stopStep):
     # Returns dict with keyname in [6,8,10,12]
     bestAlgs = {}
+    topAlgs = []
     for stepRange in [6,8,10,12]:
         stepBack = stepRange*400
-        bestAlgs[str(stepRange)] = meSchema.backTestResult.all().filter("stopStep =", stopStep)
-        bestAlgs[str(stepRange)] = bestAlgs[str(stepRange)].filter("startStep =", stopStep - stepBack)
-        bestAlgs[str(stepRange)] = bestAlgs[str(stepRange)].order("-percentReturn").get().algKey
+        topAlgs = meSchema.backTestResult.all().filter("stopStep =", stopStep).filter("startStep =", stopStep - stepBack)
+        topAlgs = topAlgs.order("-percentReturn").fetch(20)
+        for topAlg in topAlgs:
+            if topAlg.PandL > topAlg.PosVal:
+                bestAlgs[str(stepRange)] = topAlg.algKey
+                break
+        else:
+            bestAlgs[str(stepRange)] = topAlgs[0].algKey
     return bestAlgs
 
 def buildStopStepList(start,stop):

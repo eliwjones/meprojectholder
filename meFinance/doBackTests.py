@@ -4,13 +4,21 @@ from google.appengine.ext import deferred
 from google.appengine.api.labs import taskqueue
 import meSchema
 import processDesires
-
+# Sample url to call code.
+#    /backtest/doBackTests?stopStep=15955&startAlg=1&stopAlg=3540&unique=b2b2
 
 class doBackTests(webapp.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/plain'
         self.response.out.write('I do backtests!\n')
         stopStep = str(self.request.get('stopStep'))
+        # Must split up string representation of list and turn into int list
+        # Just say no to eval().
+        startSteps = str(self.request.get('startSteps'))
+        if startSteps != '':
+            startSteps = startSteps[1:-1].split(',')
+            startSteps = [int(i) for i in startSteps]
+        
         startAlg = str(self.request.get('startAlg'))
         stopAlg = str(self.request.get('stopAlg'))
         unique = str(self.request.get('unique'))
@@ -22,7 +30,10 @@ class doBackTests(webapp.RequestHandler):
             startAlg = int(startAlg)
             stopAlg = int(stopAlg)
             alglist = [meSchema.buildAlgKey(i) for i in range(startAlg, stopAlg+1)]
-            stepRange = [stopStep - i*400 for i in range(6,13,2)]  # Creates range every 2 weeks starting 6 weeks out to 12 weeks
+            if type(startSteps) == type([]):
+                stepRange = [stopStep - i*400 for i in startSteps]
+            else:
+                stepRange = [stopStep - i*400 for i in [2,3,4,5]]
             try:
                 deferred.defer(processDesires.runBackTests, alglist, stopStep, 5, stepRange,
                                _name = unique + '-' + str(startAlg) + '-' + str(stopAlg) + '-' + str(stopStep))
