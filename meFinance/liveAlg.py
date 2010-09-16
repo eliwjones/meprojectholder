@@ -35,6 +35,9 @@ def processLiveAlgStepRange(start,stop):
         else:
             lastStep = stop
         liveAlgInfo = processStepRangeDesires(currentStep,lastStep,bestAlgs,liveAlgInfo)
+        # Add in code to calculate stopStep return
+        # Then append this return and the stopStep to liveAlg.history
+        liveAlgInfo = getCurrentReturn(liveAlgInfo,lastStep)
         currentStep = lastStep + 1
     # Write liveAlgInfo info back datatstore
     stopStepQuotes = princeFunc.getStepQuotes(currentStep)
@@ -53,6 +56,24 @@ def processLiveAlgStepRange(start,stop):
         liveAlgInfo[liveAlgKey].numTrades = len(eval(liveAlgInfo[liveAlgKey].CashDelta))
         putList.append(liveAlgInfo[liveAlgKey])
     db.put(putList)
+
+def getCurrentReturn(liveAlgInfo,stopStep):
+    print "I calculate and return the current stopStep return"
+    stopStepQuotes = princeFunc.getStepQuotes(stopStep)
+    for liveAlgKey in liveAlgInfo:
+        positions = eval(liveAlgInfo[liveAlgKey].Positions)
+        positionsValue = 0.0
+        for symbol in positions:
+            currentPrice = stopStepQuotes[symbol]
+            posPrice = positions[symbol]['Price']
+            shares = positions[symbol]['Shares']
+            positionsValue += (currentPrice - posPrice)*shares
+        liveAlgInfo[liveAlgKey].PosVal = positionsValue
+        liveAlgInfo[liveAlgKey].percentReturn = (liveAlgInfo[liveAlgKey].PosVal + liveAlgInfo[liveAlgKey].PandL)/20000.0
+        history = eval(liveAlgInfo[liveAlgKey].history)
+        history.appendleft({ 'step' : stopStep, 'return' : liveAlgInfo[liveAlgKey].percentReturn })
+        liveAlgInfo[liveAlgKey].history = repr(history)
+    return liveAlgInfo
         
 
 def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
@@ -190,7 +211,8 @@ def initializeLiveAlgs():
         liveAlg = meSchema.liveAlg(key_name = str(stepRange), lastStep = recentStep, lastBuy = 0, lastSell = 0,
                                    percentReturn = 0.0, Positions = repr({}), PosVal = 0.0, PandL = 0.0,
                                    CashDelta = repr(deque([])), Cash = 20000.0, numTrades = 0,
-                                   algKey = bestAlg[stepRange].algKey)
+                                   algKey = bestAlg[stepRange].algKey,
+                                   history = repr(deque([])) )
         liveAlgs.append(liveAlg)
     db.put(liveAlgs)
 
