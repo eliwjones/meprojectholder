@@ -18,10 +18,10 @@ import princeFunc
 from collections import deque
 from google.appengine.ext import db
 
-def processLiveAlgStepRange(start,stop,doReverse=False):
+def processLiveAlgStepRange(start, stop, doReverse = False, algKeyFilter = None):
     currentStep = start
     stopStepList = buildStopStepList(start,stop)
-    liveAlgInfo = getLiveAlgInfo()
+    liveAlgInfo = getLiveAlgInfo(algKeyFilter)
     liveAlgKeys = [int(key) for key in liveAlgInfo.keys()]
     liveAlgKeys.sort()
     # populate liveAlgsDict with datastore info
@@ -122,17 +122,20 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
         liveAlgInfo[liveAlgKey].lastStep  = stop
     return liveAlgInfo
 
-def getLiveAlgInfo():
-    liveAlgs = meSchema.liveAlg.all().fetch(20)
+def getLiveAlgInfo(algKeyFilter = None):
+    liveAlgs = meSchema.liveAlg.all()
+    if algKeyFilter is not None:
+        liveAlgs = liveAlgs.filter("__key__ =", db.Key.from_path('liveAlg',algKeyFilter))
+    liveAlgs = liveAlgs.fetch(20)
     liveAlgInfo = {}
     for alg in liveAlgs:
         liveAlgInfo[alg.key().name()] = alg
     return liveAlgInfo
 
-def getBestAlgs(stopStep,backSteps):
+def getBestAlgs(stopStep,liveAlgKeys):
     bestAlgs = {}
     topAlgs = []
-    for stepRange in backSteps:
+    for stepRange in liveAlgKeys:
         stepBack = stepRange*400
         topAlgs = meSchema.backTestResult.all().filter("stopStep =", stopStep).filter("startStep =", stopStep - stepBack)
         topAlgs = topAlgs.order("-percentReturn").fetch(20)
@@ -205,12 +208,12 @@ def getStepRangeAlgDesires(algKey,startStep,stopStep):
     return desireDict
     
 
-def initializeLiveAlgs():
+def initializeLiveAlgs(stepBackRange = [2,3,4,5,6,8,10,12]):
     currentStep = 5556
     result = meSchema.backTestResult.all().filter("stopStep <=",currentStep).order("-stopStep").get()
     recentStep = result.stopStep
     bestAlg = {}
-    for stepRange in [2,3,4,5,6,8,10,12]:
+    for stepRange in stepBackRange:
         stepBack = stepRange*400
         bestAlg[stepRange] = meSchema.backTestResult.all().filter("stopStep =",recentStep)
         bestAlg[stepRange] = bestAlg[stepRange].filter("startStep =", recentStep - stepBack)
