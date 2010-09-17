@@ -18,7 +18,7 @@ import princeFunc
 from collections import deque
 from google.appengine.ext import db
 
-def processLiveAlgStepRange(start,stop):
+def processLiveAlgStepRange(start,stop,doReverse=False):
     currentStep = start
     stopStepList = buildStopStepList(start,stop)
     liveAlgInfo = getLiveAlgInfo()
@@ -28,6 +28,8 @@ def processLiveAlgStepRange(start,stop):
     for i in range(len(stopStepList)):
         lastBackTestStop = stopStepList[i]
         bestAlgs = getBestAlgs(lastBackTestStop, liveAlgKeys)
+        if doReverse:
+            bestAlgs = getOppositeAlgs(bestAlgs)
         # bestAlg now filled with four stepRange algs that were best in last test period.
         # Must get lastBuy, lastSell info and get desires for bestAlg[stepRange] for start -> stop steps.
         if i < len(stopStepList)-1:
@@ -58,7 +60,6 @@ def processLiveAlgStepRange(start,stop):
     db.put(putList)
 
 def getCurrentReturn(liveAlgInfo,stopStep):
-    print "I calculate and return the current stopStep return"
     stopStepQuotes = princeFunc.getStepQuotes(stopStep)
     for liveAlgKey in liveAlgInfo:
         positions = eval(liveAlgInfo[liveAlgKey].Positions)
@@ -142,6 +143,15 @@ def getBestAlgs(stopStep,backSteps):
         else:
             bestAlgs[str(stepRange)] = topAlgs[0].algKey
     return bestAlgs
+
+def getOppositeAlgs(bestAlgs):
+    newBestAlgs = {}
+    for key in bestAlgs:
+        meAlgKey = bestAlgs[key]
+        meAlg = meSchema.meAlg.get_by_key_name(meAlgKey)
+        oppositeAlg = meSchema.meAlg.all().filter("BuyCue =", meAlg.SellCue).filter("SellCue =", meAlg.BuyCue).get()
+        newBestAlgs[key] = oppositeAlg.key().name()
+    return newBestAlgs
 
 def buildStopStepList(start,stop):
     stopStepList = []
