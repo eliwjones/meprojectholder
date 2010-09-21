@@ -27,7 +27,7 @@ def processLiveAlgStepRange(start, stop, doReverse = False, algKeyFilter = None)
     # populate liveAlgsDict with datastore info
     for i in range(len(stopStepList)):
         lastBackTestStop = stopStepList[i]
-        bestAlgs = getBestAlgs(lastBackTestStop, liveAlgKeys)
+        bestAlgs = getBestAlgs(lastBackTestStop, liveAlgKeys, doReverse)
         if doReverse:
             bestAlgs = getOppositeAlgs(bestAlgs)
         # bestAlg now filled with four stepRange algs that were best in last test period.
@@ -132,15 +132,19 @@ def getLiveAlgInfo(algKeyFilter = None):
         liveAlgInfo[alg.key().name()] = alg
     return liveAlgInfo
 
-def getBestAlgs(stopStep,liveAlgKeys):
+def getBestAlgs(stopStep, liveAlgKeys, doReverse=False):
+    if doReverse:
+        orderBy = "percentReturn"
+    else:
+        orderBy = "-percentReturn"
     bestAlgs = {}
     topAlgs = []
     for stepRange in liveAlgKeys:
         stepBack = stepRange*400
         topAlgs = meSchema.backTestResult.all().filter("stopStep =", stopStep).filter("startStep =", stopStep - stepBack)
-        topAlgs = topAlgs.order("-percentReturn").fetch(20)
+        topAlgs = topAlgs.order(orderBy).fetch(20)
         for topAlg in topAlgs:
-            if topAlg.PandL > topAlg.PosVal:
+            if abs(topAlg.PandL) > abs(topAlg.PosVal):
                 bestAlgs[str(stepRange)] = topAlg.algKey
                 break
         else:

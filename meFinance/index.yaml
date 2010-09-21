@@ -5,3 +5,10 @@ indexes:
   - name: stopStep
   - name: percentReturn
     direction: desc
+
+- kind: backTestResult
+  properties:
+  - name: startStep
+  - name: stopStep
+  - name: percentReturn
+    direction: asc
