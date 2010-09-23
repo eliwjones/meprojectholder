@@ -28,8 +28,8 @@ def processLiveAlgStepRange(start, stop, doReverse = False, algKeyFilter = None)
     for i in range(len(stopStepList)):
         lastBackTestStop = stopStepList[i]
         bestAlgs = getBestAlgs(lastBackTestStop, liveAlgKeys, doReverse)
-        if doReverse:
-            bestAlgs = getOppositeAlgs(bestAlgs)
+        #if doReverse:
+        #    bestAlgs = getOppositeAlgs(bestAlgs)
         # bestAlg now filled with four stepRange algs that were best in last test period.
         # Must get lastBuy, lastSell info and get desires for bestAlg[stepRange] for start -> stop steps.
         if i < len(stopStepList)-1:
@@ -212,24 +212,23 @@ def getStepRangeAlgDesires(algKey,startStep,stopStep):
     return desireDict
     
 
-def initializeLiveAlgs(stepBackRange = [2,3,4,5,6,8,10,12]):
-    currentStep = 5556
-    result = meSchema.backTestResult.all().filter("stopStep <=",currentStep).order("-stopStep").get()
-    recentStep = result.stopStep
-    bestAlg = {}
-    for stepRange in stepBackRange:
-        stepBack = stepRange*400
-        bestAlg[stepRange] = meSchema.backTestResult.all().filter("stopStep =",recentStep)
-        bestAlg[stepRange] = bestAlg[stepRange].filter("startStep =", recentStep - stepBack)
-        bestAlg[stepRange] = bestAlg[stepRange].order("-percentReturn").get()
+def initializeLiveAlgs(initialStopStep=3955, stepRange=1600):
+    techniques = []
+    FTLtype = ['FTLe','dnFTLe','FTLo','dnFTLo']
+    Ntype   = ['N1','N2','N3']
+    for FTL in FTLtype:
+        for N in Ntype:
+            techniques.append(FTL + '-' + N)
 
     liveAlgs = []
-    for stepRange in bestAlg.keys():
-        liveAlg = meSchema.liveAlg(key_name = str(stepRange), lastStep = recentStep, lastBuy = 0, lastSell = 0,
+    for technique in techniques:
+        keyname = str(initialStopStep).rjust(7,'0') + '-' + str(stepRange).rjust(7,'0') + '-' + technique
+        liveAlg = meSchema.liveAlg(key_name = keyname,
+                                   stopStep = initialStopStep, startStep = initialStopStep - stepRange,
+                                   stepRange = stepRange, lastBuy = 0, lastSell = 0,
                                    percentReturn = 0.0, Positions = repr({}), PosVal = 0.0, PandL = 0.0,
                                    CashDelta = repr(deque([])), Cash = 20000.0, numTrades = 0,
-                                   algKey = bestAlg[stepRange].algKey,
-                                   history = repr(deque([])) )
+                                   history = repr(deque([])), technique = technique )
         liveAlgs.append(liveAlg)
     db.put(liveAlgs)
 

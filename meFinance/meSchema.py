@@ -81,11 +81,15 @@ class backTestResult(db.Model):                                # Model to use fo
     PosVal        = db.FloatProperty(required=True)
     CashDelta     = db.TextProperty(required=False)
     Positions     = db.TextProperty(required=False)
+    N             = db.IntegerProperty(required=False)         # Maximum number of weeks back this algorithm appears with percentReturn > 0
+                                                               # Only technically needed for top 20 worst, best for each stopStep.
 
 class liveAlg(db.Model):
-    lastStep      = db.IntegerProperty(required=True)
-    lastBuy       = db.IntegerProperty(required=True)
-    lastSell      = db.IntegerProperty(required=True)
+    stopStep      = db.IntegerProperty(required=True)
+    startStep     = db.IntegerProperty(required=False)
+    stepRange     = db.IntegerProperty(required=False)       # Used to indicate what backTestResult range alg is pulled from.
+    lastBuy       = db.IntegerProperty(required=True)        # backTestResult.startStep = currentStep - liveAlg.stepRange
+    lastSell      = db.IntegerProperty(required=True)        # backTestResult.stopStep = currentStep
     percentReturn = db.FloatProperty(required=True)
     Positions     = db.TextProperty(required=True)
     PosVal        = db.FloatProperty(required=True)
@@ -93,8 +97,10 @@ class liveAlg(db.Model):
     CashDelta     = db.TextProperty(required=True)
     Cash          = db.FloatProperty(required=True)
     numTrades     = db.IntegerProperty(required=True)
-    algKey        = db.StringProperty(required=True)
     history       = db.TextProperty(required=False)
+    technique     = db.StringProperty(required=False)       # FTL method: Follow The Leader, Follow The Loser,
+                                                            # Do Not Follow The Leader, Do Not Follow The Loser
+                                                            # May also contain N-tersect value. E.G.: dnFTLe-N2, FTLo-N1, FTLo-N3
 
 def batchPut(entities, cache=False, memkey=None, time=0):
     batch = []
