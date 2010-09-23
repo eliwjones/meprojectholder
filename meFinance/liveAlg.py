@@ -18,44 +18,30 @@ import princeFunc
 from collections import deque
 from google.appengine.ext import db
 
-def processLiveAlgStepRange(start, stop, doReverse = False, algKeyFilter = None):
+def calculateWeeklyLiveAlgs(stopStep, stepRange = 1600):
+    # This will initialize and calculate performance for all liveAlg techniques
+    # for this stopStep.
+    initializeLiveAlgs(stopStep,stepRange)
+    processLiveAlgStepRange(stopStep - 1600, stopStep, stepRange) # Calculates a month of performance for the stopStep.
+
+def processLiveAlgStepRange(start, stop, stepRange, algKeyFilter = None):
     currentStep = start
     stopStepList = buildStopStepList(start,stop)
-    liveAlgInfo = getLiveAlgInfo(algKeyFilter)
-    liveAlgKeys = [int(key) for key in liveAlgInfo.keys()]
-    liveAlgKeys.sort()
-    # populate liveAlgsDict with datastore info
+    liveAlgInfo = getLiveAlgInfo(stop, stepRange, algKeyFilter)
     for i in range(len(stopStepList)):
         lastBackTestStop = stopStepList[i]
-        bestAlgs = getBestAlgs(lastBackTestStop, liveAlgKeys, doReverse)
-        #if doReverse:
-        #    bestAlgs = getOppositeAlgs(bestAlgs)
-        # bestAlg now filled with four stepRange algs that were best in last test period.
-        # Must get lastBuy, lastSell info and get desires for bestAlg[stepRange] for start -> stop steps.
+        bestAlgs = getBestAlgs(lastBackTestStop, liveAlgInfo)
         if i < len(stopStepList)-1:
             lastStep = stopStepList[i+1]
         else:
             lastStep = stop
-        liveAlgInfo = processStepRangeDesires(currentStep,lastStep,bestAlgs,liveAlgInfo)
-        # Add in code to calculate stopStep return
-        # Then append this return and the stopStep to liveAlg.history
-        liveAlgInfo = getCurrentReturn(liveAlgInfo,lastStep)
-        currentStep = lastStep + 1
-    # Write liveAlgInfo info back datatstore
-    stopStepQuotes = princeFunc.getStepQuotes(currentStep)
+        # Must deal with case where stop step is final step in stopStepList.
+        if currentStep < lastStep:
+            liveAlgInfo = processStepRangeDesires(currentStep,lastStep,bestAlgs,liveAlgInfo)
+            liveAlgInfo = getCurrentReturn(liveAlgInfo,lastStep)
+            currentStep = lastStep + 1
     putList = []
     for liveAlgKey in liveAlgInfo:
-        # Must calculate PosVal.
-        positions = eval(liveAlgInfo[liveAlgKey].Positions)
-        positionsValue = 0.0
-        for symbol in positions:
-            currentPrice = stopStepQuotes[symbol]
-            posPrice = positions[symbol]['Price']
-            shares = positions[symbol]['Shares']
-            positionsValue += (currentPrice - posPrice)*shares
-        liveAlgInfo[liveAlgKey].PosVal = positionsValue
-        liveAlgInfo[liveAlgKey].percentReturn = (liveAlgInfo[liveAlgKey].PosVal + liveAlgInfo[liveAlgKey].PandL)/20000.0
-        liveAlgInfo[liveAlgKey].numTrades = len(eval(liveAlgInfo[liveAlgKey].CashDelta))
         putList.append(liveAlgInfo[liveAlgKey])
     db.put(putList)
 
@@ -71,6 +57,7 @@ def getCurrentReturn(liveAlgInfo,stopStep):
             positionsValue += (currentPrice - posPrice)*shares
         liveAlgInfo[liveAlgKey].PosVal = positionsValue
         liveAlgInfo[liveAlgKey].percentReturn = (liveAlgInfo[liveAlgKey].PosVal + liveAlgInfo[liveAlgKey].PandL)/20000.0
+        liveAlgInfo[liveAlgKey].numTrades = len(eval(liveAlgInfo[liveAlgKey].CashDelta))
         history = eval(liveAlgInfo[liveAlgKey].history)
         history.appendleft({ 'step' : stopStep, 'return' : liveAlgInfo[liveAlgKey].percentReturn })
         liveAlgInfo[liveAlgKey].history = repr(history)
@@ -122,34 +109,43 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
         liveAlgInfo[liveAlgKey].lastStep  = stop
     return liveAlgInfo
 
-def getLiveAlgInfo(algKeyFilter = None):
+def getLiveAlgInfo(stopStep, stepRange, algKeyFilter = None):
     liveAlgs = meSchema.liveAlg.all()
     if algKeyFilter is not None:
         liveAlgs = liveAlgs.filter("__key__ =", db.Key.from_path('liveAlg',algKeyFilter))
+    else:
+        liveAlgs = liveAlgs.filter("stopStep =", stopStep).filter("stepRange =", stepRange).filter("percentReturn =", 0.0)
     liveAlgs = liveAlgs.fetch(20)
     liveAlgInfo = {}
     for alg in liveAlgs:
         liveAlgInfo[alg.key().name()] = alg
     return liveAlgInfo
 
-def getBestAlgs(stopStep, liveAlgKeys, doReverse=False):
-    if doReverse:
-        orderBy = "percentReturn"
-    else:
-        orderBy = "-percentReturn"
+def getBestAlgs(stopStep, liveAlgInfo):
     bestAlgs = {}
     topAlgs = []
-    for stepRange in liveAlgKeys:
-        stepBack = stepRange*400
-        topAlgs = meSchema.backTestResult.all().filter("stopStep =", stopStep).filter("startStep =", stopStep - stepBack)
-        topAlgs = topAlgs.order(orderBy).fetch(20)
-        for topAlg in topAlgs:
-            if abs(topAlg.PandL) > abs(topAlg.PosVal):
-                bestAlgs[str(stepRange)] = topAlg.algKey
-                break
-        else:
-            bestAlgs[str(stepRange)] = topAlgs[0].algKey
+    for algKey in liveAlgInfo:
+        # Must get .technique and .stepRange from liveAlgInfo
+        #   to decide appropriate action.
+        startStep = stopStep - liveAlgInfo[algKey].stepRange
+        technique = liveAlgInfo[algKey].technique
+        bestAlgs[algKey] = getTopAlgs(stopStep, startStep, technique)
     return bestAlgs
+
+def getTopAlgs(stopStep, startStep, technique):
+    topAlgs = meSchema.backTestResult.all().filter("stopStep =", stopStep).filter("startStep =", startStep)
+    # get -N123 value.. add filter("N =", Nvalue)
+    # if technique contains 'FTLe-', orderBy = '-percentReturn'
+    # if technique contains 'FTLo-', orderBY = 'percentReturn'
+    topAlgs = topAlgs.order(orderBy).fetch(20)
+    for topAlg in topAlgs:
+        if abs(topAlg.PandL) > abs(topAlg.PosVal):
+            bestAlg = topAlg.algKey
+            break
+    else:
+        bestAlg = topAlgs[0].algKey
+    # if technique contains 'dnFTL', bestAlg = opposite alg.
+    return bestAlg
 
 def getOppositeAlgs(bestAlgs):
     newBestAlgs = {}
