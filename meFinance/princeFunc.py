@@ -279,48 +279,6 @@ def closeoutPositions(step):
         algstats[alg].Positions = repr(positions)
         alglist[alg] = algstats[alg]
     return alglist
-    
-def wipeoutDesires():
-    total = 0
-    count = 100
-    cursor = None
-
-    while count == 100:
-        query = meSchema.desire.all()
-        if cursor is not None:
-            query.with_cursor(cursor)
-        desire = query.fetch(100)
-        count = len(desire)
-        db.delete(desire)
-        cursor = query.cursor()
-        total += count
-
-def wipeoutAlgStats():
-    total = 0
-    count = 100
-    cursor = None
-
-    while count == 100:
-        query = meSchema.algStats.all()
-        if cursor is not None:
-            query.with_cursor(cursor)
-        stats = query.fetch(100)
-        count = len(stats)
-        db.delete(stats)
-        cursor = query.cursor()
-        total += count
-
-def wipeoutBackTests():
-    count = 200
-    cursor = None
-    while count == 200:
-        query = db.Query(meSchema.backTestResult, keys_only=True)
-        if cursor is not None:
-            query.with_cursor(cursor)
-        btests = query.fetch(200)
-        count = len(btests)
-        db.delete(btests)
-        cursor = query.cursor()
 
 def getBackTestResultCount(stopStep):
     count = 200
@@ -335,19 +293,6 @@ def getBackTestResultCount(stopStep):
         total += count
         cursor = query.cursor()
     return total
-
-
-def wipeoutDeltas():
-    count = 100
-    cursor = None
-    while count == 100:
-        query = db.Query(meSchema.delta, keys_only=True)
-        if cursor is not None:
-            query.with_cursor(cursor)
-        delts = query.fetch(100)
-        count = len(delts)
-        db.delete(delts)
-        cursor = query.cursor()
 
 def initializeAlgStats():
     meList = []
