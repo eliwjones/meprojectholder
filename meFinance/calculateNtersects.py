@@ -4,21 +4,75 @@ from google.appengine.api.labs import taskqueue
 from google.appengine.api import memcache
 from pickle import dumps
 from google.appengine.ext import db
+from google.appengine.ext import webapp
+from google.appengine.ext.webapp.util import run_wsgi_app
+
+class calculateNtersect(webapp.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.out.write('I just translate parameters and fire off a task.\n')
+        stopStep = str(self.request.get('stopStep'))
+        startStep = str(self.request.get('startStep'))
+        percentReturnFilter = str(self.request.get('pReturn'))
+        name = str(self.request.get('name'))
+        doAll = str(self.request.get('doAll'))
+        if '' in [stopStep, startStep, percentReturnFilter]:
+            self.response.out.write('stopStep, startStep, and pReturn must all be non-empty.\n')
+            return
+        if doAll == '':
+            self.response.out.write('doAll is empty!\n')
+        else:
+            self.response.out.write('doAll: ' + doAll)
+        stopStep = int(stopStep)
+        startStep = int(startStep)
+        taskAdd(stopStep, startStep, percentReturnFilter, name, 0, '', doAll)
+        
+    def post(self):
+        stopStep = int(self.request.get('stopStep'))
+        startStep = int(self.request.get('startStep'))
+        pReturnFilter = str(self.request.get('pReturnFilter'))
+        name = str(self.request.get('name'))
+        doAll = str(self.request.get('doAll'))
+        if doAll.lower() == 'true':
+            doAll = True
+        else:
+            doAll = False
+        i = int(self.request.get('i'))
+        cursor = str(self.request.get('cursor'))
+        doNtersects(stopStep, startStep, pReturnFilter, name, i, cursor, doAll)
+
+def taskAdd(stopStep, startStep, pReturnFilter, name, i, cursor, doAll, wait = .5):
+    try:
+        taskqueue.add(url    = '/calculate/ntersect', countdown = 0,
+                      name   = 'doNtersects-' + str(stopStep) + '-' + str(startStep) + '-' + str(i) + '-' + name,
+                      params = {'stopStep'      : stopStep,
+                                'startStep'     : startStep,
+                                'pReturnFilter' : pReturnFilter,
+                                'name'          : name,
+                                'doAll'         : doAll,
+                                'i'             : i,
+                                'cursor'        : cursor} )
+    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
+        pass
+    except:
+        from time import sleep
+        sleep(wait)
+        taskAdd(stopStep, startStep, pReturnFilter, name, doAll, 2*wait)
 
 def doDeferred(stopStep,startStep, pReturnFilter = "percentReturn >", name = '', doAll = False):
     deferred.defer(doNtersects, stopStep, startStep, pReturnFilter, name, 0, None, doAll)
 
-def doNtersects(stopStep, startStep, pReturnFilter, name = '', i=0, cursor=None, doAll = False):
+def doNtersects(stopStep, startStep, pReturnFilter, name = '', i=0, cursor='', doAll = False):
     from time import time
     deadline = time() + 20.0
     globalStop = 15955
     count = 200
     while count == 200:
-        i += 1
         query = meSchema.backTestResult.all().filter("stopStep =", stopStep).filter("startStep =", startStep).filter(pReturnFilter,0.0).order("-percentReturn")
-        if cursor is not None:
+        if cursor != '':
             query.with_cursor(cursor)
         if deadline > time():
+            i += 1
             backTests = query.fetch(200)
             keyList = [alg.key().name().split('_')[0] for alg in backTests]
             memKeyQuery = meSchema.backTestResult.all(keys_only = True).filter("stopStep =", stopStep).filter("startStep =", startStep).filter(pReturnFilter,0.0).order("-percentReturn")
@@ -31,26 +85,15 @@ def doNtersects(stopStep, startStep, pReturnFilter, name = '', i=0, cursor=None,
                 algKeys = list(set(algKeys))
                 memcache.set(memKey, algKeys)
             count = len(backTests)
-            try:
-                #deferred.defer(updateNs, stopStep, startStep, name, i, backTests, _name = "updateNs-" + str(stopStep) + "-" + str(startStep) + "-" + str(i) + '-' + name)
-                updateNs(stopStep, startStep, pReturnFilter, name, i, backTests)
-            except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError):
-                pass
+            updateNs(stopStep, startStep, pReturnFilter, name, i, backTests)
             cursor = query.cursor()
         else:
-            try:
-                deferred.defer(doNtersects, stopStep, startStep, pReturnFilter, name, i, cursor, doAll, _name = "doNtersects-" + str(stopStep) + "-" + str(startStep) + "-" + str(i) + '-' + name)
-                return
-            except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError):
-                pass
+            taskAdd(stopStep, startStep, pReturnFilter, name, i, cursor, doAll)
+            return
     if (stopStep <= globalStop - 400) and doAll:
         stopStep += 400
         startStep += 400
-        try:
-            deferred.defer(doNtersects, stopStep, startStep, pReturnFilter, name, 0, None, doAll, _name = "doNtersects-" + str(stopStep) + "-" + str(startStep) + "-init-" + name)
-        except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError):
-            pass
-            
+        taskAdd(stopStep, startStep, pReturnFilter, name, 0, '', doAll)
     
 def updateNs(stopStep,startStep, pReturnFilter, name, i, backTests):
     N = [1,2]
@@ -74,27 +117,16 @@ def updateNs(stopStep,startStep, pReturnFilter, name, i, backTests):
             backTest.N = 2
         elif algKey in set(Nkeys[1]) & set(Nkeys[2]):
             backTest.N = 3
-
     meSchema.batchPut(backTests)
-    '''
-    putList = []
-    j = 0
-    for backTest in backTests:
-        putList.append(backTest)
-        if len(putList) > 100:
-            j += 1
-            try:
-                deferred.defer(db.put, putList, _name = "dbPut-" + str(stopStep) + "-" + str(startStep) + '-' + str(i) + '-' + str(j) + '-' + name)
-            except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError):
-                pass
-            putList = []
-    if putList > 0:
-        j += 1
-        try:
-            deferred.defer(db.put, putList, _name = "dbPut-" + str(stopStep) + "-" + str(startStep) + '-' + str(i) + '-' + str(j) + '-' + name)
-        except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError):
-            pass
-    '''
+
+application = webapp.WSGIApplication([('/calculate/ntersect',calculateNtersect)],
+                                     debug = True)
+
+def main():
+    run_wsgi_app(application)
+
+if __name__ == "__main__":
+    main()
     
     
     

@@ -48,6 +48,10 @@ handlers:
   script: meConverter.py
   login: admin
 
+- url: /calculate/ntersect
+  script: calculateNtersects.py
+  login: admin
+
 - url: /algorithms/go
   script: meAlgorithm.py
   login: admin
