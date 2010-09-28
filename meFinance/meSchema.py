@@ -96,6 +96,7 @@ class liveAlg(db.Model):
     PandL         = db.FloatProperty(required=True)
     CashDelta     = db.TextProperty(required=True)
     Cash          = db.FloatProperty(required=True)
+    N             = db.IntegerProperty(required=False)
     numTrades     = db.IntegerProperty(required=True)
     history       = db.TextProperty(required=False)
     technique     = db.StringProperty(required=False)       # FTL method: Follow The Leader, Follow The Loser,

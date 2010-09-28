@@ -146,7 +146,7 @@ def getBestAlgs(stopStep, liveAlgInfo):
     for algKey in liveAlgInfo:
         # Must get .technique and .stepRange from liveAlgInfo
         #   to decide appropriate action.
-        startStep = stopStep - liveAlgInfo[algKey].stepRange
+        startStep = stopStep - 1600 #liveAlgInfo[algKey].stepRange   # Changing to hardcode 1600 to force test.
         technique = liveAlgInfo[algKey].technique
         bestAlgs[algKey] = getTopAlg(stopStep, startStep, technique)
     return bestAlgs
@@ -228,10 +228,8 @@ def getStepRangeAlgDesires(algKey,startStep,stopStep):
     return desireDict
     
 
-def initializeLiveAlgs(initialStopStep=3955, stepRange=1600):
+def initializeLiveAlgs(initialStopStep=3955, stepRange=1600, FTLtype = ['FTLe','dnFTLe','FTLo','dnFTLo'], Ntype = ['N1','N2','N3']):
     techniques = []
-    FTLtype = ['FTLe','dnFTLe','FTLo','dnFTLo']
-    Ntype   = ['N1','N2','N3']
     for FTL in FTLtype:
         for N in Ntype:
             techniques.append(FTL + '-' + N)
