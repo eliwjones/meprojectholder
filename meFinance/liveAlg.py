@@ -17,12 +17,31 @@ import processDesires
 import princeFunc
 from collections import deque
 from google.appengine.ext import db
+from google.appengine.ext import deferred
+from google.appengine.api.labs import taskqueue
 
-def calculateWeeklyLiveAlgs(stopStep, stepRange = 1600):
+def calculateWeeklyLiveAlgs(stopStep, stepRange = 1600, name = ''):
     # This will initialize and calculate performance for all liveAlg techniques
     # for this stopStep.
     initializeLiveAlgs(stopStep,stepRange)
-    processLiveAlgStepRange(stopStep - 1600, stopStep, stepRange) # Calculates a month of performance for the stopStep.
+    # Get liveAlgs and branch out the different FTL, dnFTL Ntypes.
+    # keys like:  0003955-0001600-FTLe-N1
+    liveAlgs = meSchema.liveAlg.all(keys_only = True).filter("stopStep =", stopStep).filter("stepRange =", stepRange).filter("percentReturn =", 0.0).fetch(1000)
+    algGroups = []
+    while len(liveAlgs) > 1:
+        firstAlgKey = liveAlgs.pop(0)
+        algSplit = firstAlgKey.name().split('-')
+        firstTechnique = algSplit[-2] + '-' + algSplit[-1]  # Based on liveAlg key formation, this should give the alg's technique.
+        for algKey in liveAlgs:
+            if algKey.name().endswith(firstTechnique.replace('dn','')):
+                secondAlgKey = algKey
+        liveAlgs.remove(secondAlgKey)
+        algGroups.append([firstAlgKey.name(), secondAlgKey.name()])
+    i = 0
+    for algGroup in algGroups:
+        deferred.defer(processLiveAlgStepRange, stopStep - 1600, stopStep, stepRange, algGroup,
+                       _name = "liveAlgCalc-" + str(stopStep) + '-' + str(stopStep - 1600) + '-' + '-' + str(stepRange) + '-group' + str(i) + '-' + name)
+        i += 1
 
 def processLiveAlgStepRange(start, stop, stepRange, algKeyFilter = None):
     currentStep = start
@@ -110,12 +129,12 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
     return liveAlgInfo
 
 def getLiveAlgInfo(stopStep, stepRange, algKeyFilter = None):
-    liveAlgs = meSchema.liveAlg.all()
     if algKeyFilter is not None:
-        liveAlgs = liveAlgs.filter("__key__ =", db.Key.from_path('liveAlg',algKeyFilter))
+        #liveAlgs = liveAlgs.filter("__key__ =", db.Key.from_path('liveAlg',algKeyFilter))
+        liveAlgs = meSchema.liveAlg.get_by_key_name(algKeyFilter)
     else:
-        liveAlgs = liveAlgs.filter("stopStep =", stopStep).filter("stepRange =", stepRange).filter("percentReturn =", 0.0)
-    liveAlgs = liveAlgs.fetch(20)
+        liveAlgs = meSchema.liveAlg.all().filter("stopStep =", stopStep).filter("stepRange =", stepRange).filter("percentReturn =", 0.0)
+        liveAlgs = liveAlgs.fetch(20)
     liveAlgInfo = {}
     for alg in liveAlgs:
         liveAlgInfo[alg.key().name()] = alg
@@ -129,32 +148,33 @@ def getBestAlgs(stopStep, liveAlgInfo):
         #   to decide appropriate action.
         startStep = stopStep - liveAlgInfo[algKey].stepRange
         technique = liveAlgInfo[algKey].technique
-        bestAlgs[algKey] = getTopAlgs(stopStep, startStep, technique)
+        bestAlgs[algKey] = getTopAlg(stopStep, startStep, technique)
     return bestAlgs
 
-def getTopAlgs(stopStep, startStep, technique):
-    topAlgs = meSchema.backTestResult.all().filter("stopStep =", stopStep).filter("startStep =", startStep)
+def getTopAlg(stopStep, startStep, technique):
+    topAlg = meSchema.backTestResult.all(keys_only = True).filter("stopStep =", stopStep).filter("startStep =", startStep)
     # get -N123 value.. add filter("N =", Nvalue)
+    nVal = technique.split('-')[-1]
+    N = int(nVal.replace('N',''))
+    topAlg = topAlg.filter("N =", N)
     # if technique contains 'FTLe-', orderBy = '-percentReturn'
     # if technique contains 'FTLo-', orderBY = 'percentReturn'
-    topAlgs = topAlgs.order(orderBy).fetch(20)
-    for topAlg in topAlgs:
-        if abs(topAlg.PandL) > abs(topAlg.PosVal):
-            bestAlg = topAlg.algKey
-            break
-    else:
-        bestAlg = topAlgs[0].algKey
+    if technique.find('FTLe-') != -1:
+        orderBy = '-percentReturn'
+    elif technique.find('FTLo-') != -1:
+        orderBy = 'percentReturn'
+    topAlg = topAlg.order(orderBy).get()
+    bestAlgKey = topAlg.name().split('_')[0]    # meAlg key is just first part of backTestResult key_name.
     # if technique contains 'dnFTL', bestAlg = opposite alg.
-    return bestAlg
+    if technique.find('dnFTL') != -1:
+        bestAlgKey = getOppositeAlg(bestAlgKey)
+    return bestAlgKey
 
-def getOppositeAlgs(bestAlgs):
-    newBestAlgs = {}
-    for key in bestAlgs:
-        meAlgKey = bestAlgs[key]
-        meAlg = meSchema.meAlg.get_by_key_name(meAlgKey)
-        oppositeAlg = meSchema.meAlg.all().filter("BuyCue =", meAlg.SellCue).filter("SellCue =", meAlg.BuyCue).get()
-        newBestAlgs[key] = oppositeAlg.key().name()
-    return newBestAlgs
+def getOppositeAlg(meAlgKey):
+    meAlg = meSchema.meAlg.get_by_key_name(meAlgKey)
+    oppositeAlg = meSchema.meAlg.all(keys_only = True).filter("BuyCue =", meAlg.SellCue).filter("SellCue =", meAlg.BuyCue).get()
+    oppositeAlgKey = oppositeAlg.name()
+    return oppositeAlgKey
 
 def buildStopStepList(start,stop):
     stopStepList = []
