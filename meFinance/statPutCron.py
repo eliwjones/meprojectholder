@@ -7,14 +7,13 @@ from google.appengine.ext import db
 from google.appengine.datastore import entity_pb
 from google.appengine.api import memcache
 from datetime import datetime, date
-from pytz import timezone
 import meSchema
 
 
 class putStats(webapp.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/plain'
-        self.response.out.write('I just put stats')
+        self.response.out.write('I just put stats\n')
         cron = 'false'
         cron = str(self.request.get('cron'))
         if 'X-AppEngine-Cron' in self.request.headers:
@@ -27,6 +26,11 @@ class putStats(webapp.RequestHandler):
             result = db.GqlQuery("Select * from stepDate Order By step desc").fetch(1)
             step = result[0].step + 1
             putEm(step)
+        elif (cron == 'noput'):
+            self.response.out.write('This is Just a "delay" Test\n')
+            delay = getStartDelay()
+            self.response.out.write('delay: ' + str(delay) + '\n')
+        self.response.out.write('Bye bye')
             
     def post(self):
         count = int(self.request.get('counter'))
@@ -131,6 +135,7 @@ def taskAdd(delay,name,counter,step,wait=.5):
         taskAdd(delay,name,counter,step,2*wait)
 
 def getStartDelay():
+    from pytz import timezone
     eastern = timezone('US/Eastern')
     today    = date.today()
     naive_DT = datetime.strptime(str(today) + " 9:30:30", "%Y-%m-%d %H:%M:%S")
