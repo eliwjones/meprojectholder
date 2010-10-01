@@ -16,6 +16,9 @@ handlers:
   script: $PYTHON_LIB/google/appengine/ext/deferred/handler.py
   login: admin
 
+#- url: /stats.*
+#  script: $PYTHON_LIB/google/appengine/ext/appstats/ui.py
+
 - url: /backtest/.*
   script: doBackTests.py
   login: admin

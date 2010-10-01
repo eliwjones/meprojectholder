@@ -1,5 +1,3 @@
-from gdata.finance.service import FinanceService,PortfolioQuery,PositionQuery
-from gdata.finance import PortfolioData
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.api.labs import taskqueue
@@ -23,13 +21,16 @@ class putStats(webapp.RequestHandler):
             delay = getStartDelay()
             taskAdd(delay,str(date.today()) + '-1',1,-1)
         elif (cron == 'test'):
-            result = db.GqlQuery("Select * from stepDate Order By step desc").fetch(1)
-            step = result[0].step + 1
+            step = -1111
             putEm(step)
         elif (cron == 'noput'):
-            self.response.out.write('This is Just a "delay" Test\n')
-            delay = getStartDelay()
-            self.response.out.write('delay: ' + str(delay) + '\n')
+            self.response.out.write('This is Just a GDATA Test\n')
+            positions = getPositions('eli.jones@gmail.com')
+            for pos in positions:
+                symbol = pos.ticker_id.split(':')[1]
+                quote = float(str(pos.position_data.market_value).replace(' USD',''))
+                self.response.out.write("symbol: " + symbol + " quote: " + str(quote) + '\n')
+            self.response.out.write('\n')
         self.response.out.write('Bye bye')
             
     def post(self):
@@ -47,31 +48,34 @@ class putStats(webapp.RequestHandler):
                 delay += 300
             taskAdd(delay,'step-' + str(step+1),count+1,step+1)
 
+def getPositions(email):
+    meData = meGDATA(email)
+    positions = meData.GetPositions()
+    return positions
+
 def putEm(step):
-    email = "eli.jones@gmail.com"    
-    creds = meSchema.getCredentials(email)
-    password = creds.password
-
-    meData = meGDATA(email,password)
-    portfolios = meData.GetPortfolios(True)
-
+    positions = getPositions('eli.jones@gmail.com')
     meDatetime = datetime.now()
     meList = []
-    for pfl in portfolios:
-        positions = meData.GetPositions(pfl,True)
-        for pos in positions:
-            symbol = pos.ticker_id.split(':')[1]
-            quote = float(str(pos.position_data.market_value).replace(' USD',''))
-            if (symbol in ['GOOG','HBC','INTC','CME']):
-                stckID = meSchema.getStckID(symbol)
-                meStck = meSchema.stck(key_name = str(stckID) + "_" + str(step),
-                                       ID    = stckID,
-                                       step  = step,
-                                       quote = quote)
-                meList.append(meStck)
+    symbols = ['GOOG','HBC','INTC','CME']
+    stckIDs = meSchema.getStckIDs(symbols)
+    for pos in positions:
+        symbol = pos.ticker_id.split(':')[1]
+        quote = float(str(pos.position_data.market_value).replace(' USD',''))
+        if (symbol in symbols):
+            stckID = stckIDs[symbol]
+            meStck = meSchema.stck(key_name = str(stckID) + "_" + str(step),
+                                   ID    = stckID,
+                                   step  = step,
+                                   quote = quote)
+            meList.append(meStck)
+        
 
+    memcacheDict = {}
     for stock in meList:
-        memcache.set("stck" + stock.key().name(),db.model_to_protobuf(stock).Encode())
+        memKey = "stck" + stock.key().name()
+        memcacheDict[memKey] = db.model_to_protobuf(stock).Encode()
+    memcache.set_multi(memcacheDict)
         
     meStepDate = meSchema.stepDate(key_name = str(step),step = step, date = meDatetime)
     meList.append(meStepDate)
@@ -88,11 +92,21 @@ def putEm(step):
             
 
 class meGDATA(object):
-    def __init__(self,email,password):
+    def __init__(self,email):
+        from gdata.finance.service import FinanceService
         self.client = FinanceService(source='meFinance')
-        self.client.ClientLogin(email,password)
+        myToken = memcache.get('meFinance-Token')
+        if myToken is None:
+            creds = meSchema.getCredentials(email)
+            password = creds.password
+            self.client.ClientLogin(email,password)
+            myToken = self.client.GetClientLoginToken()
+            memcache.set('meFinance-Token', myToken,36000)
+        else:
+            self.client.SetClientLoginToken(myToken)
 
     def GetPortfolios(self, with_returns=False):
+        from gdata.finance.service import PortfolioQuery
         query = PortfolioQuery()
         query.returns = with_returns
         wait = .1
@@ -106,13 +120,14 @@ class meGDATA(object):
                 wait *= 2
         return feed
 
-    def GetPositions(self, portfolio, with_returns=False):
+    def GetPositions(self, portfolio_id = '1', with_returns = True):
+        from gdata.finance.service import PositionQuery
         query = PositionQuery()
         query.returns = with_returns
         wait = .1
         while True:
             try:
-                feed = self.client.GetPositionFeed(portfolio, query=query).entry
+                feed = self.client.GetPositionFeed(portfolio_id = portfolio_id, query=query).entry
                 break
             except Exception, e:
                 from time import sleep

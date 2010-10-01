@@ -292,6 +292,13 @@ def getStckID(stock):
     result = result.ID
     return result
 
+def getStckIDs(stockList):
+    results = memGet_multi(stckID, stockList)
+    stckIDdict = {}
+    for res in results:
+        stckIDdict[res] = results[res].ID
+    return stckIDdict
+
 def getStckSymbol(stckID):
     memkey = "symbol"+str(stckID)
     memget = cachepy.get_multi([memkey],priority=1)
