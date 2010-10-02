@@ -8,16 +8,31 @@ from google.appengine.api.labs import taskqueue
 # Call from remote_api console with command:
 #     deferred.defer(meUtilities.cleanupBackTestResult, 3555)
 
-def cleanupBackTestResult(maxStopStep, cursor = None):
+def cleanupBackTestResult(validStepRange = 1600, cursor = None):
     count = 200
     while count == 200:
-        query = meSchema.backTestResult.all(keys_only = True).filter("stopStep <", maxStopStep)
+        query = meSchema.backTestResult.all(keys_only = True).order('__key__')
         if cursor is not None:
             query.with_cursor(cursor)
         backTests = query.fetch(200)
         count = len(backTests)
-        deferred.defer(deleteByKeyList, repr(backTests))
+        delKeys = []
+        for delKey in backTests:
+            keyname = delKey.name()
+            keysplit = keyname.split('_')
+            meSum = int(keysplit[2]) - int(keysplit[1])
+            if meSum != validStepRange and meSum <= 4800:
+                delKeys.append(delKey)
+        addDeferred(repr(delKeys))
         cursor = query.cursor()
+
+def addDeferred(delKeys,wait=.5):
+    try:
+        deferred.defer(deleteByKeyList, delKeys)
+    except:
+        from time import sleep
+        sleep(wait)
+        addDeferred(delKeys,2*wait)
 
 def deleteByKeyList(keylist):
     from google.appengine.api import datastore_types
