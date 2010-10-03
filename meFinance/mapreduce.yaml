@@ -1,0 +1,8 @@
+mapreduce:
+- name: backtestResult Compound Return Calculator
+  mapper:
+    input_reader: mapreduce.input_readers.DatastoreInputReader
+    handler: meMapper.doIt
+    params:
+    - name: entity_kind
+      default: meSchema.backTestResult

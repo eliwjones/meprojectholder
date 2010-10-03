@@ -81,6 +81,10 @@ class backTestResult(db.Model):                                # Model to use fo
     PosVal        = db.FloatProperty(required=True)
     CashDelta     = db.TextProperty(required=False)
     Positions     = db.TextProperty(required=False)
+    R2            = db.FloatProperty(required=False)
+    R3            = db.FloatProperty(required=False)
+    R4            = db.FloatProperty(required=False)
+    R5            = db.FloatProperty(required=False)
     N             = db.IntegerProperty(required=False)         # Maximum number of weeks back this algorithm appears with percentReturn > 0
                                                                # Only technically needed for top 20 worst, best for each stopStep.
 
