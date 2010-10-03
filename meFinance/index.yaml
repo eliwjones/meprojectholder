@@ -3,10 +3,66 @@ indexes:
   properties:
   - name: startStep
   - name: stopStep
+  - name: R5
+    direction: desc
+
+- kind: backTestResult
+  properties:
+  - name: startStep
+  - name: stopStep
+  - name: R4
+    direction: desc
+
+- kind: backTestResult
+  properties:
+  - name: startStep
+  - name: stopStep
+  - name: R3
+    direction: desc
+
+- kind: backTestResult
+  properties:
+  - name: startStep
+  - name: stopStep
+  - name: R2
+    direction: desc
+
+- kind: backTestResult
+  properties:
+  - name: startStep
+  - name: stopStep
+  - name: R5
+    direction: asc
+
+- kind: backTestResult
+  properties:
+  - name: startStep
+  - name: stopStep
+  - name: R4
+    direction: asc
+
+- kind: backTestResult
+  properties:
+  - name: startStep
+  - name: stopStep
+  - name: R3
+    direction: asc
+
+- kind: backTestResult
+  properties:
+  - name: startStep
+  - name: stopStep
+  - name: R2
+    direction: asc
+
+- kind: backTestResult
+  properties:
+  - name: startStep
+  - name: stopStep
   - name: N
   - name: percentReturn
     direction: desc
-    
+
 - kind: backTestResult
   properties:
   - name: startStep
@@ -19,7 +75,7 @@ indexes:
   - name: stopStep
   - name: percentReturn
     direction: desc
-    
+
 - kind: backTestResult
   properties:
   - name: startStep
