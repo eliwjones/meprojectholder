@@ -153,16 +153,23 @@ def getBestAlgs(stopStep, liveAlgInfo):
 
 def getTopAlg(stopStep, startStep, technique):
     topAlg = meSchema.backTestResult.all(keys_only = True).filter("stopStep =", stopStep).filter("startStep =", startStep)
-    # get -N123 value.. add filter("N =", Nvalue)
-    nVal = technique.split('-')[-1]
-    N = int(nVal.replace('N',''))
-    topAlg = topAlg.filter("N =", N)
-    # if technique contains 'FTLe-', orderBy = '-percentReturn'
-    # if technique contains 'FTLo-', orderBY = 'percentReturn'
+    # get -NR  value.. add filter("N =", Nvalue) for N val..
+    NRval = technique.split('-')[-1]
+    if NRval.find('N') != -1:
+        N = int(NRval.replace('N',''))
+        topAlg = topAlg.filter("N =", N)
+    # if technique contains 'FTLe-', orderBy = '-percentReturn' unless NRval.find('R') != -1, then orderBy = '-' + NRval
+    # if technique contains 'FTLo-', orderBY = 'percentReturn' unless NRval.find('R') != -1, then orderBy = NRval
     if technique.find('FTLe-') != -1:
-        orderBy = '-percentReturn'
+        if NRval.find('R') != -1:
+            orderBy = '-' + NRval
+        else:
+            orderBy = '-percentReturn'
     elif technique.find('FTLo-') != -1:
-        orderBy = 'percentReturn'
+        if NRval.find('R') != -1:
+            orderBy = NRval
+        else:
+            orderBy = 'percentReturn'
     topAlg = topAlg.order(orderBy).get()
     bestAlgKey = topAlg.name().split('_')[0]    # meAlg key is just first part of backTestResult key_name.
     # if technique contains 'dnFTL', bestAlg = opposite alg.
@@ -228,11 +235,11 @@ def getStepRangeAlgDesires(algKey,startStep,stopStep):
     return desireDict
     
 
-def initializeLiveAlgs(initialStopStep=3955, stepRange=1600, FTLtype = ['FTLe','dnFTLe','FTLo','dnFTLo'], Ntype = ['N1','N2','N3']):
+def initializeLiveAlgs(initialStopStep=5155, stepRange=1600, FTLtype = ['FTLe','dnFTLe','FTLo','dnFTLo'], NRtype = ['R3','R4','R5']):
     techniques = []
     for FTL in FTLtype:
-        for N in Ntype:
-            techniques.append(FTL + '-' + N)
+        for NR in NRtype:
+            techniques.append(FTL + '-' + NR)
 
     liveAlgs = []
     for technique in techniques:
