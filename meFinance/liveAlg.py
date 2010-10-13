@@ -84,15 +84,12 @@ def getCurrentReturn(liveAlgInfo,stopStep):
         
 
 def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
-    # For each bestAlg, get desires, process, merge into liveAlgInfo and return.
     for liveAlgKey in bestAlgs:
         algKey = bestAlgs[liveAlgKey]
         desires = getStepRangeAlgDesires(algKey,start,stop)
         alginfo = meSchema.memGet(meSchema.meAlg,algKey)
         buydelta = meSchema.memGet(meSchema.tradeCue,alginfo.BuyCue).TimeDelta
         selldelta = meSchema.memGet(meSchema.tradeCue,alginfo.SellCue).TimeDelta
-        # lastSell = liveAlgInfo[liveAlgKey].lastSell
-        # lastBuy = liveAlgInfo[liveAlgKey].lastBuy
         # Don't think I need to explicitly order the desire keys, but just in case.
         orderDesires = desires.keys()
         orderDesires.sort()
@@ -130,7 +127,6 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
 
 def getLiveAlgInfo(stopStep, stepRange, algKeyFilter = None):
     if algKeyFilter is not None:
-        #liveAlgs = liveAlgs.filter("__key__ =", db.Key.from_path('liveAlg',algKeyFilter))
         liveAlgs = meSchema.liveAlg.get_by_key_name(algKeyFilter)
     else:
         liveAlgs = meSchema.liveAlg.all().filter("stopStep =", stopStep).filter("stepRange =", stepRange).filter("percentReturn =", 0.0)
@@ -206,9 +202,24 @@ def getStepRangeAlgDesires(algKey,startStep,stopStep):
     sellStopKey = meSchema.buildDesireKey(stopStep,sellCue,99)
     sellQuery  = "Select * From desire Where CueKey = '%s' " % (sellCue)
     sellQuery += " AND __key__ >= Key('desire','%s') AND __key__ <= Key('desire','%s')" % (sellStartKey,sellStopKey)
-
+    '''
     buyList = db.GqlQuery(buyQuery).fetch(1000)
     sellList = db.GqlQuery(sellQuery).fetch(1000)
+    ''''
+    buyList = meSchema.cachepy.get(buyQuery)
+    if buyList is None:
+        buyList = memcache.get(buyQuery)
+        if buyList is None:
+            buyList = db.GqlQuery(buyQuery).fetch(4000)
+            memcache.set(buyQuery,buyList)
+        meSchema.cachepy.set(buyQuery,buyList)
+    sellList = meSchema.cachepy.get(sellQuery)
+    if sellList is None:
+        sellList = memcache.get(sellQuery)
+        if sellList is None:
+            sellList = db.GqlQuery(sellQuery).fetch(4000)
+            memcache.set(sellQuery,sellList)
+        meSchema.cachepy.set(sellQuery,sellList)
 
     if len(buyList) > len(sellList):
         # If there are more buys than sells, fill dict with buys first
@@ -218,20 +229,20 @@ def getStepRangeAlgDesires(algKey,startStep,stopStep):
         for buy in buyList:
             keyname = buy.key().name()
             keyname = keyname.replace('_' + buyCue + '_', '_' + algKey + '_')
-            desireDict[keyname] = processDesires.convertDesireToDict(buy,1)
+            desireDict[keyname] = processDesires.convertDesireToDict(buy,1, alginfo.TradeSize, alginfo.Cash)
         for sell in sellList:
             keyname = sell.key().name()
             keyname = keyname.replace('_' + sellCue + '_', '_' + algKey + '_')
-            desireDict[keyname] = processDesires.convertDesireToDict(sell,-1)
+            desireDict[keyname] = processDesires.convertDesireToDict(sell,-1, alginfo.TradeSize, alginfo.Cash)
     else:
         for sell in sellList:
             keyname = sell.key().name()
             keyname = keyname.replace('_' + sellCue + '_', '_' + algKey + '_')
-            desireDict[keyname] = processDesires.convertDesireToDict(sell,-1)
+            desireDict[keyname] = processDesires.convertDesireToDict(sell,-1, alginfo.TradeSize, alginfo.Cash)
         for buy in buyList:
             keyname = buy.key().name()
             keyname = keyname.replace('_' + buyCue + '_', '_' + algKey + '_')
-            desireDict[keyname] = processDesires.convertDesireToDict(buy,1)
+            desireDict[keyname] = processDesires.convertDesireToDict(buy,1, alginfo.TradeSize, alginfo.Cash)
     return desireDict
     
 

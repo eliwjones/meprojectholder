@@ -26,10 +26,12 @@ class stepDate(db.Model):
     date = db.DateTimeProperty(required=True)
 
 class meAlg(db.Model):                                          # Need to implement 0-padded key_name for consistency.
-    TradeSize = db.FloatProperty(required=True)
-    BuyCue    = db.StringProperty(required=True)               # Contains tradeCue key that triggers Buy.
-    SellCue   = db.StringProperty(required=True)               # Contains tradeCue key that triggers Sell.
-    Cash      = db.FloatProperty(required=True)
+    TradeSize  = db.FloatProperty(required=True)
+    BuyCue     = db.StringProperty(required=True)               # Contains tradeCue key that triggers Buy.
+    SellCue    = db.StringProperty(required=True)               # Contains tradeCue key that triggers Sell.
+    StopLoss   = db.FloatProperty(required=False)
+    StopProfit = db.FloatProperty(required=False)
+    Cash       = db.FloatProperty(required=True)
 
 '''
   tradeCue class will replace BuyDelta, SellDelta, TimeDelta pairs from meAlg
