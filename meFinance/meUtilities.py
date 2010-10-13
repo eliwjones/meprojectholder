@@ -3,6 +3,7 @@ import meSchema
 from google.appengine.ext import db
 from google.appengine.ext import deferred
 from google.appengine.api.labs import taskqueue
+from random import random
 
 # Iterate through cursor and fire off deferred batches for deletes.
 # Call from remote_api console with command:
@@ -26,13 +27,17 @@ def cleanupBackTestResult(validStepRange = 1600, cursor = None):
         addDeferred(repr(delKeys))
         cursor = query.cursor()
 
-def addDeferred(delKeys,wait=.5):
+def addDeferred(delKeys, name = '', wait=.5):
+    r = random()
+    countdown = int(10*r)
     try:
-        deferred.defer(deleteByKeyList, delKeys)
+        deferred.defer(deleteByKeyList, delKeys, _name = name, _countdown = countdown)
+    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
+        pass
     except:
         from time import sleep
         sleep(wait)
-        addDeferred(delKeys,2*wait)
+        addDeferred(delKeys, name, 2*wait)
 
 def deleteByKeyList(keylist):
     from google.appengine.api import datastore_types
@@ -76,15 +81,20 @@ def wipeoutAlgStats(cursor = None):
         cursor = query.cursor()
         total += count
 
-def wipeoutBackTests(cursor = None):
-    count = 200
-    while count == 200:
-        query = db.Query(meSchema.backTestResult, keys_only=True)
-        if cursor is not None:
-            query.with_cursor(cursor)
-        btests = query.fetch(200)
-        count = len(btests)
-        deferred.defer(deleteByKeyList, repr(btests))
+def wipeoutBackTests(name = '', cursor = None):
+    i = 0
+    count = 50
+    while count == 50:
+        try:
+            query = db.Query(meSchema.backTestResult, keys_only=True)
+            if cursor is not None:
+                query.with_cursor(cursor)
+            btestKeys = query.fetch(50)
+        except:
+            wipeoutBackTests(name, cursor)
+        count = len(btestKeys)
+        addDeferred(repr(btestKeys), name + '-batch' + str(i))
+        i += 1
         cursor = query.cursor()
 
 def wipeoutDeltas(cursor = None):

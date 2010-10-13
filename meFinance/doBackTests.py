@@ -29,19 +29,115 @@ class doBackTests(webapp.RequestHandler):
             stopStep = int(stopStep)
             startAlg = int(startAlg)
             stopAlg = int(stopAlg)
-            alglist = [meSchema.buildAlgKey(i) for i in range(startAlg, stopAlg+1)]
+            # alglist = [meSchema.buildAlgKey(i) for i in range(startAlg, stopAlg+1)]
             if type(startSteps) == type([]):
                 stepRange = [stopStep - i*400 for i in startSteps]
             else:
-                stepRange = [stopStep - i*400 for i in [2,3,4,5]]
-            try:
-                deferred.defer(processDesires.runBackTests, alglist, stopStep, 5, stepRange,
-                               _name = unique + '-' + str(startAlg) + '-' + str(stopAlg) + '-' + str(stopStep))
-            except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError):
-                self.response.out.write('Job already added for these Algs and stopStep')
+                stepRange = [stopStep - i*400 for i in [4]]    # Changing default to just do 1600 step range.
+            # Create proper taskAdd() function and add with params.
+            name = unique + '-' + str(startAlg) + '-' + str(stopAlg) + '-' + str(stopStep)
+            mainTaskAdd(name, startAlg, stopAlg, stopStep, 5, stepRange, unique)
             self.response.out.write('Added job!\n')
+            
+    def post(self):
+        uniquifier = self.request.get('uniquifier')
+        
+        startAlg = int(self.request.get('startAlg'))
+        stopAlg = int(self.request.get('stopAlg'))
+        alglist = [meSchema.buildAlgKey(i) for i in range(startAlg, stopAlg+1)]
+        
+        stopStep = int(self.request.get('stopStep'))
+        batchSize = int(self.request.get('batchSize'))
+        stepRange = self.request.get_all('stepRange')
+        stepRange = [int(step) for step in stepRange]
+        runBackTests(alglist, stopStep, batchSize, stepRange, uniquifier)
 
-application = webapp.WSGIApplication([('/backtest/doBackTests',doBackTests)],
+class doBackTestBatch(webapp.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.out.write('I aint nothing but a task handler..\n')
+        
+    def post(self):
+        algBatch = self.request.get_all('algBatch')
+        monthBatch = self.request.get_all('monthBatch')
+        stopStep = self.request.get('stopStep')
+        backTestBatch(algBatch, monthBatch, stopStep)
+
+def mainTaskAdd(name,startAlg, stopAlg,stopStep,batchSize,stepRange,uniquifier, delay = 0, wait = .5):
+    try:
+        taskqueue.add(url = '/backtest/doBackTests', countdown = delay,
+                      name = name,
+                      params = {'startAlg'  : startAlg,
+                                'stopAlg'   : stopAlg,
+                                'stopStep'  : stopStep,
+                                'batchSize' : batchSize,
+                                'stepRange' : stepRange,
+                                'uniquifier': uniquifier} )
+    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
+        pass
+    except:
+        from time import sleep
+        sleep(wait)
+        mainTaskAdd(name,startAlg,stopAlg,stopStep,batchSize,stepRange,uniquifier,delay,2*wait)
+        
+
+def batchTaskAdd(name, algBatch, monthBatch, stopStep,delay=0,wait=.5):
+    try:
+        taskqueue.add(url = '/backtest/doBackTestBatch', countdown = delay,
+                      name = name,
+                      queue_name = 'backTestQueue',
+                      params = {'algBatch'   : algBatch,
+                                'monthBatch' : monthBatch,
+                                'stopStep'   : stopStep} )
+    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
+        pass
+    except:
+        from time import sleep
+        sleep(wait)
+        batchTaskAdd(name,alglist,stopStep,batchSize,stepRange,uniquifier,delay,2*wait)
+
+def runBackTests(alglist, stop, batchSize = 5, stepRange=None, uniquifier=''):
+    monthList = []
+    algBatch = []
+    if stepRange is None:
+        monthList.append(str(max(stop - 1600, 1)))  # Default monthList now just contains startStep from 4 weeks ago.
+    else:
+        for step in stepRange:
+            monthList.append(str(step))             # Simply want it to test the range I give it.
+    for alg in alglist:
+        algBatch.append(alg)
+        if len(monthList)*len(algBatch) > batchSize:
+            batchName = str(algBatch[0]) + '-' + str(algBatch[-1]) + '-' + str(monthList[0]) + '-' + str(monthList[-1]) + '-' + str(stop) + '-' + uniquifier
+            #deferredbackTestBatch(algBatch, monthList, str(stop), deferredName)
+            batchTaskAdd(batchName, algBatch, monthList, stop)
+            algBatch = []
+    if len(algBatch) > 0:
+        batchName = str(algBatch[0]) + '-' + str(algBatch[-1]) + '-' + str(monthList[0]) + '-' + str(monthlist[-1]) + '-' + str(stop) + '-' + uniquifier
+        #deferredbackTestBatch(algBatch, monthList, str(stop), deferredName)
+        batchTaskAdd(batchName, algBatch, monthList, stop)
+        algBatch = []
+    keylist = []
+    for startMonth in monthList:
+        for algkey in alglist:
+            memprefix = startMonth + "_" + str(stop) + "_"
+            keylist.append(memprefix + algkey)
+    return keylist
+
+def backTestBatch(algBatch,monthBatch,stopStep):
+    backTestReturnDict = {}
+    for alg in algBatch:
+        for startMonth in monthBatch:
+            memprefix = startMonth + '_' + stopStep + '_'
+            batchReturns = processDesires.updateAlgStat(alg, startMonth, stopStep, memprefix)
+            for key in batchReturns:
+                if key in backTestReturnDict:
+                    backTestReturnDict[key]['returns'].update(batchReturns[key]['returns'])
+                else:
+                    backTestReturnDict[key] = batchReturns[key]                        
+    processDesires.persistBackTestReturns(backTestReturnDict)
+
+application = webapp.WSGIApplication([('/backtest/doBackTests',doBackTests),
+                                      ('/backtest/doBackTestBatch',doBackTestBatch)],
                                      debug = True)
 
 def main():

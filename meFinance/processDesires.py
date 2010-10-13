@@ -7,7 +7,6 @@ from collections import deque
 from google.appengine.ext import deferred
 from google.appengine.api.labs import taskqueue
 
-
 def updateAllAlgStats(alphaAlg=1,omegaAlg=3540):
     # Way too slow to be useful.
     # Must implement looping method similar to process for desires.
@@ -149,55 +148,6 @@ def calculatePositionPandLs(algKeys,memprefix,stopStep,algStats=None):
         algPosValues[memkey] = positionsValue
     return algPosValues
         
-def backTestBatch(algBatch,monthBatch,stopStep):
-    backTestReturnDict = {}
-    for alg in algBatch:
-        for startMonth in monthBatch:
-            memprefix = startMonth + '_' + stopStep + '_'
-            batchReturns = updateAlgStat(alg, startMonth, stopStep, memprefix)
-            for key in batchReturns:
-                if key in backTestReturnDict:
-                    backTestReturnDict[key]['returns'].update(batchReturns[key]['returns'])
-                else:
-                    backTestReturnDict[key] = batchReturns[key]                        
-    persistBackTestReturns(backTestReturnDict)
-
-def runBackTests(alglist, stop, batchSize = 5, stepRange=None):
-    monthList = []
-    algBatch = []
-    if stepRange is None:
-        for i in range(1,4):    # Create monthList with last three months as startsteps. Need max in case we hit step 1.
-            monthList.append(str(max(stop - 1760*i, 1)))
-    else:
-        for step in stepRange:
-            monthList.append(str(step))  # Simply want it to test the range I give it.
-    for alg in alglist:
-        algBatch.append(alg)
-        if len(monthList)*len(algBatch) > batchSize:
-            deferredName = str(algBatch[0]) + '-' + str(algBatch[-1]) + '-' + str(monthList[0]) + '-' + str(monthList[-1]) + '-' + str(stop)
-            deferredbackTestBatch(algBatch, monthList, str(stop), deferredName)
-            algBatch = []
-    if len(algBatch) > 0:
-        deferredName = str(algBatch[0]) + '-' + str(algBatch[-1]) + '-' + str(monthList[0]) + '-' + str(monthlist[-1]) + '-' + str(stop)
-        deferredbackTestBatch(algBatch, monthList, str(stop), deferredName)
-        algBatch = []
-    keylist = []
-    for startMonth in monthList:
-        for algkey in alglist:
-            memprefix = startMonth + "_" + str(stop) + "_"
-            keylist.append(memprefix + algkey)
-    return keylist
-
-def deferredbackTestBatch(algBatch, monthBatch, stop, name, wait=0.5):
-    try:
-        deferred.defer(backTestBatch, algBatch, monthBatch, stop, _name = name, _queue = 'backTestQueue')
-    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError):
-        pass
-    except:
-        from time import sleep
-        sleep(wait)
-        deferredbackTestBatch(algBatch, monthBatch, stop, name, 2*wait)
-
 def getBackTestReturns(memkeylist, stopStep, stats=None):
     # If want can pass in stats dict with appropriate data.
     if stats is None:
