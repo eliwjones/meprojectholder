@@ -1,11 +1,12 @@
-import meSchema
-import princeFunc
 from google.appengine.ext import db
 from google.appengine.api import memcache
 from zlib import compress,decompress
 from collections import deque
 from google.appengine.ext import deferred
 from google.appengine.api.labs import taskqueue
+import meSchema
+import princeFunc
+import liveAlg
 
 def updateAllAlgStats(alphaAlg=1,omegaAlg=10620):
     # Way too slow to be useful.
@@ -35,35 +36,46 @@ def updateAlgStat(algKey, startStep, stopStep, memprefix = "unpacked_"):
     #         Check position values, Closeout if Necessary.
     #         if step in orderDesires:
     #             do all desire processing
-    for key in orderDesires:
-        currentDesire = eval(desires[key])
-        desireStep = int(key.split('_')[0])
-        for des in currentDesire:
-            buysell = cmp(currentDesire[des]['Shares'],0)
-            Symbol = des
-            
-        tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(repr(stats['Positions'])))
-        cash = tradeCash + eval(repr(stats['Cash']))
-        if buysell == -1:
-            timedelta = selldelta
-        elif buysell == 1:
-            timedelta = buydelta
-        
-        if cash > 0 and lastTradeStep[memprefix + '_' + algKey + '_' + str(buysell)] <= desireStep - timedelta:
-            lastTradeStep[memprefix + '_' + algKey + '_' + str(buysell)] = desireStep
-            stats['CashDelta'].appendleft({'Symbol'  : Symbol,
-                                           'buysell' : buysell,
-                                           'value'   : tradeCash,
-                                           'PandL'   : PandL,
-                                           'step'    : desireStep})
-            if len(stats['CashDelta']) > 800:
-                stats['CashDelta'].pop()
-            stats['Cash'] = cash
-            stats['PandL'] += PandL
-            stats['Positions'] = position
+    # OR
+    # Look at collection of 1-step returns for past 3 days.
+    # Randomly draw one of those returns.. if return is "better" than current 1-step return, keep trade.
+    for step in range(int(startStep), int(stopStep)+1):
+        #stats = doStops(step,eval(repr(stats)))
+        potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in [1,2,3,4]]
+        potentialDesires.sort()
+        for key in potentialDesires:
+            if key in orderDesires:
+                currentDesire = eval(desires[key])
+                desireStep = int(key.split('_')[0])
+                for des in currentDesire:
+                    buysell = cmp(currentDesire[des]['Shares'],0)
+                    Symbol = des
+                    
+                tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(repr(stats['Positions'])))
+                cash = tradeCash + eval(repr(stats['Cash']))
+                if buysell == -1:
+                    timedelta = selldelta
+                elif buysell == 1:
+                    timedelta = buydelta
+                
+                if cash > 0 and lastTradeStep[memprefix + '_' + algKey + '_' + str(buysell)] <= desireStep - timedelta:
+                    lastTradeStep[memprefix + '_' + algKey + '_' + str(buysell)] = desireStep
+                    stats['CashDelta'].appendleft({'Symbol'  : Symbol,
+                                                   'buysell' : buysell,
+                                                   'value'   : tradeCash,
+                                                   'PandL'   : PandL,
+                                                   'step'    : desireStep})
+                    if len(stats['CashDelta']) > 800:
+                        stats['CashDelta'].pop()
+                    stats['Cash'] = cash
+                    stats['PandL'] += PandL
+                    stats['Positions'] = position
 
     bTestReturns = getBackTestReturns([memprefix + algKey],stopStep, {memprefix + algKey: stats})
     return bTestReturns
+
+def doStops(step,statDict):
+    pass
 
 def bestAlgSearch(startStep,stopStep):
     allAlgs = meSchema.meAlg.all().fetch(10620)

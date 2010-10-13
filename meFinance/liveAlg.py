@@ -16,6 +16,7 @@ import meSchema
 import processDesires
 import princeFunc
 from collections import deque
+from google.appengine.api import memcache
 from google.appengine.ext import db
 from google.appengine.ext import deferred
 from google.appengine.api.labs import taskqueue
@@ -205,7 +206,7 @@ def getStepRangeAlgDesires(algKey,startStep,stopStep):
     '''
     buyList = db.GqlQuery(buyQuery).fetch(1000)
     sellList = db.GqlQuery(sellQuery).fetch(1000)
-    ''''
+    '''
     buyList = meSchema.cachepy.get(buyQuery)
     if buyList is None:
         buyList = memcache.get(buyQuery)
