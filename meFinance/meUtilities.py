@@ -44,15 +44,20 @@ def deleteByKeyList(keylist):
     keylist = eval(keylist)
     db.delete(keylist)
 
-def wipeoutLiveAlgs(cursor = None):
+def wipeoutLiveAlgs(name = '', cursor = None):
+    i = 0
     count = 100
     while count == 100:
-        query = meSchema.liveAlg.all(keys_only = True)
-        if cursor is not None:
-            query.with_cursor(cursor)
-        liveAlgs = query.fetch(100)
+        try:
+            query = meSchema.liveAlg.all(keys_only = True)
+            if cursor is not None:
+                query.with_cursor(cursor)
+            liveAlgs = query.fetch(100)
+        except:
+            wipeoutLiveAlgs(cursor)
         count = len(liveAlgs)
-        addDeferred(repr(liveAlgs))
+        addDeferred(repr(liveAlgs), name + '-liveAlgWipe-batch' + str(i))
+        i += 1
         cursor = query.cursor()
 
 def wipeoutDesires(cursor = None):

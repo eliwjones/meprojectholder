@@ -91,40 +91,58 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
         alginfo = meSchema.memGet(meSchema.meAlg,algKey)
         buydelta = meSchema.memGet(meSchema.tradeCue,alginfo.BuyCue).TimeDelta
         selldelta = meSchema.memGet(meSchema.tradeCue,alginfo.SellCue).TimeDelta
-        # Don't think I need to explicitly order the desire keys, but just in case.
+        # Don't need this anymore..
         orderDesires = desires.keys()
         orderDesires.sort()
-        for key in orderDesires:
-            currentDesire = eval(desires[key])
-            desireStep = int(key.split('_')[0])
-            for des in currentDesire:
-                buysell = cmp(currentDesire[des]['Shares'],0)
-                Symbol = des
-            tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(liveAlgInfo[liveAlgKey].Positions))
-            cash = tradeCash + eval(repr(liveAlgInfo[liveAlgKey].Cash))
-            if buysell == -1:
-                timedelta = selldelta
-                lastTradeStep = liveAlgInfo[liveAlgKey].lastSell
-            elif buysell == 1:
-                timedelta = buydelta
-                lastTradeStep = liveAlgInfo[liveAlgKey].lastBuy
-            if cash > 0 and lastTradeStep <= desireStep - timedelta:
-                if buysell == -1:
-                    liveAlgInfo[liveAlgKey].lastSell = desireStep
-                elif buysell == 1:
-                    liveAlgInfo[liveAlgKey].lastBuy = desireStep
-                CashDelta = eval(liveAlgInfo[liveAlgKey].CashDelta)
-                CashDelta.appendleft({'Symbol' : Symbol,
-                                      'buysell': buysell,
-                                      'value'  : tradeCash,
-                                      'PandL'  : PandL,
-                                      'step'   : desireStep})
-                liveAlgInfo[liveAlgKey].CashDelta = repr(CashDelta)
-                liveAlgInfo[liveAlgKey].Cash      = cash
-                liveAlgInfo[liveAlgKey].PandL    += PandL
-                liveAlgInfo[liveAlgKey].Positions = repr(position)
-        liveAlgInfo[liveAlgKey].lastStep  = stop
+        for step in range(start, stop+1):
+            if (step-start)%80==0:
+                stats = convertLiveAlgInfoToStatDict(liveAlgInfo[liveAlgKey])
+                stats = processDesires.doStops(step, stats, alginfo)
+                liveAlgInfo[liveAlgKey].CashDelta = repr(stats['CashDelta'])
+                liveAlgInfo[liveAlgKey].Positions = repr(stats['Positions'])
+                liveAlgInfo[liveAlgKey].PandL     = stats['PandL']
+                liveAlgInfo[liveAlgKey].Cash      = stats['Cash']
+            potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in [1,2,3,4]]
+            potentialDesires.sort()
+            for key in potentialDesires:
+                if key in orderDesires:
+                    currentDesire = eval(desires[key])
+                    desireStep = int(key.split('_')[0])
+                    for des in currentDesire:
+                        buysell = cmp(currentDesire[des]['Shares'],0)
+                        Symbol = des
+                    tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(liveAlgInfo[liveAlgKey].Positions))
+                    cash = tradeCash + eval(repr(liveAlgInfo[liveAlgKey].Cash))
+                    if buysell == -1:
+                        timedelta = selldelta
+                        lastTradeStep = liveAlgInfo[liveAlgKey].lastSell
+                    elif buysell == 1:
+                        timedelta = buydelta
+                        lastTradeStep = liveAlgInfo[liveAlgKey].lastBuy
+                    if cash > 0 and lastTradeStep <= desireStep - timedelta:
+                        if buysell == -1:
+                            liveAlgInfo[liveAlgKey].lastSell = desireStep
+                        elif buysell == 1:
+                            liveAlgInfo[liveAlgKey].lastBuy = desireStep
+                        CashDelta = eval(liveAlgInfo[liveAlgKey].CashDelta)
+                        CashDelta.appendleft({'Symbol' : Symbol,
+                                              'buysell': buysell,
+                                              'value'  : tradeCash,
+                                              'PandL'  : PandL,
+                                              'step'   : desireStep})
+                        liveAlgInfo[liveAlgKey].CashDelta = repr(CashDelta)
+                        liveAlgInfo[liveAlgKey].Cash      = cash
+                        liveAlgInfo[liveAlgKey].PandL    += PandL
+                        liveAlgInfo[liveAlgKey].Positions = repr(position)
+                liveAlgInfo[liveAlgKey].lastStep  = stop
     return liveAlgInfo
+
+def convertLiveAlgInfoToStatDict(liveAlgInfo):
+    statDict = {'CashDelta' : eval(liveAlgInfo.CashDelta),
+                'Positions' : eval(liveAlgInfo.Positions),
+                'PandL'     : eval(repr(liveAlgInfo.PandL)),
+                'Cash'      : eval(repr(liveAlgInfo.Cash))}
+    return statDict
 
 def getLiveAlgInfo(stopStep, stepRange, algKeyFilter = None):
     if algKeyFilter is not None:
@@ -260,7 +278,7 @@ def initializeLiveAlgs(initialStopStep=5155, stepRange=1600, FTLtype = ['FTLe','
                                    stopStep = initialStopStep, startStep = initialStopStep - stepRange,
                                    stepRange = stepRange, lastBuy = 0, lastSell = 0,
                                    percentReturn = 0.0, Positions = repr({}), PosVal = 0.0, PandL = 0.0,
-                                   CashDelta = repr(deque([])), Cash = 20000.0, numTrades = 0,
+                                   CashDelta = repr(deque([])), Cash = 100000.0, numTrades = 0,
                                    history = repr(deque([])), technique = technique )
         liveAlgs.append(liveAlg)
     db.put(liveAlgs)
