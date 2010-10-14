@@ -66,6 +66,7 @@ def processLiveAlgStepRange(start, stop, stepRange, algKeyFilter = None):
     db.put(putList)
 
 def getCurrentReturn(liveAlgInfo,stopStep):
+    startCash = meSchema.memGet(meSchema.meAlg, meSchema.buildAlgKey(1)).Cash
     stopStepQuotes = princeFunc.getStepQuotes(stopStep)
     for liveAlgKey in liveAlgInfo:
         positions = eval(liveAlgInfo[liveAlgKey].Positions)
@@ -76,7 +77,7 @@ def getCurrentReturn(liveAlgInfo,stopStep):
             shares = positions[symbol]['Shares']
             positionsValue += (currentPrice - posPrice)*shares
         liveAlgInfo[liveAlgKey].PosVal = positionsValue
-        liveAlgInfo[liveAlgKey].percentReturn = (liveAlgInfo[liveAlgKey].PosVal + liveAlgInfo[liveAlgKey].PandL)/20000.0
+        liveAlgInfo[liveAlgKey].percentReturn = (liveAlgInfo[liveAlgKey].PosVal + liveAlgInfo[liveAlgKey].PandL)/startCash
         liveAlgInfo[liveAlgKey].numTrades = len(eval(liveAlgInfo[liveAlgKey].CashDelta))
         history = eval(liveAlgInfo[liveAlgKey].history)
         history.appendleft({ 'step' : stopStep, 'return' : liveAlgInfo[liveAlgKey].percentReturn })
@@ -176,12 +177,12 @@ def getTopAlg(stopStep, startStep, technique):
     # if technique contains 'FTLe-', orderBy = '-percentReturn' unless NRval.find('R') != -1, then orderBy = '-' + NRval
     # if technique contains 'FTLo-', orderBY = 'percentReturn' unless NRval.find('R') != -1, then orderBy = NRval
     if technique.find('FTLe-') != -1:
-        if NRval.find('R') != -1:
+        if NRval.find('R') != -1 and NRval != "R1":
             orderBy = '-' + NRval
         else:
             orderBy = '-percentReturn'
     elif technique.find('FTLo-') != -1:
-        if NRval.find('R') != -1:
+        if NRval.find('R') != -1 and NRval != "R1":
             orderBy = NRval
         else:
             orderBy = 'percentReturn'
@@ -265,7 +266,7 @@ def getStepRangeAlgDesires(algKey,startStep,stopStep):
     return desireDict
     
 
-def initializeLiveAlgs(initialStopStep=5155, stepRange=1600, FTLtype = ['FTLe','dnFTLe','FTLo','dnFTLo'], NRtype = ['R3','R4','R5']):
+def initializeLiveAlgs(initialStopStep=5155, stepRange=1600, FTLtype = ['FTLe','dnFTLe','FTLo','dnFTLo'], NRtype = ['R2','R3','R4','R5']):
     techniques = []
     for FTL in FTLtype:
         for NR in NRtype:
