@@ -9,7 +9,7 @@ def makeAlgs():
     TradeCues = []
     for tradecue in fetchCues:
         TradeCues.append(tradecue.key().name())
-    Cash = [20000.0]
+    Cash = [100000.0]
     id = 0
     meList = []
     count = 0

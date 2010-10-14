@@ -18,7 +18,6 @@ def updateAllAlgStats(alphaAlg=1,omegaAlg=10620):
 
 def updateAlgStat(algKey, startStep, stopStep, memprefix = "unpacked_"):
     lastStep = stopStep
-    # Using liveAlg version to get range of desires.
     desires = liveAlg.getStepRangeAlgDesires(algKey, startStep, stopStep)
     alginfo = meSchema.memGet(meSchema.meAlg,algKey)
     stats = resetAlgstats(memprefix, alginfo.Cash, int(algKey), int(algKey))[memprefix + algKey]
@@ -26,21 +25,12 @@ def updateAlgStat(algKey, startStep, stopStep, memprefix = "unpacked_"):
     selldelta = meSchema.memGet(meSchema.tradeCue,alginfo.SellCue).TimeDelta
     lastTradeStep = {memprefix + '_' + algKey + '_-1': -10000,
                      memprefix + '_' + algKey + '_1' : -10000}
-    # Must order desire keys so that trades are executed in correct sequence.
     orderDesires = desires.keys()
     orderDesires.sort()
-
-    # Must now implement wrapper code to monitor position value step by step for StopLoss, StopProfit.
-    # Something like:
-    #     for step in range(startStep, stopStep +1):
-    #         Check position values, Closeout if Necessary.
-    #         if step in orderDesires:
-    #             do all desire processing
-    # OR
-    # Look at collection of 1-step returns for past 3 days.
-    # Randomly draw one of those returns.. if return is "better" than current 1-step return, keep trade.
     for step in range(int(startStep), int(stopStep)+1):
-        #stats = doStops(step,eval(repr(stats)))
+        # for now, just running stop every 80 steps
+        if (step-int(startStep))%80 == 0:
+            stats = doStops(step, eval(repr(stats)), alginfo)
         potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in [1,2,3,4]]
         potentialDesires.sort()
         for key in potentialDesires:
@@ -50,7 +40,6 @@ def updateAlgStat(algKey, startStep, stopStep, memprefix = "unpacked_"):
                 for des in currentDesire:
                     buysell = cmp(currentDesire[des]['Shares'],0)
                     Symbol = des
-                    
                 tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(repr(stats['Positions'])))
                 cash = tradeCash + eval(repr(stats['Cash']))
                 if buysell == -1:
@@ -74,8 +63,80 @@ def updateAlgStat(algKey, startStep, stopStep, memprefix = "unpacked_"):
     bTestReturns = getBackTestReturns([memprefix + algKey],stopStep, {memprefix + algKey: stats})
     return bTestReturns
 
-def doStops(step,statDict):
-    pass
+def doStops(step, statDict, alginfo):
+    # Use desireFunc.memGetStcks(stckKeyList) to get stock values for last N steps
+    # for each stckID and step in N, calculate percentReturns for (step, step-1)
+    # This should give recent range of single step percentReturns.
+    from random import random
+    stopDesires = []
+    stckKeys = [str(stckID) + '_' + str(step) for stckID in [1,2,3,4]]
+    stocks = memGetStcks(stckKeys)
+    stckQuotes = {}
+    for stock in stocks:
+        if stock is None:
+            return statDict
+        else:
+            stckQuotes[meSchema.getStckSymbol(stock.ID)] = stock.quote
+    for pos in statDict['Positions']:
+        stckID = meSchema.getStckID(pos)
+        stckDeltas = calculateDeltas(stckID,step)
+        n = len(stckDeltas) - 2
+        r = random()
+        index = int(round(n*r)) + 1                                # Don't want to choose 0 index.
+        choose = stckDeltas[index]
+        shares = statDict['Positions'][pos]['Shares']
+        longshort = cmp(shares,0)                                  # -1 for short, +1 for long
+        stckQuote = stckQuotes[pos]
+        offsetDesire = meSchema.desire(Symbol = pos,
+                                       Quote = stckQuote,
+                                       CueKey = '0000')
+        dictDesire = convertDesireToDict(offsetDesire, -1*longshort, alginfo.TradeSize, alginfo.Cash, -1*shares)
+        if (longshort == 1 and choose < stckDeltas[0]) or (longshort == -1 and choose > stckDeltas[0]):
+            # Possibly consider looking at whether choose is simply negative or positive.
+            stopDesires.append(dictDesire)
+    for stop in stopDesires:
+        tradeCash, PandL, position = princeFunc.mergePosition(eval(stop), eval(repr(statDict['Positions'])))
+        cash = tradeCash + eval(repr(statDict['Cash']))
+        Symbol = eval(stop).keys()[0]
+        buysell = cmp(eval(stop)[Symbol]['Shares'], 0)
+        statDict['CashDelta'].appendleft({'Symbol'  : Symbol,
+                                          'buysell' : 'stop',
+                                          'value'   : tradeCash,
+                                          'PandL'   : PandL,
+                                          'step'    : step})
+        if len(statDict['CashDelta']) > 800:
+            statDict['CashDelta'].pop()
+        statDict['Cash'] = cash
+        statDict['PandL'] += PandL
+        statDict['Positions'] = position
+    return statDict
+
+def calculateDeltas(stckID, step):
+    stckKeyList = []
+    # Create list of stckKeys starting from current step and going backwards to 400 steps.
+    #   stckKeyList ~ ['1_1300', '1_1299', ..., '1_900'] for stckID =1 and step=1300
+    # Trying with daily checks over past 4 weeks.
+    for i in range(0,1601,80):
+        keyStep = step - i
+        if keyStep > 0:
+            stckKey = str(stckID) + '_' + str(keyStep)
+            stckKeyList.append(stckKey)
+    stockQuotes = memGetStcks(stckKeyList)
+    deltaList = []
+    for i in range(len(stockQuotes)-1):
+        if stockQuotes[i] is not None and stockQuotes[i+1] is not None and float(stockQuotes[i].quote) != 0.0 and float(stockQuotes[i+1].quote) != 0.0:
+            medelta = (stockQuotes[i].quote - float(stockQuotes[i+1].quote))/float(stockQuotes[i+1].quote)
+        else:
+            medelta = 0.0
+        deltaList.append(medelta)
+    return deltaList
+
+def memGetStcks(stckKeyList):
+    meList = []
+    results = meSchema.memGet_multi(meSchema.stck, stckKeyList)
+    for key in stckKeyList:
+        meList.append(results[key])
+    return meList
 
 def bestAlgSearch(startStep,stopStep):
     allAlgs = meSchema.meAlg.all().fetch(10620)
@@ -341,11 +402,11 @@ def getAlgDesires(algKey,resetCache=False,startStep=None,stopStep=None):
             desireDict[keyname] = convertDesireToDict(buy, 1, alginfo.TradeSize, alginfo.Cash)
     return desireDict
 
-def convertDesireToDict(desire,buysell,tradesize = 0.25, cash = 20000.0):
-    # Right now just using default tradesize and cash to get working.
+def convertDesireToDict(desire, buysell, tradesize, cash, shares = None):
     from math import floor
     meDict = {}
-    shares = int((buysell)*floor(((tradesize*cash) - 10.00)/desire.Quote))
+    if shares is None:
+        shares = int((buysell)*floor(((tradesize*cash) - 10.00)/desire.Quote))
     meDict[desire.Symbol] = {'Shares' : shares,
                              'Price'  : desire.Quote,
                              'Value'  : desire.Quote*shares}
