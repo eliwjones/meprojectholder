@@ -266,7 +266,7 @@ def getStepRangeAlgDesires(algKey,startStep,stopStep):
     return desireDict
     
 
-def initializeLiveAlgs(initialStopStep=5155, stepRange=1600, FTLtype = ['FTLe','dnFTLe','FTLo','dnFTLo'], NRtype = ['R2','R3','R4','R5']):
+def initializeLiveAlgs(initialStopStep=5155, stepRange=1600, FTLtype = ['FTLe','dnFTLe','FTLo','dnFTLo'], NRtype = ['R1','R2','R3','R4','R5']):
     techniques = []
     for FTL in FTLtype:
         for NR in NRtype:
