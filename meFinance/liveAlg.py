@@ -40,8 +40,8 @@ def calculateWeeklyLiveAlgs(stopStep, stepRange = 1600, name = ''):
         algGroups.append([firstAlgKey.name(), secondAlgKey.name()])
     i = 0
     for algGroup in algGroups:
-        deferred.defer(processLiveAlgStepRange, stopStep - 1600, stopStep, stepRange, algGroup,
-                       _name = "liveAlgCalc-" + str(stopStep) + '-' + str(stopStep - 1600) + '-' + '-' + str(stepRange) + '-group' + str(i) + '-' + name)
+        deferred.defer(processLiveAlgStepRange, stopStep - stepRange, stopStep, stepRange, algGroup,
+                       _name = "liveAlgCalc-" + str(stopStep) + '-' + str(stopStep - stepRange) + '-' + '-' + str(stepRange) + '-group' + str(i) + '-' + name)
         i += 1
 
 def processLiveAlgStepRange(start, stop, stepRange, algKeyFilter = None):
