@@ -16,6 +16,7 @@ import meSchema
 import processDesires
 import princeFunc
 from collections import deque
+from pickle import dumps
 from google.appengine.api import memcache
 from google.appengine.ext import db
 from google.appengine.ext import deferred
@@ -135,7 +136,7 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
                         liveAlgInfo[liveAlgKey].Cash      = cash
                         liveAlgInfo[liveAlgKey].PandL    += PandL
                         liveAlgInfo[liveAlgKey].Positions = repr(position)
-                liveAlgInfo[liveAlgKey].lastStep  = stop
+                #liveAlgInfo[liveAlgKey].lastStep  = stop
     return liveAlgInfo
 
 def convertLiveAlgInfoToStatDict(liveAlgInfo):
@@ -168,12 +169,12 @@ def getBestAlgs(stopStep, liveAlgInfo):
     return bestAlgs
 
 def getTopAlg(stopStep, startStep, technique):
-    topAlg = meSchema.backTestResult.all(keys_only = True).filter("stopStep =", stopStep).filter("startStep =", startStep)
+    query = meSchema.backTestResult.all(keys_only = True).filter("stopStep =", stopStep).filter("startStep =", startStep)
     # get -NR  value.. add filter("N =", Nvalue) for N val..
     NRval = technique.split('-')[-1]
     if NRval.find('N') != -1:
         N = int(NRval.replace('N',''))
-        topAlg = topAlg.filter("N =", N)
+        query = query.filter("N =", N)
     # if technique contains 'FTLe-', orderBy = '-percentReturn' unless NRval.find('R') != -1, then orderBy = '-' + NRval
     # if technique contains 'FTLo-', orderBY = 'percentReturn' unless NRval.find('R') != -1, then orderBy = NRval
     if technique.find('FTLe-') != -1:
@@ -186,7 +187,13 @@ def getTopAlg(stopStep, startStep, technique):
             orderBy = NRval
         else:
             orderBy = 'percentReturn'
-    topAlg = topAlg.order(orderBy).get()
+    #topAlg = query.order(orderBy).get()
+    query = query.order(orderBy)
+    memKey = str(dumps(query).__hash__())
+    topAlg = memcache.get(memKey)
+    if topAlg is None:
+        topAlg = query.get()
+        memcache.set(memKey, topAlg)
     bestAlgKey = topAlg.name().split('_')[0]    # meAlg key is just first part of backTestResult key_name.
     # if technique contains 'dnFTL', bestAlg = opposite alg.
     if technique.find('dnFTL') != -1:
@@ -194,8 +201,14 @@ def getTopAlg(stopStep, startStep, technique):
     return bestAlgKey
 
 def getOppositeAlg(meAlgKey):
-    meAlg = meSchema.meAlg.get_by_key_name(meAlgKey)
-    oppositeAlg = meSchema.meAlg.all(keys_only = True).filter("BuyCue =", meAlg.SellCue).filter("SellCue =", meAlg.BuyCue).get()
+    #meAlg = meSchema.meAlg.get_by_key_name(meAlgKey)
+    meAlg = meSchema.memGet(meSchema.meAlg, meAlgKey)
+    query = meSchema.meAlg.all(keys_only = True).filter("BuyCue =", meAlg.SellCue).filter("SellCue =", meAlg.BuyCue)
+    memKey = str(dumps(query).__hash__())
+    oppositeAlg = memcache.get(memKey)
+    if oppositeAlg is None:
+        oppositeAlg = query.get()
+        memcache.set(memKey, oppositeAlg)
     oppositeAlgKey = oppositeAlg.name()
     return oppositeAlgKey
 
