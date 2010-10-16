@@ -96,6 +96,22 @@ def buildStopStepList(start, stop):
         liveAlgStop += 400
     return stopStepList
 
+def outputStats():
+    metaAlgs = meSchema.metaAlg.all().fetch(100)
+    meDict = {}
+    for metaAlg in metaAlgs:
+        meDict[metaAlg.technique] = []
+    for metaAlg in metaAlgs:
+        ret = metaAlg.percentReturn
+        meDict[metaAlg.technique].append(ret)
+    dictKeys = meDict.keys()
+    dictKeys.sort()
+    for key in dictKeys:
+        meDict[key].sort()
+        meDict[key] = [str(round(ret*100,2))[0:5] for ret in meDict[key]]
+        print key, ': ', meDict[key]
+    
+
 
 def initializeMetaAlgs(FTLtype = ['FTLe'], Rtype = ['R1','R2','R3'], Vs = ['V01','V02','V03','V04','V05','V06','V07','V08','V09','V10']):
     metaAlgKeys = []
