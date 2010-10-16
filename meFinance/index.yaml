@@ -124,3 +124,17 @@ indexes:
   - name: startStep
   - name: percentReturn
     direction: asc
+
+- kind: liveAlg
+  properties:
+  - name: stopStep
+  - name: startStep
+  - name: R2
+    direction: desc
+
+- kind: liveAlg
+  properties:
+  - name: stopStep
+  - name: startStep
+  - name: R3
+    direction: desc
