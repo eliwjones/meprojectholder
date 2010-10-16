@@ -102,6 +102,8 @@ class liveAlg(db.Model):
     PandL         = db.FloatProperty(required=True)
     CashDelta     = db.TextProperty(required=True)
     Cash          = db.FloatProperty(required=True)
+    R2            = db.FloatProperty(required=False)
+    R3            = db.FloatProperty(required=False)
     N             = db.IntegerProperty(required=False)
     numTrades     = db.IntegerProperty(required=True)
     history       = db.TextProperty(required=False)

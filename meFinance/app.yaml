@@ -59,7 +59,7 @@ handlers:
   script: calculateNtersects.py
   login: admin
 
-- url: /calculate/compounds
+- url: /calculate/compounds/.*
   script: calculateCompoundReturns.py
   login: admin
 
