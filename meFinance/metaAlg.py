@@ -23,7 +23,7 @@ def playThatGame(startStep, stopStep, metaKeys):
         # This will contain the liveAlg.technique that
         # each metaAlg.technique likes.
         # e.g. bestLiveAlgInfo['FTLe-R2'] = 'dnFTLo-R3'
-        bestLiveAlgInfo = getBestLiveAlgs(stopStep, metaAlgInfo)
+        bestLiveAlgInfo = getBestLiveAlgs(lastLiveAlgStop, metaAlgInfo)
         bestAlgs = liveAlg.getBestAlgs(lastLiveAlgStop, bestLiveAlgInfo)
         if i < len(stopStepList)-1:
             lastStep = stopStepList[i+1]
@@ -32,11 +32,19 @@ def playThatGame(startStep, stopStep, metaKeys):
         if currentStep < lastStep:
             metaAlgInfo = liveAlg.processStepRangeDesires(currentStep, lastStep, bestAlgs, metaAlgInfo)
             metaAlgInfo = liveAlg.getCurrentReturn(metaAlgInfo, lastStep)
+            metaAlgInfo = addLiveAlgTechne(metaAlgInfo, bestLiveAlgInfo)
             currentStep = lastStep + 1
     putList = []
     for metaAlgKey in metaAlgInfo:
         putList.append(metaAlgInfo[metaAlgKey])
     db.put(putList)
+
+def addLiveAlgTechne(metaAlgInfo, bestLiveAlgInfo):
+    for metaAlgKey in metaAlgInfo:
+        history = eval(metaAlgInfo[metaAlgKey].history)
+        history[0]['liveAlgTechne'] = bestLiveAlgInfo[metaAlgKey].technique
+        metaAlgInfo[metaAlgKey].history = repr(history)
+    return metaAlgInfo
 
 def getMetaAlgInfo(metaKeys):
     metaAlgInfo = {}
