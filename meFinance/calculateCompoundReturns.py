@@ -13,10 +13,11 @@ class calculateBTestCompounds(webapp.RequestHandler):
     def post(self):
         stopStep = int(self.request.get('stopStep'))
         startStep = int(self.request.get('startStep'))
+        globalStop = int(self.request.get('globalStop'))
         name = str(self.request.get('name'))
         i = int(self.request.get('i'))
         cursor = str(self.request.get('cursor'))
-        doCompoundReturns(stopStep, startStep, name, i, cursor)
+        doCompoundReturns(stopStep, startStep, globalStop, name, i, cursor)
 
 class calculateLiveAlgCompounds(webapp.RequestHandler):
     def get(self):
@@ -25,31 +26,34 @@ class calculateLiveAlgCompounds(webapp.RequestHandler):
     def post(self):
         stopStep = int(self.request.get('stopStep'))
         startStep = int(self.request.get('startStep'))
+        globalStop = int(self.request.get('globalStop'))
         name = str(self.request.get('name'))
         i = int(self.request.get('i'))
         cursor = str(self.request.get('cursor'))
-        doLiveALgCompoundReturns(stopStep, startStep, name, i, cursor)
+        doLiveALgCompoundReturns(stopStep, startStep, globalStop, name, i, cursor)
 
-def taskAdd(stopStep, startStep, name, i, cursor, calcUrl, wait = 0.5):
+def taskAdd(stopStep, startStep, globalStop, name, i, cursor, calcUrl, wait = 0.5):
+    urlSplit = calcUrl.split('/')
+    prefix = urlSplit[-1]
     try:
         taskqueue.add(url = calcUrl, countdown = 0,
-                      name = 'doCompounds-' + str(stopStep) + '-' + str(startStep) + '-' + str(i) + '-' + name,
-                      params = {'stopStep' : stopStep,
+                      name = prefix + '-' + str(stopStep) + '-' + str(startStep) + '-' + str(i) + '-' + name,
+                      params = {'stopStep'  : stopStep,
                                 'startStep' : startStep,
-                                'name' : name,
-                                'i' : i,
-                                'cursor' : cursor } )
+                                'globalStop': globalStop,
+                                'name'      : name,
+                                'i'         : i,
+                                'cursor'    : cursor } )
     except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
         pass
     except:
         from time import sleep
         sleep(wait)
-        taskAdd(stopStep, startStep, name, i, cursor, calcUrl, 2*wait)
+        taskAdd(stopStep, startStep, globalStop, name, i, cursor, calcUrl, 2*wait)
 
-def doLiveALgCompoundReturns(stopStep, startStep, name = '', i = 0, cursor = ''):
+def doLiveALgCompoundReturns(stopStep, startStep, globalStop, name = '', i = 0, cursor = ''):
     from time import time
     deadline = time() + 20.00
-    globalStop = 15955
     count = 100
     while count == 100:
         query = meSchema.liveAlg.all().filter('stopStep =', stopStep).filter('startStep =', startStep).order('percentReturn')
@@ -67,17 +71,16 @@ def doLiveALgCompoundReturns(stopStep, startStep, name = '', i = 0, cursor = '')
             doLiveAlgCompounds(stopStep, startStep, name, i, liveAlgs)
             cursor = query.cursor()
         else:
-            taskAdd(stopStep, startStep, name, i, cursor, '/calculate/compounds/liveAlgCompounds')
+            taskAdd(stopStep, startStep, globalStop, name, i, cursor, '/calculate/compounds/liveAlgCompounds')
             return
     if stopStep <= globalStop - 400:
         stopStep += 400
         startStep += 400
-        taskAdd(stopStep, startStep, name, 0, '', '/calculate/compounds/liveAlgCompounds')
+        taskAdd(stopStep, startStep, globalStop, name, 0, '', '/calculate/compounds/liveAlgCompounds')
 
-def doCompoundReturns(stopStep, startStep, name = '', i = 0, cursor = ''):
+def doCompoundReturns(stopStep, startStep, globalStop, name = '', i = 0, cursor = ''):
     from time import time
     deadline = time() + 20.00
-    globalStop = 15955
     count = 100
     while count == 100:
         query = meSchema.backTestResult.all().filter('stopStep =', stopStep).filter('startStep =', startStep).order('percentReturn')
@@ -95,12 +98,12 @@ def doCompoundReturns(stopStep, startStep, name = '', i = 0, cursor = ''):
             doCompounds(stopStep, startStep, name, i, backTests)
             cursor = query.cursor()
         else:
-            taskAdd(stopStep, startStep, name, i, cursor, '/calculate/compounds/bTestCompounds')
+            taskAdd(stopStep, startStep, globalStop, name, i, cursor, '/calculate/compounds/bTestCompounds')
             return
     if stopStep <= globalStop - 400:
         stopStep += 400
         startStep += 400
-        taskAdd(stopStep, startStep, name, 0, '', '/calculate/compounds/bTestCompounds')
+        taskAdd(stopStep, startStep, globalStop, name, 0, '', '/calculate/compounds/bTestCompounds')
 
 def doLiveAlgCompounds(stopStep, startStep, name, i, liveAlgs):
     putList = []

@@ -7,11 +7,12 @@ from google.appengine.api.labs import taskqueue
 from google.appengine.api import memcache
 from pickle import dumps
 
-def taskAdd(startStep, stopStep, name=''):
-    initializeMetaAlgs()
-    for techne in ['FTLe-R1','FTLe-R2','FTLe-R3']:
-        for i in range(1,11):
-            keyname = techne + '-V' + str(i).rjust(2,'0')
+def taskAdd(startStep, stopStep, technes, name=''):
+    Vs = initializeMetaAlgs()
+    # technes = ['FTLe-R1','FTLe-R2','FTLe-R3']
+    for techne in technes:
+        for v in Vs:
+            keyname = techne + '-' + v
             deferred.defer(playThatGame, startStep, stopStep, [keyname], _name = 'metaAlg-Calculator-' + name + '-' + keyname)
 
 def playThatGame(startStep, stopStep, metaKeys):
@@ -104,9 +105,9 @@ def buildStopStepList(start, stop):
         liveAlgStop += 400
     return stopStepList
 
-def outputStats(technique='FTLe-R3'):
+def outputStats(technique='FTLe-R3', showFullStats=False):
     from math import floor, ceil
-    metaAlgs = meSchema.metaAlg.all().filter('technique =', technique).fetch(100)
+    metaAlgs = meSchema.metaAlg.all().filter('technique =', technique).fetch(500)
     meDict = {}
     for metaAlg in metaAlgs:
         meDict[metaAlg.technique] = []
@@ -135,6 +136,7 @@ def outputStats(technique='FTLe-R3'):
         print 'Min: ', Min, 'Med: ', Med, 'Mean: ', Mean, 'Max: ', Max
     
     sumDict = {}
+    totalSumDict = {'HBC': 0.0, 'CME': 0.0, 'GOOG': 0.0, 'INTC':0.0}
     for metaAlg in metaAlgs:
         dictKey = metaAlg.key().name()
         sumDict[dictKey] = {}
@@ -143,14 +145,24 @@ def outputStats(technique='FTLe-R3'):
         CashDelta = eval(metaAlg.CashDelta)
         for trade in CashDelta:
             sumDict[dictKey][trade['Symbol']] += trade['PandL']
+            totalSumDict[trade['Symbol']] += trade['PandL']
+    print totalSumDict
+    totalSum = 0.0
+    for stock in totalSumDict:
+        totalSum += totalSumDict[stock]
+    for stock in totalSumDict:
+        print stock, ': ', 100*(totalSumDict[stock]/totalSum)
     dictKeys = sumDict.keys()
     dictKeys.sort()
-    for key in dictKeys:
-        for pos in sumDict[key]:
-            sumDict[key][pos] = int(sumDict[key][pos])
-        print key, ': ', sumDict[key]
+    if showFullStats:
+        for key in dictKeys:
+            for pos in sumDict[key]:
+                sumDict[key][pos] = int(sumDict[key][pos])
+            print key, ': ', sumDict[key]
 
-def initializeMetaAlgs(FTLtype = ['FTLe'], Rtype = ['R1','R2','R3'], Vs = ['V01','V02','V03','V04','V05','V06','V07','V08','V09','V10']):
+def initializeMetaAlgs(FTLtype = ['FTLe'], Rtype = ['R1','R2','R3'], Vs = None):
+    if Vs is None:
+        Vs = ['V' + str(i).rjust(3,'0') for i in range(1,101)]
     metaAlgKeys = []
     for FTL in FTLtype:
         for R in Rtype:
@@ -169,5 +181,6 @@ def initializeMetaAlgs(FTLtype = ['FTLe'], Rtype = ['R1','R2','R3'], Vs = ['V01'
                                    technique = technique)
         metaAlgs.append(metaAlg)
     db.put(metaAlgs)
+    return Vs
                                    
         

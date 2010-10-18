@@ -98,7 +98,7 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
         orderDesires.sort()
         for step in range(start, stop+1):
             stopRange = 80
-            if (step-start)%stopRange==0:
+            if (step - start - 44)%stopRange==0:
                 stats = convertLiveAlgInfoToStatDict(liveAlgInfo[liveAlgKey])
                 stats = processDesires.doStops(step, stats, alginfo, stopRange)
                 liveAlgInfo[liveAlgKey].CashDelta = repr(stats['CashDelta'])

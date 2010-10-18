@@ -13,6 +13,7 @@ class calculateNtersect(webapp.RequestHandler):
         self.response.out.write('I just translate parameters and fire off a task.\n')
         stopStep = str(self.request.get('stopStep'))
         startStep = str(self.request.get('startStep'))
+        globalStop = str(self.request.get('globalStop'))
         percentReturnFilter = str(self.request.get('pReturn'))
         name = str(self.request.get('name'))
         doAll = str(self.request.get('doAll'))
@@ -30,6 +31,7 @@ class calculateNtersect(webapp.RequestHandler):
     def post(self):
         stopStep = int(self.request.get('stopStep'))
         startStep = int(self.request.get('startStep'))
+        globalStop = int(self.request.get('globalStop'))
         pReturnFilter = str(self.request.get('pReturnFilter'))
         name = str(self.request.get('name'))
         doAll = str(self.request.get('doAll'))
@@ -39,14 +41,15 @@ class calculateNtersect(webapp.RequestHandler):
             doAll = False
         i = int(self.request.get('i'))
         cursor = str(self.request.get('cursor'))
-        doNtersects(stopStep, startStep, pReturnFilter, name, i, cursor, doAll)
+        doNtersects(stopStep, startStep, globalStop, pReturnFilter, name, i, cursor, doAll)
 
-def taskAdd(stopStep, startStep, pReturnFilter, name, i, cursor, doAll, wait = .5):
+def taskAdd(stopStep, startStep, globalStop, pReturnFilter, name, i, cursor, doAll, wait = .5):
     try:
         taskqueue.add(url    = '/calculate/ntersect', countdown = 0,
                       name   = 'doNtersects-' + str(stopStep) + '-' + str(startStep) + '-' + str(i) + '-' + name,
                       params = {'stopStep'      : stopStep,
                                 'startStep'     : startStep,
+                                'globalStop'    : globalStop,
                                 'pReturnFilter' : pReturnFilter,
                                 'name'          : name,
                                 'doAll'         : doAll,
@@ -57,15 +60,14 @@ def taskAdd(stopStep, startStep, pReturnFilter, name, i, cursor, doAll, wait = .
     except:
         from time import sleep
         sleep(wait)
-        taskAdd(stopStep, startStep, pReturnFilter, name, doAll, 2*wait)
+        taskAdd(stopStep, startStep, globalStop, pReturnFilter, name, doAll, 2*wait)
 
-def doDeferred(stopStep,startStep, pReturnFilter = "percentReturn >", name = '', doAll = False):
-    deferred.defer(doNtersects, stopStep, startStep, pReturnFilter, name, 0, None, doAll)
+def doDeferred(stopStep,startStep, globalStop, pReturnFilter = "percentReturn >", name = '', doAll = False):
+    deferred.defer(doNtersects, stopStep, startStep, globalStop, pReturnFilter, name, 0, None, doAll)
 
-def doNtersects(stopStep, startStep, pReturnFilter, name = '', i=0, cursor='', doAll = False):
+def doNtersects(stopStep, startStep, globalStop, pReturnFilter, name = '', i=0, cursor='', doAll = False):
     from time import time
     deadline = time() + 20.0
-    globalStop = 15955
     count = 200
     while count == 200:
         query = meSchema.backTestResult.all().filter("stopStep =", stopStep).filter("startStep =", startStep).filter(pReturnFilter,0.0).order("-percentReturn")
@@ -88,12 +90,12 @@ def doNtersects(stopStep, startStep, pReturnFilter, name = '', i=0, cursor='', d
             updateNs(stopStep, startStep, pReturnFilter, name, i, backTests)
             cursor = query.cursor()
         else:
-            taskAdd(stopStep, startStep, pReturnFilter, name, i, cursor, doAll)
+            taskAdd(stopStep, startStep, globalStop, pReturnFilter, name, i, cursor, doAll)
             return
     if (stopStep <= globalStop - 400) and doAll:
         stopStep += 400
         startStep += 400
-        taskAdd(stopStep, startStep, pReturnFilter, name, 0, '', doAll)
+        taskAdd(stopStep, startStep, globalStop, pReturnFilter, name, 0, '', doAll)
     
 def updateNs(stopStep,startStep, pReturnFilter, name, i, backTests):
     N = [1,2]

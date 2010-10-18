@@ -28,9 +28,11 @@ def updateAlgStat(algKey, startStep, stopStep, memprefix = "unpacked_"):
     orderDesires = desires.keys()
     orderDesires.sort()
     for step in range(int(startStep), int(stopStep)+1):
+        stopRange = 80
         # for now, just running stop every 80 steps
-        if (step-int(startStep))%80 == 0:
-            stats = doStops(step, eval(repr(stats)), alginfo)
+        # Shift back step - start by 44 to get midday stop.
+        if (step - int(startStep) - 44)%stopRange == 0:
+            stats = doStops(step, eval(repr(stats)), alginfo, stopRange)
         potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in [1,2,3,4]]
         potentialDesires.sort()
         for key in potentialDesires:
