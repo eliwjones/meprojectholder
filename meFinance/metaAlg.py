@@ -104,8 +104,9 @@ def buildStopStepList(start, stop):
         liveAlgStop += 400
     return stopStepList
 
-def outputStats():
-    metaAlgs = meSchema.metaAlg.all().fetch(100)
+def outputStats(technique='FTLe-R3'):
+    from math import floor, ceil
+    metaAlgs = meSchema.metaAlg.all().filter('technique =', technique).fetch(100)
     meDict = {}
     for metaAlg in metaAlgs:
         meDict[metaAlg.technique] = []
@@ -118,8 +119,36 @@ def outputStats():
         meDict[key].sort()
         meDict[key] = [str(round(ret*100,2))[0:5] for ret in meDict[key]]
         print key, ': ', meDict[key]
+    # Display Min, Med, Mean, Max
+    for key in dictKeys:
+        Min = meDict[key][0]
+        Max = meDict[key][-1]
+        nums = [float(ret) for ret in meDict[key]]
+        Mean = sum(nums)/len(nums)
+        length = len(meDict[key])
+        if length%2==0:
+            Floor = int(floor(length/2))
+            Ceil = int(ceil(length/2))
+            Med = str((float(meDict[key][Floor]) + float(meDict[key][Ceil]))/2)[0:5]
+        else:
+            Med = meDict[key][length/2]
+        print 'Min: ', Min, 'Med: ', Med, 'Mean: ', Mean, 'Max: ', Max
     
-
+    sumDict = {}
+    for metaAlg in metaAlgs:
+        dictKey = metaAlg.key().name()
+        sumDict[dictKey] = {}
+        for symbol in ['HBC','CME','GOOG','INTC']:
+            sumDict[dictKey][symbol] = 0.0
+        CashDelta = eval(metaAlg.CashDelta)
+        for trade in CashDelta:
+            sumDict[dictKey][trade['Symbol']] += trade['PandL']
+    dictKeys = sumDict.keys()
+    dictKeys.sort()
+    for key in dictKeys:
+        for pos in sumDict[key]:
+            sumDict[key][pos] = int(sumDict[key][pos])
+        print key, ': ', sumDict[key]
 
 def initializeMetaAlgs(FTLtype = ['FTLe'], Rtype = ['R1','R2','R3'], Vs = ['V01','V02','V03','V04','V05','V06','V07','V08','V09','V10']):
     metaAlgKeys = []

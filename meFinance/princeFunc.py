@@ -77,14 +77,16 @@ def getAlgQueryStr(alphaAlg='0',omegaAlg='999999'):
    positions:
        {'stck' : {'Shares' : shares,
                   'Price'  : price,
-                  'Value'  : value } }
+                  'Value'  : value,
+                  'Step'   : step} }
 
        shares: -+ value depending on long/short.
        price:  price when position was entered.
        value:  shares*price for convenience.
+       step:   last step when position was modified.
 '''
 
-def mergePosition(desire,positions):
+def mergePosition(desire,positions,step):
     cash = 0
     PandL = 0
     for pos in desire:
@@ -97,29 +99,18 @@ def mergePosition(desire,positions):
                 posValue = abs(positions[pos]['Shares'])*positions[pos]['Price']
                 desValue = abs(desire[pos]['Shares'])*desire[pos]['Price']
                 tradeDistance = abs((posValue - desValue)/posValue)
-                # Check if tradeDistance is less than 35%
-                if tradeDistance < 0.35:
-                    # Set desire[pos] to -positions[pos] to close out entire position.
+                # Check if tradeDistance is less than 35% or if we want to sell more than we have.
+                if tradeDistance < 0.35 or stockDiff < 0:
                     desire[pos]['Shares'] = (-1)*positions[pos]['Shares']
                     cash += abs(desire[pos]['Shares'])*positions[pos]['Price']
                     PandL = desire[pos]['Shares']*priceDiff
                     cash += PandL
                 elif stockDiff >= 0:
-                    # # Using floor/ceil to estimate "proper" percentage of position to close out.
-                    # Changing to use round() to see difference.
+                    # Must estimate proper ratio of position to close out.
                     desire[pos]['Shares'] = round(positions[pos]['Shares']/round(positions[pos]['Shares']/float(desire[pos]['Shares'])))
                     cash += abs(desire[pos]['Shares'])*positions[pos]['Price']
                     PandL = desire[pos]['Shares']*priceDiff
                     cash += PandL
-                else:
-                    cash += abs(positions[pos]['Shares'])*positions[pos]['Price']
-                    PandL = (-1)*positions[pos]['Shares']*priceDiff
-                    cash += PandL
-                    cash -= abs(stockDiff)*(desire[pos]['Price'])
-                    cash -= 9.95                                         # Need this since Closing and Opening.
-                    positions[pos]['Price'] = desire[pos]['Price']
-                # Must subtract commission from PandL
-                PandL -= 20.00
                 positions[pos]['Shares'] += float(desire[pos]['Shares'])
                 if positions[pos]['Shares'] == 0:
                     del positions[pos]
@@ -130,12 +121,16 @@ def mergePosition(desire,positions):
                 positions[pos]['Shares'] += float(desire[pos]['Shares'])
                 positions[pos]['Value'] += desire[pos]['Value']
                 positions[pos]['Price'] = (positions[pos]['Value'])/(positions[pos]['Shares'])
+                positions[pos]['Step'] = step
         else:
             cash += -abs(desire[pos]['Value'])
             positions[pos] = {'Shares' : float(desire[pos]['Shares']),
                               'Price'  : desire[pos]['Price'],
-                              'Value'  : desire[pos]['Value']}
-        cash -= 9.95                                                     # Must subtract trade commission.
+                              'Value'  : desire[pos]['Value'],
+                              'Step'   : step}
+        commission = max(10.00, desire[pos]['Shares']*0.01)
+        PandL -= commission
+        cash -= commission
     return cash, PandL, positions
 
 def analyzeAlgPerformance(aggregateType=None,memkeylist=None,stopStep=13715):

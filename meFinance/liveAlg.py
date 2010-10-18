@@ -97,9 +97,10 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
         orderDesires = desires.keys()
         orderDesires.sort()
         for step in range(start, stop+1):
-            if (step-start)%80==0:
+            stopRange = 80
+            if (step-start)%stopRange==0:
                 stats = convertLiveAlgInfoToStatDict(liveAlgInfo[liveAlgKey])
-                stats = processDesires.doStops(step, stats, alginfo)
+                stats = processDesires.doStops(step, stats, alginfo, stopRange)
                 liveAlgInfo[liveAlgKey].CashDelta = repr(stats['CashDelta'])
                 liveAlgInfo[liveAlgKey].Positions = repr(stats['Positions'])
                 liveAlgInfo[liveAlgKey].PandL     = stats['PandL']
@@ -113,7 +114,7 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
                     for des in currentDesire:
                         buysell = cmp(currentDesire[des]['Shares'],0)
                         Symbol = des
-                    tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(liveAlgInfo[liveAlgKey].Positions))
+                    tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(liveAlgInfo[liveAlgKey].Positions), step)
                     cash = tradeCash + eval(repr(liveAlgInfo[liveAlgKey].Cash))
                     if buysell == -1:
                         timedelta = selldelta

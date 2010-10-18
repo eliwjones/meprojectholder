@@ -40,7 +40,7 @@ def updateAlgStat(algKey, startStep, stopStep, memprefix = "unpacked_"):
                 for des in currentDesire:
                     buysell = cmp(currentDesire[des]['Shares'],0)
                     Symbol = des
-                tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(repr(stats['Positions'])))
+                tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(repr(stats['Positions'])), step)
                 cash = tradeCash + eval(repr(stats['Cash']))
                 if buysell == -1:
                     timedelta = selldelta
@@ -63,7 +63,7 @@ def updateAlgStat(algKey, startStep, stopStep, memprefix = "unpacked_"):
     bTestReturns = getBackTestReturns([memprefix + algKey],stopStep, {memprefix + algKey: stats})
     return bTestReturns
 
-def doStops(step, statDict, alginfo):
+def doStops(step, statDict, alginfo, stopRange):
     # Use desireFunc.memGetStcks(stckKeyList) to get stock values for last N steps
     # for each stckID and step in N, calculate percentReturns for (step, step-1)
     # This should give recent range of single step percentReturns.
@@ -93,9 +93,11 @@ def doStops(step, statDict, alginfo):
         dictDesire = convertDesireToDict(offsetDesire, -1*longshort, alginfo.TradeSize, alginfo.Cash, -1*shares)
         if (longshort == 1 and choose < stckDeltas[0]) or (longshort == -1 and choose > stckDeltas[0]):
             # Possibly consider looking at whether choose is simply negative or positive.
-            stopDesires.append(dictDesire)
+            # Must make sure this position wasn't modified within the stopRange.
+            if statDict['Positions'][pos]['Step'] < step - stopRange:
+                stopDesires.append(dictDesire)
     for stop in stopDesires:
-        tradeCash, PandL, position = princeFunc.mergePosition(eval(stop), eval(repr(statDict['Positions'])))
+        tradeCash, PandL, position = princeFunc.mergePosition(eval(stop), eval(repr(statDict['Positions'])), step)
         cash = tradeCash + eval(repr(statDict['Cash']))
         Symbol = eval(stop).keys()[0]
         buysell = cmp(eval(stop)[Symbol]['Shares'], 0)
@@ -406,7 +408,11 @@ def convertDesireToDict(desire, buysell, tradesize, cash, shares = None):
     from math import floor
     meDict = {}
     if shares is None:
-        shares = int((buysell)*floor(((tradesize*cash) - 10.00)/desire.Quote))
+        commission = 10.00
+        shares = int((buysell)*floor(((tradesize*cash) - commission)/desire.Quote))
+        if shares > 1000:
+            commission = shares*0.01
+            shares = int((buysell)*floor(((tradesize*cash) - commission)/desire.Quote))
     meDict[desire.Symbol] = {'Shares' : shares,
                              'Price'  : desire.Quote,
                              'Value'  : desire.Quote*shares}
