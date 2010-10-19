@@ -66,6 +66,16 @@ class doBackTestBatch(webapp.RequestHandler):
         namespace = str(self.request.get('namespace'))
         backTestBatch(algBatch, monthBatch, stopStep, namespace)
 
+def addTaskRange(initialStopStep, globalStop, unique, namespace):
+    startAlg = 1
+    stopAlg = 3540
+    batchSize = 5
+    for i in range(initialStopStep, globalStop, 400):
+        stopStep = i
+        stepRange = [stopStep - 1600]
+        name = unique + '-' + str(startAlg) + '-' + str(stopAlg) + '-' + str(stopStep) + '-' + namespace
+        mainTaskAdd(name, startAlg, stopAlg, stopStep, batchSize, stepRange, unique, namespace)
+
 def mainTaskAdd(name,startAlg, stopAlg, stopStep, batchSize, stepRange, uniquifier, namespace, delay = 0, wait = .5):
     try:
         taskqueue.add(url = '/backtest/doBackTests', countdown = delay,
