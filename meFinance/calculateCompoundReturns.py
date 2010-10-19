@@ -15,9 +15,10 @@ class calculateBTestCompounds(webapp.RequestHandler):
         startStep = int(self.request.get('startStep'))
         globalStop = int(self.request.get('globalStop'))
         name = str(self.request.get('name'))
+        namespace = str(self.request.get('namespace'))
         i = int(self.request.get('i'))
         cursor = str(self.request.get('cursor'))
-        doCompoundReturns(stopStep, startStep, globalStop, name, i, cursor)
+        doCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, cursor)
 
 class calculateLiveAlgCompounds(webapp.RequestHandler):
     def get(self):
@@ -32,16 +33,32 @@ class calculateLiveAlgCompounds(webapp.RequestHandler):
         cursor = str(self.request.get('cursor'))
         doLiveALgCompoundReturns(stopStep, startStep, globalStop, name, i, cursor)
 
-def taskAdd(stopStep, startStep, globalStop, name, i, cursor, calcUrl, wait = 0.5):
+def fanoutTaskAdd(stopStep, startStep, globalStop, namespace, name, cType):
+    # partition range of steps into batches to add in parallel.
+    if cType == 'BackTest':
+        calcUrl = '/calculate/compounds/bTestCompounds'
+    elif cType == 'LiveAlg':
+        calcUrl = '/calculate/compounds/liveAlgCompounds'
+    stepRange = stopStep - startStep
+    for i in range(stopStep, globalStop, 1600):
+        newStopStep = i
+        newStartStep = newStopStep - stepRange
+        newGlobalStop = min(newStopStep + 1600 - 1, globalStop)
+        taskAdd(newStopStep, newStartStep, newGlobalStop, namespace, name, 0, '', calcUrl)
+
+def taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, calcUrl, wait = 0.5):
+    from google.appengine.api import namespace_manager
+    namespace_manager.set_namespace(namespace)
     urlSplit = calcUrl.split('/')
     prefix = urlSplit[-1]
     try:
         taskqueue.add(url = calcUrl, countdown = 0,
-                      name = prefix + '-' + str(stopStep) + '-' + str(startStep) + '-' + str(i) + '-' + name,
+                      name = prefix + '-' + str(stopStep) + '-' + str(startStep) + '-' + str(i) + '-' + name + '-' + namespace,
                       params = {'stopStep'  : stopStep,
                                 'startStep' : startStep,
                                 'globalStop': globalStop,
                                 'name'      : name,
+                                'namespace' : namespace,
                                 'i'         : i,
                                 'cursor'    : cursor } )
     except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
@@ -49,7 +66,7 @@ def taskAdd(stopStep, startStep, globalStop, name, i, cursor, calcUrl, wait = 0.
     except:
         from time import sleep
         sleep(wait)
-        taskAdd(stopStep, startStep, globalStop, name, i, cursor, calcUrl, 2*wait)
+        taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, calcUrl, 2*wait)
 
 def doLiveALgCompoundReturns(stopStep, startStep, globalStop, name = '', i = 0, cursor = ''):
     from time import time
@@ -78,7 +95,7 @@ def doLiveALgCompoundReturns(stopStep, startStep, globalStop, name = '', i = 0, 
         startStep += 400
         taskAdd(stopStep, startStep, globalStop, name, 0, '', '/calculate/compounds/liveAlgCompounds')
 
-def doCompoundReturns(stopStep, startStep, globalStop, name = '', i = 0, cursor = ''):
+def doCompoundReturns(stopStep, startStep, globalStop, namespace, name = '', i = 0, cursor = ''):
     from time import time
     deadline = time() + 20.00
     count = 100
@@ -98,12 +115,12 @@ def doCompoundReturns(stopStep, startStep, globalStop, name = '', i = 0, cursor 
             doCompounds(stopStep, startStep, name, i, backTests)
             cursor = query.cursor()
         else:
-            taskAdd(stopStep, startStep, globalStop, name, i, cursor, '/calculate/compounds/bTestCompounds')
+            taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, '/calculate/compounds/bTestCompounds')
             return
     if stopStep <= globalStop - 400:
         stopStep += 400
         startStep += 400
-        taskAdd(stopStep, startStep, globalStop, name, 0, '', '/calculate/compounds/bTestCompounds')
+        taskAdd(stopStep, startStep, globalStop, namespace, name, 0, '', '/calculate/compounds/bTestCompounds')
 
 def doLiveAlgCompounds(stopStep, startStep, name, i, liveAlgs):
     putList = []
