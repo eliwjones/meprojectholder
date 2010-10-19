@@ -16,10 +16,14 @@ def updateAllAlgStats(alphaAlg=1,omegaAlg=10620):
         key_name = meSchema.buildAlgKey(str(i))
         updateAlgStat(key_name)
 
-def updateAlgStat(algKey, startStep, stopStep, memprefix = "unpacked_"):
+def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_"):
     lastStep = stopStep
-    desires = liveAlg.getStepRangeAlgDesires(algKey, startStep, stopStep)
     alginfo = meSchema.memGet(meSchema.meAlg,algKey)
+    if namespace != '':
+        # If using stock namespace, set Cash to fraction equal to tradesize and TradeSize = 100%
+        alginfo.Cash = alginfo.Cash*alginfo.TradeSize
+        alginfo.TradeSize = 1.0
+    desires = liveAlg.getStepRangeAlgDesires(algKey, alginfo, startStep, stopStep)
     stats = resetAlgstats(memprefix, alginfo.Cash, int(algKey), int(algKey))[memprefix + algKey]
     buydelta = meSchema.memGet(meSchema.tradeCue,alginfo.BuyCue).TimeDelta
     selldelta = meSchema.memGet(meSchema.tradeCue,alginfo.SellCue).TimeDelta
@@ -33,7 +37,11 @@ def updateAlgStat(algKey, startStep, stopStep, memprefix = "unpacked_"):
         # Shift back step - start by 44 to get midday stop.
         if (step - int(startStep) - 44)%stopRange == 0:
             stats = doStops(step, eval(repr(stats)), alginfo, stopRange)
-        potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in [1,2,3,4]]
+        if namespace == '':
+            potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in [1,2,3,4]]
+        else:
+            # If namespace nonempty, build desire key for that stckID.
+            potentialDesires = [meSchema.buildDesireKey(step, algKey, meSchema.getStckID(namespace))]
         potentialDesires.sort()
         for key in potentialDesires:
             if key in orderDesires:

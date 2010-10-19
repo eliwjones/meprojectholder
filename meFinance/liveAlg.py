@@ -221,11 +221,11 @@ def buildStopStepList(start,stop):
         BackTestStop += 400
     return stopStepList
 
-def getStepRangeAlgDesires(algKey,startStep,stopStep):
+def getStepRangeAlgDesires(algKey, alginfo, startStep,stopStep):
     buyList = []
     sellList = []
     desireDict = {}
-    alginfo = meSchema.memGet(meSchema.meAlg, algKey)
+    #alginfo = meSchema.memGet(meSchema.meAlg, algKey)    # passing in alginfo.
     buyCue = alginfo.BuyCue
     sellCue = alginfo.SellCue
     buyStartKey = meSchema.buildDesireKey(startStep,buyCue,0)

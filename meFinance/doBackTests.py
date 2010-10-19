@@ -22,6 +22,7 @@ class doBackTests(webapp.RequestHandler):
         startAlg = str(self.request.get('startAlg'))
         stopAlg = str(self.request.get('stopAlg'))
         unique = str(self.request.get('unique'))
+        namespace = str(self.request.get('namespace'))
 
         if stopStep == '' or startAlg == '' or stopAlg == '':
             self.response.out.write('You must provide a "stopStep","startAlg", and "stopAlg" params!')
@@ -35,12 +36,13 @@ class doBackTests(webapp.RequestHandler):
             else:
                 stepRange = [stopStep - i*400 for i in [4]]    # Changing default to just do 1600 step range.
             # Create proper taskAdd() function and add with params.
-            name = unique + '-' + str(startAlg) + '-' + str(stopAlg) + '-' + str(stopStep)
-            mainTaskAdd(name, startAlg, stopAlg, stopStep, 5, stepRange, unique)
+            name = unique + '-' + str(startAlg) + '-' + str(stopAlg) + '-' + str(stopStep) + '-' + namespace
+            mainTaskAdd(name, startAlg, stopAlg, stopStep, 5, stepRange, unique, namespace)
             self.response.out.write('Added job!\n')
             
     def post(self):
         uniquifier = self.request.get('uniquifier')
+        namespace = str(self.request.get('namespace'))
         
         startAlg = int(self.request.get('startAlg'))
         stopAlg = int(self.request.get('stopAlg'))
@@ -50,7 +52,7 @@ class doBackTests(webapp.RequestHandler):
         batchSize = int(self.request.get('batchSize'))
         stepRange = self.request.get_all('stepRange')
         stepRange = [int(step) for step in stepRange]
-        runBackTests(alglist, stopStep, batchSize, stepRange, uniquifier)
+        runBackTests(alglist, stopStep, batchSize, stepRange, uniquifier, namespace)
 
 class doBackTestBatch(webapp.RequestHandler):
     def get(self):
@@ -61,9 +63,10 @@ class doBackTestBatch(webapp.RequestHandler):
         algBatch = self.request.get_all('algBatch')
         monthBatch = self.request.get_all('monthBatch')
         stopStep = self.request.get('stopStep')
-        backTestBatch(algBatch, monthBatch, stopStep)
+        namespace = str(self.request.get('namespace'))
+        backTestBatch(algBatch, monthBatch, stopStep, namespace)
 
-def mainTaskAdd(name,startAlg, stopAlg,stopStep,batchSize,stepRange,uniquifier, delay = 0, wait = .5):
+def mainTaskAdd(name,startAlg, stopAlg, stopStep, batchSize, stepRange, uniquifier, namespace, delay = 0, wait = .5):
     try:
         taskqueue.add(url = '/backtest/doBackTests', countdown = delay,
                       name = name,
@@ -72,31 +75,33 @@ def mainTaskAdd(name,startAlg, stopAlg,stopStep,batchSize,stepRange,uniquifier, 
                                 'stopStep'  : stopStep,
                                 'batchSize' : batchSize,
                                 'stepRange' : stepRange,
-                                'uniquifier': uniquifier} )
+                                'uniquifier': uniquifier,
+                                'namespace' : namespace} )
     except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
         pass
     except:
         from time import sleep
         sleep(wait)
-        mainTaskAdd(name,startAlg,stopAlg,stopStep,batchSize,stepRange,uniquifier,delay,2*wait)
+        mainTaskAdd(name,startAlg,stopAlg,stopStep,batchSize,stepRange,uniquifier,namespace,delay,2*wait)
         
 
-def batchTaskAdd(name, algBatch, monthBatch, stopStep,delay=0,wait=.5):
+def batchTaskAdd(name, algBatch, monthBatch, stopStep, namespace, delay=0,wait=.5):
     try:
         taskqueue.add(url = '/backtest/doBackTestBatch', countdown = delay,
                       name = name,
                       queue_name = 'backTestQueue',
                       params = {'algBatch'   : algBatch,
                                 'monthBatch' : monthBatch,
-                                'stopStep'   : stopStep} )
+                                'stopStep'   : stopStep,
+                                'namespace'  : namespace} )
     except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
         pass
     except:
         from time import sleep
         sleep(wait)
-        batchTaskAdd(name,alglist,stopStep,batchSize,stepRange,uniquifier,delay,2*wait)
+        batchTaskAdd(name, algBatch, monthBatch, stopStep, namespace, delay, 2*wait)
 
-def runBackTests(alglist, stop, batchSize = 5, stepRange=None, uniquifier=''):
+def runBackTests(alglist, stop, batchSize = 5, stepRange=None, uniquifier='', namespace=''):
     monthList = []
     algBatch = []
     if stepRange is None:
@@ -108,13 +113,11 @@ def runBackTests(alglist, stop, batchSize = 5, stepRange=None, uniquifier=''):
         algBatch.append(alg)
         if len(monthList)*len(algBatch) > batchSize:
             batchName = str(algBatch[0]) + '-' + str(algBatch[-1]) + '-' + str(monthList[0]) + '-' + str(monthList[-1]) + '-' + str(stop) + '-' + uniquifier
-            #deferredbackTestBatch(algBatch, monthList, str(stop), deferredName)
-            batchTaskAdd(batchName, algBatch, monthList, stop)
+            batchTaskAdd(batchName, algBatch, monthList, stop, namespace)
             algBatch = []
     if len(algBatch) > 0:
         batchName = str(algBatch[0]) + '-' + str(algBatch[-1]) + '-' + str(monthList[0]) + '-' + str(monthlist[-1]) + '-' + str(stop) + '-' + uniquifier
-        #deferredbackTestBatch(algBatch, monthList, str(stop), deferredName)
-        batchTaskAdd(batchName, algBatch, monthList, stop)
+        batchTaskAdd(batchName, algBatch, monthList, stop, namespace)
         algBatch = []
     keylist = []
     for startMonth in monthList:
@@ -123,18 +126,24 @@ def runBackTests(alglist, stop, batchSize = 5, stepRange=None, uniquifier=''):
             keylist.append(memprefix + algkey)
     return keylist
 
-def backTestBatch(algBatch,monthBatch,stopStep):
+def backTestBatch(algBatch, monthBatch, stopStep, namespace):
+    from google.appengine.api import namespace_manager
     backTestReturnDict = {}
     for alg in algBatch:
         for startMonth in monthBatch:
             memprefix = startMonth + '_' + stopStep + '_'
-            batchReturns = processDesires.updateAlgStat(alg, startMonth, stopStep, memprefix)
+            batchReturns = processDesires.updateAlgStat(alg, startMonth, stopStep, namespace, memprefix)
             for key in batchReturns:
                 if key in backTestReturnDict:
                     backTestReturnDict[key]['returns'].update(batchReturns[key]['returns'])
                 else:
-                    backTestReturnDict[key] = batchReturns[key]                        
-    processDesires.persistBackTestReturns(backTestReturnDict)
+                    backTestReturnDict[key] = batchReturns[key]
+    try:
+        # defaultNameSpace = namespace_manager.get_namespace() # Not doing this since I want default alwasy to be ''
+        namespace_manager.set_namespace(namespace)
+        processDesires.persistBackTestReturns(backTestReturnDict)
+    finally:
+        namespace_manager.set_namespace('')
 
 application = webapp.WSGIApplication([('/backtest/doBackTests',doBackTests),
                                       ('/backtest/doBackTestBatch',doBackTestBatch)],
