@@ -91,11 +91,11 @@ def getTopLiveAlg(stopStep, startStep, technique):
         else:
             orderBy = '-' + Rval
     query = query.order(orderBy)
-    memKey = str(dumps(query).__hash__())
-    topLiveAlg = memcache.get(memKey)
-    if topLiveAlg is None:
-        topLiveAlg = query.get()
-        memcache.set(memKey, topLiveAlg)
+    #memKey = str(dumps(query).__hash__())
+    #topLiveAlg = memcache.get(memKey)
+    #if topLiveAlg is None:
+    topLiveAlg = query.get()
+    #    memcache.set(memKey, topLiveAlg)
     bestLiveAlgTechnique = topLiveAlg
     return bestLiveAlgTechnique
 

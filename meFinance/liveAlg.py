@@ -32,10 +32,11 @@ def calculateWeeklyLiveAlgs(stopStep, stepRange, namespace, name = ''):
     namespace_manager.set_namespace('')
     alginfo = meSchema.memGet(meSchema.meAlg, meSchema.buildAlgKey(1))
     namespace_manager.set_namespace(namespace)
+    '''
     if namespace != '':
         Cash = alginfo.Cash*alginfo.TradeSize
-    else:
-        Cash = alginfo.Cash
+    else: '''
+    Cash = alginfo.Cash
     initializeLiveAlgs(stopStep,stepRange, Cash)
     # Get liveAlgs and branch out the different FTL, dnFTL Ntypes.
     # keys like:  0003955-0001600-FTLe-N1
@@ -84,8 +85,10 @@ def getCurrentReturn(liveAlgInfo,stopStep):
     namespace_manager.set_namespace('')
     alginfo = meSchema.memGet(meSchema.meAlg, meSchema.buildAlgKey(1))
     namespace_manager.set_namespace(originalNameSpace)
+    # Not munging .Cash since want to use underlying base val.
+    '''
     if originalNameSpace != '':
-        alginfo.Cash = alginfo.Cash*alginfo.TradeSize
+        alginfo.Cash = alginfo.Cash*alginfo.TradeSize '''
     startCash = alginfo.Cash
     stopStepQuotes = princeFunc.getStepQuotes(stopStep)
     for liveAlgKey in liveAlgInfo:
@@ -111,9 +114,11 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
     for liveAlgKey in bestAlgs:
         algKey = bestAlgs[liveAlgKey]
         alginfo = meSchema.memGet(meSchema.meAlg,algKey)
+        # Don't want to munge .Cash, .TradeSize except for with metaAlg.
+        '''
         if originalNameSpace != '':
             alginfo.Cash = alginfo.Cash*alginfo.TradeSize
-            alginfo.TradeSize = 1.0
+            alginfo.TradeSize = 1.0 '''
         desires = getStepRangeAlgDesires(algKey,alginfo,start,stop)
         buydelta = meSchema.memGet(meSchema.tradeCue,alginfo.BuyCue).TimeDelta
         selldelta = meSchema.memGet(meSchema.tradeCue,alginfo.SellCue).TimeDelta
@@ -218,11 +223,11 @@ def getTopAlg(stopStep, startStep, technique):
             orderBy = 'percentReturn'
     #topAlg = query.order(orderBy).get()
     query = query.order(orderBy)
-    memKey = str(dumps(query).__hash__())
-    topAlg = memcache.get(memKey)
-    if topAlg is None:
-        topAlg = query.get()
-        memcache.set(memKey, topAlg)
+    #memKey = str(dumps(query).__hash__())
+    #topAlg = memcache.get(memKey)
+    #if topAlg is None:
+    topAlg = query.get()
+    #    memcache.set(memKey, topAlg)
     bestAlgKey = topAlg.name().split('_')[0]    # meAlg key is just first part of backTestResult key_name.
     # if technique contains 'dnFTL', bestAlg = opposite alg.
     if technique.find('dnFTL') != -1:
@@ -235,11 +240,11 @@ def getOppositeAlg(meAlgKey):
     namespace_manager.set_namespace('')
     meAlg = meSchema.memGet(meSchema.meAlg, meAlgKey)
     query = meSchema.meAlg.all(keys_only = True).filter("BuyCue =", meAlg.SellCue).filter("SellCue =", meAlg.BuyCue)
-    memKey = str(dumps(query).__hash__())
-    oppositeAlg = memcache.get(memKey)
-    if oppositeAlg is None:
-        oppositeAlg = query.get()
-        memcache.set(memKey, oppositeAlg)
+    #memKey = str(dumps(query).__hash__())
+    #oppositeAlg = memcache.get(memKey)
+    #if oppositeAlg is None:
+    oppositeAlg = query.get()
+    #    memcache.set(memKey, oppositeAlg)
     oppositeAlgKey = oppositeAlg.name()
     namespace_manager.set_namespace(originalNameSpace)
     return oppositeAlgKey
