@@ -19,10 +19,13 @@ def updateAllAlgStats(alphaAlg=1,omegaAlg=10620):
 def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_"):
     lastStep = stopStep
     alginfo = meSchema.memGet(meSchema.meAlg,algKey)
+    # Not using this.. want to leave backtTestReturn level at .25 TradeSize.
+    '''
     if namespace != '':
         # If using stock namespace, set Cash to fraction equal to tradesize and TradeSize = 100%
         alginfo.Cash = alginfo.Cash*alginfo.TradeSize
         alginfo.TradeSize = 1.0
+        '''
     desires = liveAlg.getStepRangeAlgDesires(algKey, alginfo, startStep, stopStep)
     stats = resetAlgstats(memprefix, alginfo.Cash, int(algKey), int(algKey))[memprefix + algKey]
     buydelta = meSchema.memGet(meSchema.tradeCue,alginfo.BuyCue).TimeDelta
@@ -40,7 +43,7 @@ def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_
         if namespace == '':
             potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in [1,2,3,4]]
         else:
-            # If namespace nonempty, build desire key for that stckID.
+            # If namespace nonempty, build desire key for that stckID only.
             potentialDesires = [meSchema.buildDesireKey(step, algKey, meSchema.getStckID(namespace))]
         potentialDesires.sort()
         for key in potentialDesires:
@@ -70,7 +73,7 @@ def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_
                     stats['PandL'] += PandL
                     stats['Positions'] = position
 
-    bTestReturns = getBackTestReturns([memprefix + algKey],stopStep, {memprefix + algKey: stats})
+    bTestReturns = getBackTestReturns([memprefix + algKey],stopStep, {memprefix + algKey: stats}, namespace)
     return bTestReturns
 
 def doStops(step, statDict, alginfo, stopRange):
@@ -218,7 +221,7 @@ def calculatePositionPandLs(algKeys,memprefix,stopStep,algStats=None):
         algPosValues[memkey] = positionsValue
     return algPosValues
         
-def getBackTestReturns(memkeylist, stopStep, stats=None):
+def getBackTestReturns(memkeylist, stopStep, stats, namespace):
     # If want can pass in stats dict with appropriate data.
     if stats is None:
         stats = memcache.get_multi(memkeylist)
@@ -229,6 +232,12 @@ def getBackTestReturns(memkeylist, stopStep, stats=None):
         algkeys[key_name] = None       # So I don't have to check if algkey already there.
     algkeys = algkeys.keys()           # Turn dictionary keys into list of keys.
     algs = meSchema.memGet_multi(meSchema.meAlg,algkeys)
+    # Not munging .Cash since want underlying backTests to trade with .25 TradeSize.
+    '''
+    if namespace != '':
+        for algkey in algs:
+            algs[algkey].Cash = algs[algkey].Cash*algs[algkey].TradeSize
+            '''
     cuekeys = {}
     for key in algs:
         key_name = algs[key].BuyCue

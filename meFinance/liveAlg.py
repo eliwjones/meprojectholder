@@ -21,11 +21,22 @@ from google.appengine.api import memcache
 from google.appengine.ext import db
 from google.appengine.ext import deferred
 from google.appengine.api.labs import taskqueue
+from google.appengine.api import namespace_manager
 
-def calculateWeeklyLiveAlgs(stopStep, stepRange = 1600, name = ''):
-    # This will initialize and calculate performance for all liveAlg techniques
-    # for this stopStep.
-    initializeLiveAlgs(stopStep,stepRange)
+def doAllLiveAlgs(initialStopStep, stepRange, globalStop, namespace, name):
+    for i in range(initialStopStep, globalStop + 1, 400):
+        stopStep = i
+        calculateWeeklyLiveAlgs(stopStep, stepRange, namespace, name)
+
+def calculateWeeklyLiveAlgs(stopStep, stepRange, namespace, name = ''):
+    namespace_manager.set_namespace('')
+    alginfo = meSchema.memGet(meSchema.meAlg, meSchema.buildAlgKey(1))
+    namespace_manager.set_namespace(namespace)
+    if namespace != '':
+        Cash = alginfo.Cash*alginfo.TradeSize
+    else:
+        Cash = alginfo.Cash
+    initializeLiveAlgs(stopStep,stepRange, Cash)
     # Get liveAlgs and branch out the different FTL, dnFTL Ntypes.
     # keys like:  0003955-0001600-FTLe-N1
     liveAlgs = meSchema.liveAlg.all(keys_only = True).filter("stopStep =", stopStep).filter("stepRange =", stepRange).filter("percentReturn =", 0.0).fetch(1000)
@@ -41,11 +52,13 @@ def calculateWeeklyLiveAlgs(stopStep, stepRange = 1600, name = ''):
         algGroups.append([firstAlgKey.name(), secondAlgKey.name()])
     i = 0
     for algGroup in algGroups:
-        deferred.defer(processLiveAlgStepRange, stopStep - stepRange, stopStep, stepRange, algGroup,
-                       _name = "liveAlgCalc-" + str(stopStep) + '-' + str(stopStep - stepRange) + '-' + '-' + str(stepRange) + '-group' + str(i) + '-' + name)
+        taskname = "liveAlgCalc-" + str(stopStep) + '-' + str(stopStep - stepRange) + '-' + '-' + str(stepRange) + '-group' + str(i) + '-' + name + '-' + namespace
+        deferred.defer(processLiveAlgStepRange, stopStep - stepRange, stopStep, stepRange, algGroup, namespace,
+                       _name = taskname)
         i += 1
 
-def processLiveAlgStepRange(start, stop, stepRange, algKeyFilter = None):
+def processLiveAlgStepRange(start, stop, stepRange, algKeyFilter, namespace):
+    namespace_manager.set_namespace(namespace)
     currentStep = start
     stopStepList = buildStopStepList(start,stop)
     liveAlgInfo = getLiveAlgInfo(stop, stepRange, algKeyFilter)
@@ -67,7 +80,13 @@ def processLiveAlgStepRange(start, stop, stepRange, algKeyFilter = None):
     db.put(putList)
 
 def getCurrentReturn(liveAlgInfo,stopStep):
-    startCash = meSchema.memGet(meSchema.meAlg, meSchema.buildAlgKey(1)).Cash
+    originalNameSpace = namespace_manager.get_namespace()
+    namespace_manager.set_namespace('')
+    alginfo = meSchema.memGet(meSchema.meAlg, meSchema.buildAlgKey(1))
+    namespace_manager.set_namespace(originalNameSpace)
+    if originalNameSpace != '':
+        alginfo.Cash = alginfo.Cash*alginfo.TradeSize
+    startCash = alginfo.Cash
     stopStepQuotes = princeFunc.getStepQuotes(stopStep)
     for liveAlgKey in liveAlgInfo:
         positions = eval(liveAlgInfo[liveAlgKey].Positions)
@@ -87,10 +106,15 @@ def getCurrentReturn(liveAlgInfo,stopStep):
         
 
 def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
+    originalNameSpace = namespace_manager.get_namespace()
+    namespace_manager.set_namespace('')
     for liveAlgKey in bestAlgs:
         algKey = bestAlgs[liveAlgKey]
-        desires = getStepRangeAlgDesires(algKey,start,stop)
         alginfo = meSchema.memGet(meSchema.meAlg,algKey)
+        if originalNameSpace != '':
+            alginfo.Cash = alginfo.Cash*alginfo.TradeSize
+            alginfo.TradeSize = 1.0
+        desires = getStepRangeAlgDesires(algKey,alginfo,start,stop)
         buydelta = meSchema.memGet(meSchema.tradeCue,alginfo.BuyCue).TimeDelta
         selldelta = meSchema.memGet(meSchema.tradeCue,alginfo.SellCue).TimeDelta
         # Don't need this anymore..
@@ -105,7 +129,10 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
                 liveAlgInfo[liveAlgKey].Positions = repr(stats['Positions'])
                 liveAlgInfo[liveAlgKey].PandL     = stats['PandL']
                 liveAlgInfo[liveAlgKey].Cash      = stats['Cash']
-            potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in [1,2,3,4]]
+            if originalNameSpace == '':
+                potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in [1,2,3,4]]
+            else:
+                potentialDesires = [meSchema.buildDesireKey(step, algKey, meSchema.getStckID(originalNameSpace))]
             potentialDesires.sort()
             for key in potentialDesires:
                 if key in orderDesires:
@@ -138,6 +165,7 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
                         liveAlgInfo[liveAlgKey].PandL    += PandL
                         liveAlgInfo[liveAlgKey].Positions = repr(position)
                 #liveAlgInfo[liveAlgKey].lastStep  = stop
+    namespace_manager.set_namespace(originalNameSpace)
     return liveAlgInfo
 
 def convertLiveAlgInfoToStatDict(liveAlgInfo):
@@ -203,6 +231,8 @@ def getTopAlg(stopStep, startStep, technique):
 
 def getOppositeAlg(meAlgKey):
     #meAlg = meSchema.meAlg.get_by_key_name(meAlgKey)
+    originalNameSpace = namespace_manager.get_namespace()
+    namespace_manager.set_namespace('')
     meAlg = meSchema.memGet(meSchema.meAlg, meAlgKey)
     query = meSchema.meAlg.all(keys_only = True).filter("BuyCue =", meAlg.SellCue).filter("SellCue =", meAlg.BuyCue)
     memKey = str(dumps(query).__hash__())
@@ -211,6 +241,7 @@ def getOppositeAlg(meAlgKey):
         oppositeAlg = query.get()
         memcache.set(memKey, oppositeAlg)
     oppositeAlgKey = oppositeAlg.name()
+    namespace_manager.set_namespace(originalNameSpace)
     return oppositeAlgKey
 
 def buildStopStepList(start,stop):
@@ -280,7 +311,7 @@ def getStepRangeAlgDesires(algKey, alginfo, startStep,stopStep):
     return desireDict
     
 
-def initializeLiveAlgs(initialStopStep=5155, stepRange=1600, FTLtype = ['FTLe','dnFTLe','FTLo','dnFTLo'], NRtype = ['R1','R2','R3','R4','R5']):
+def initializeLiveAlgs(initialStopStep, stepRange, Cash, FTLtype = ['FTLe','dnFTLe','FTLo','dnFTLo'], NRtype = ['R1','R2','R3','R4','R5']):
     techniques = []
     for FTL in FTLtype:
         for NR in NRtype:
@@ -293,7 +324,7 @@ def initializeLiveAlgs(initialStopStep=5155, stepRange=1600, FTLtype = ['FTLe','
                                    stopStep = initialStopStep, startStep = initialStopStep - stepRange,
                                    stepRange = stepRange, lastBuy = 0, lastSell = 0,
                                    percentReturn = 0.0, Positions = repr({}), PosVal = 0.0, PandL = 0.0,
-                                   CashDelta = repr(deque([])), Cash = 100000.0, numTrades = 0,
+                                   CashDelta = repr(deque([])), Cash = Cash, numTrades = 0,
                                    history = repr(deque([])), technique = technique )
         liveAlgs.append(liveAlg)
     db.put(liveAlgs)

@@ -5,15 +5,18 @@ from google.appengine.ext import db
 from google.appengine.ext import deferred
 from google.appengine.api.labs import taskqueue
 from google.appengine.api import memcache
+from google.appengine.api import namespace_manager
 from pickle import dumps
 
-def taskAdd(startStep, stopStep, technes, name=''):
+def taskAdd(startStep, stopStep, technes, namespace, name=''):
+    namespace_manager.set_namespace(namespace)
     Vs = initializeMetaAlgs()
     # technes = ['FTLe-R1','FTLe-R2','FTLe-R3']
     for techne in technes:
         for v in Vs:
             keyname = techne + '-' + v
-            deferred.defer(playThatGame, startStep, stopStep, [keyname], _name = 'metaAlg-Calculator-' + name + '-' + keyname)
+            taskname = 'metaAlg-Calculator-' + name + '-' + keyname + '-' + namespace
+            deferred.defer(playThatGame, startStep, stopStep, [keyname], _name = taskname)
 
 def playThatGame(startStep, stopStep, metaKeys):
     currentStep = startStep

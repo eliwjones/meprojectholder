@@ -242,6 +242,9 @@ def analyzeAlgPerformance(aggregateType=None,memkeylist=None,stopStep=13715):
             print "-------------------------------"
 
 def getStepQuotes(step):
+    from google.appengine.api import namespace_manager
+    originalNameSpace = namespace_manager.get_namespace()
+    namespace_manager.set_namespace('')
     stckKeyList = []
     for i in range(1,5):
         stckKeyList.append(str(i) + "_" + str(step))
@@ -250,6 +253,7 @@ def getStepQuotes(step):
     for quote in quotes:
         symbol = meSchema.getStckSymbol(quotes[quote].ID)
         stepQuotes[symbol] = quotes[quote].quote
+    namespace_manager.set_namespace(originalNameSpace)
     return stepQuotes
 
 def closeoutPositions(step):
