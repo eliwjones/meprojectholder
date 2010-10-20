@@ -34,8 +34,8 @@ def playThatGame(startStep, stopStep, metaKeys):
         else:
             lastStep = stopStep
         if currentStep < lastStep:
-            metaAlgInfo = liveAlg.processStepRangeDesires(currentStep, lastStep, bestAlgs, metaAlgInfo)
-            metaAlgInfo = liveAlg.getCurrentReturn(metaAlgInfo, lastStep)
+            metaAlgInfo = liveAlg.processStepRangeDesires(currentStep, lastStep, bestAlgs, metaAlgInfo, 25000.00, 0.85)
+            metaAlgInfo = liveAlg.getCurrentReturn(metaAlgInfo, lastStep, 25000.00)
             metaAlgInfo = addLiveAlgTechne(metaAlgInfo, bestLiveAlgInfo)
             currentStep = lastStep + 1
     putList = []
@@ -180,7 +180,7 @@ def initializeMetaAlgs(FTLtype = ['FTLe'], Rtype = ['R1','R2','R3'], Vs = None):
                                    lastBuy = 0, lastSell = 0,
                                    percentReturn = 0.0, Positions = repr({}),
                                    PosVal = 0.0, PandL = 0.0, CashDelta = repr(deque([])),
-                                   Cash = 100000.0, numTrades = 0, history = repr(deque([])),
+                                   Cash = 25000.0, numTrades = 0, history = repr(deque([])),
                                    technique = technique)
         metaAlgs.append(metaAlg)
     db.put(metaAlgs)

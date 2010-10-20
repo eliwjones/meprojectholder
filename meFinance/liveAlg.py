@@ -80,16 +80,15 @@ def processLiveAlgStepRange(start, stop, stepRange, algKeyFilter, namespace):
         putList.append(liveAlgInfo[liveAlgKey])
     db.put(putList)
 
-def getCurrentReturn(liveAlgInfo,stopStep):
+def getCurrentReturn(liveAlgInfo,stopStep, Cash = None):
     originalNameSpace = namespace_manager.get_namespace()
     namespace_manager.set_namespace('')
     alginfo = meSchema.memGet(meSchema.meAlg, meSchema.buildAlgKey(1))
     namespace_manager.set_namespace(originalNameSpace)
-    # Not munging .Cash since want to use underlying base val.
-    '''
-    if originalNameSpace != '':
-        alginfo.Cash = alginfo.Cash*alginfo.TradeSize '''
-    startCash = alginfo.Cash
+    if Cash is not None:
+        startCash = Cash
+    else:
+        startCash = alginfo.Cash
     stopStepQuotes = princeFunc.getStepQuotes(stopStep)
     for liveAlgKey in liveAlgInfo:
         positions = eval(liveAlgInfo[liveAlgKey].Positions)
@@ -108,17 +107,17 @@ def getCurrentReturn(liveAlgInfo,stopStep):
     return liveAlgInfo
         
 
-def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo):
+def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, Cash = None, TradeSize = None):
     originalNameSpace = namespace_manager.get_namespace()
     namespace_manager.set_namespace('')
     for liveAlgKey in bestAlgs:
         algKey = bestAlgs[liveAlgKey]
         alginfo = meSchema.memGet(meSchema.meAlg,algKey)
         # Don't want to munge .Cash, .TradeSize except for with metaAlg.
-        '''
-        if originalNameSpace != '':
-            alginfo.Cash = alginfo.Cash*alginfo.TradeSize
-            alginfo.TradeSize = 1.0 '''
+        
+        if Cash is not None and TradeSize is not None:
+            alginfo.Cash = Cash
+            alginfo.TradeSize = TradeSize
         desires = getStepRangeAlgDesires(algKey,alginfo,start,stop)
         buydelta = meSchema.memGet(meSchema.tradeCue,alginfo.BuyCue).TimeDelta
         selldelta = meSchema.memGet(meSchema.tradeCue,alginfo.SellCue).TimeDelta
