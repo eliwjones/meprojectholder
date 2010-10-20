@@ -29,9 +29,10 @@ class calculateLiveAlgCompounds(webapp.RequestHandler):
         startStep = int(self.request.get('startStep'))
         globalStop = int(self.request.get('globalStop'))
         name = str(self.request.get('name'))
+        namespace = str(self.request.get('namespace'))
         i = int(self.request.get('i'))
         cursor = str(self.request.get('cursor'))
-        doLiveALgCompoundReturns(stopStep, startStep, globalStop, name, i, cursor)
+        doLiveALgCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, cursor)
 
 def fanoutTaskAdd(stopStep, startStep, globalStop, namespace, name, cType):
     # partition range of steps into batches to add in parallel.
@@ -68,7 +69,7 @@ def taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, calcUrl
         sleep(wait)
         taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, calcUrl, 2*wait)
 
-def doLiveALgCompoundReturns(stopStep, startStep, globalStop, name = '', i = 0, cursor = ''):
+def doLiveALgCompoundReturns(stopStep, startStep, globalStop, namespace, name = '', i = 0, cursor = ''):
     from time import time
     deadline = time() + 20.00
     count = 100
@@ -88,12 +89,12 @@ def doLiveALgCompoundReturns(stopStep, startStep, globalStop, name = '', i = 0, 
             doLiveAlgCompounds(stopStep, startStep, name, i, liveAlgs)
             cursor = query.cursor()
         else:
-            taskAdd(stopStep, startStep, globalStop, name, i, cursor, '/calculate/compounds/liveAlgCompounds')
+            taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, '/calculate/compounds/liveAlgCompounds')
             return
     if stopStep <= globalStop - 400:
         stopStep += 400
         startStep += 400
-        taskAdd(stopStep, startStep, globalStop, name, 0, '', '/calculate/compounds/liveAlgCompounds')
+        taskAdd(stopStep, startStep, globalStop, namespace, name, 0, '', '/calculate/compounds/liveAlgCompounds')
 
 def doCompoundReturns(stopStep, startStep, globalStop, namespace, name = '', i = 0, cursor = ''):
     from time import time
