@@ -10,13 +10,14 @@ from pickle import dumps
 
 def taskAdd(startStep, stopStep, technes, namespace, name=''):
     namespace_manager.set_namespace(namespace)
-    Vs = initializeMetaAlgs()
+    Vs = initializeMetaAlgs(['FTLe'], ['R3'])
     # technes = ['FTLe-R1','FTLe-R2','FTLe-R3']
     for techne in technes:
         for v in Vs:
             keyname = techne + '-' + v
             taskname = 'metaAlg-Calculator-' + name + '-' + keyname + '-' + namespace
             deferred.defer(playThatGame, startStep, stopStep, [keyname], _name = taskname)
+    namespace_manager.set_namespace('')
 
 def playThatGame(startStep, stopStep, metaKeys):
     currentStep = startStep
@@ -108,8 +109,10 @@ def buildStopStepList(start, stop):
         liveAlgStop += 400
     return stopStepList
 
-def outputStats(technique='FTLe-R3', showFullStats=False):
+def outputStats(namespace, technique='FTLe-R3', showFullStats=False):
     from math import floor, ceil
+    from google.appengine.api import namespace_manager
+    namespace_manager.set_namespace(namespace)
     metaAlgs = meSchema.metaAlg.all().filter('technique =', technique).fetch(500)
     meDict = {}
     for metaAlg in metaAlgs:
@@ -162,6 +165,7 @@ def outputStats(technique='FTLe-R3', showFullStats=False):
             for pos in sumDict[key]:
                 sumDict[key][pos] = int(sumDict[key][pos])
             print key, ': ', sumDict[key]
+    namespace_manager.set_namespace('')
 
 def initializeMetaAlgs(FTLtype = ['FTLe'], Rtype = ['R1','R2','R3'], Vs = None):
     if Vs is None:

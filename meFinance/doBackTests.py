@@ -70,7 +70,7 @@ def addTaskRange(initialStopStep, globalStop, unique, namespace):
     startAlg = 1
     stopAlg = 3540
     batchSize = 5
-    for i in range(initialStopStep, globalStop, 400):
+    for i in range(initialStopStep, globalStop+1, 400):
         stopStep = i
         stepRange = [stopStep - 1600]
         name = unique + '-' + str(startAlg) + '-' + str(stopAlg) + '-' + str(stopStep) + '-' + namespace

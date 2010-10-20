@@ -41,7 +41,7 @@ def fanoutTaskAdd(stopStep, startStep, globalStop, namespace, name, cType):
     elif cType == 'LiveAlg':
         calcUrl = '/calculate/compounds/liveAlgCompounds'
     stepRange = stopStep - startStep
-    for i in range(stopStep, globalStop, 1600):
+    for i in range(stopStep, globalStop + 1, 1600):
         newStopStep = i
         newStartStep = newStopStep - stepRange
         newGlobalStop = min(newStopStep + 1600 - 1, globalStop)
