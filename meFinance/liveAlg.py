@@ -117,8 +117,15 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, Cash = None, TradeS
         # Don't want to munge .Cash, .TradeSize except for with metaAlg.
         
         if Cash is not None and TradeSize is not None:
-            alginfo.Cash = Cash
-            alginfo.TradeSize = TradeSize
+            algCash = Cash*(1.0 + liveAlgInfo[liveAlgKey].percentReturn)
+            alginfo.Cash = algCash
+            alginfo.TradeSize = 0.95
+            history = eval(liveAlgInfo[liveAlgKey].history)
+            if len(history) != 0:
+                history[0]['Cash'] = alginfo.Cash
+                liveAlgInfo[liveAlgKey].history = repr(history)
+            #alginfo.Cash = Cash
+            #alginfo.TradeSize = TradeSize
         desires = getStepRangeAlgDesires(algKey,alginfo,start,stop)
         buydelta = meSchema.memGet(meSchema.tradeCue,alginfo.BuyCue).TimeDelta
         selldelta = meSchema.memGet(meSchema.tradeCue,alginfo.SellCue).TimeDelta
