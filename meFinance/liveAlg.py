@@ -57,6 +57,7 @@ def calculateWeeklyLiveAlgs(stopStep, stepRange, namespace, name = ''):
         deferred.defer(processLiveAlgStepRange, stopStep - stepRange, stopStep, stepRange, algGroup, namespace,
                        _name = taskname)
         i += 1
+    namespace_manager.set_namespace('')
 
 def processLiveAlgStepRange(start, stop, stepRange, algKeyFilter, namespace):
     namespace_manager.set_namespace(namespace)

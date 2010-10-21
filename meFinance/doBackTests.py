@@ -67,6 +67,8 @@ class doBackTestBatch(webapp.RequestHandler):
         backTestBatch(algBatch, monthBatch, stopStep, namespace)
 
 def addTaskRange(initialStopStep, globalStop, unique, namespace):
+    from google.appengine.api import namespace_manager
+    namespace_manager.set_namespace('')
     startAlg = 1
     stopAlg = 3540
     batchSize = 5

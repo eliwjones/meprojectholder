@@ -68,6 +68,7 @@ def taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, calcUrl
         from time import sleep
         sleep(wait)
         taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, calcUrl, 2*wait)
+    namespace_manager.set_namespace('')
 
 def doLiveALgCompoundReturns(stopStep, startStep, globalStop, namespace, name = '', i = 0, cursor = ''):
     from time import time
