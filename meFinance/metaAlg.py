@@ -1,6 +1,8 @@
 import meSchema
 import liveAlg
 from collections import deque
+from google.appengine.ext import webapp
+from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.ext import db
 from google.appengine.ext import deferred
 from google.appengine.api.labs import taskqueue
@@ -8,20 +10,56 @@ from google.appengine.api import memcache
 from google.appengine.api import namespace_manager
 from pickle import dumps
 
+class doMetaAlg(webapp.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.out.write('I do metaAlgs!')
+    def post(self):
+        startStep = int(self.request.get('startStep'))
+        stopStep = int(self.request.get('stopStep'))
+        metaKey = str(self.request.get('metaKey'))
+        playThatGame(startStep, stopStep, [metaKey])
+
+def doDeferredBatchAdd(startStep, stopStep, FTLlist, Rs, namespace, name):
+    deferred.defer(taskAdd, startStep, stopStep, FTLlist, Rs, namespace, name)
+
 def taskAdd(startStep, stopStep, FTLlist, Rs, namespace, name=''):
+    tasklist = []
     namespace_manager.set_namespace(namespace)
-    Vs = initializeMetaAlgs(FTLlist, Rs)
+    Vs = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep)
     technes = []
     for FTL in FTLlist:
         for R in Rs:
             technes.append(FTL + '-' + R)
-    # technes = ['FTLe-R1','FTLe-R2','FTLe-R3']
     for techne in technes:
         for v in Vs:
-            keyname = techne + '-' + v
+            keyname = str(startStep).rjust(7,'0') + '-' + str(stopStep).rjust(7,'0')  + '-' + techne + '-' + v
             taskname = 'metaAlg-Calculator-' + name + '-' + keyname + '-' + namespace
-            deferred.defer(playThatGame, startStep, stopStep, [keyname], _name = taskname)
-    namespace_manager.set_namespace('')
+            tasklist.append(taskCreate(startStep, stopStep, keyname, taskname))
+            #deferred.defer(playThatGame, startStep, stopStep, [keyname], _name = taskname)
+    try:
+        batchAdd(tasklist)
+    finally:
+        namespace_manager.set_namespace('')
+
+def batchAdd(tasklist):
+    queue = taskqueue.Queue()
+    batchlist = []
+    for task in tasklist:
+        batchlist.append(task)
+        if len(batchlist) == 10:
+            queue.add(batchlist)
+            batchlist = []
+    if len(batchlist) > 0:
+        queue.add(batchlist)
+
+def taskCreate(startStep, stopStep, metaKey, taskname):
+    meTask = taskqueue.Task(url = '/metaAlg/doMetaAlg', countdown = 0,
+                            name = taskname,
+                            params = {'startStep' : startStep,
+                                      'stopStep'  : stopStep,
+                                      'metaKey'   : metaKey} )
+    return meTask
 
 def playThatGame(startStep, stopStep, metaKeys):
     currentStep = startStep
@@ -96,13 +134,20 @@ def getTopLiveAlg(stopStep, startStep, technique):
         else:
             orderBy = '-' + Rval
     query = query.order(orderBy)
-    #memKey = str(dumps(query).__hash__())
-    #topLiveAlg = memcache.get(memKey)
-    #if topLiveAlg is None:
     topLiveAlg = query.get()
-    #    memcache.set(memKey, topLiveAlg)
+    if technique.find('dnFTLe-') != -1:
+        topLiveAlg = getOppositeLiveAlg(topLiveAlg)
     bestLiveAlgTechnique = topLiveAlg
     return bestLiveAlgTechnique
+
+def getOppositeLiveAlg(LiveAlg):
+    liveAlgKey = LiveAlg.key().name()
+    if liveAlgKey.find('-dnFTL') != -1:
+        newLiveAlgKey = liveAlgKey.replace('-dnFTL', '-FTL')
+    elif liveAlgKey.find('-FTL') != -1:
+        newLiveAlgKey = liveAlgKey.replace('-FTL','-dnFTL')
+    oppositeAlg = meSchema.liveAlg.get_by_key_name(newLiveAlgKey)
+    return oppositeAlg
 
 def buildStopStepList(start, stop):
     stopStepList = []
@@ -113,11 +158,11 @@ def buildStopStepList(start, stop):
         liveAlgStop += 400
     return stopStepList
 
-def outputStats(namespace, technique='FTLe-R3', showFullStats=False):
+def outputStats(namespace, startStep, stopStep, technique='FTLe-R3', showFullStats=False):
     from math import floor, ceil
     from google.appengine.api import namespace_manager
     namespace_manager.set_namespace(namespace)
-    metaAlgs = meSchema.metaAlg.all().filter('technique =', technique).fetch(500)
+    metaAlgs = meSchema.metaAlg.all().filter('technique =', technique).filter('stopStep =', stopStep).filter('startStep =', startStep).fetch(500)
     meDict = {}
     for metaAlg in metaAlgs:
         meDict[metaAlg.technique] = []
@@ -171,20 +216,21 @@ def outputStats(namespace, technique='FTLe-R3', showFullStats=False):
             print key, ': ', sumDict[key]
     namespace_manager.set_namespace('')
 
-def initializeMetaAlgs(FTLtype = ['FTLe'], Rtype = ['R1','R2','R3'], Vs = None):
+def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, Vs = None):
     if Vs is None:
         Vs = ['V' + str(i).rjust(3,'0') for i in range(1,101)]
     metaAlgKeys = []
     for FTL in FTLtype:
         for R in Rtype:
             for v in Vs:
-                metaAlgKeys.append(FTL + '-' + R + '-' + v)
+                keyname = str(startStep).rjust(7,'0') + '-' + str(stopStep).rjust(7,'0')  + '-' + FTL + '-' + R + '-' + v
+                metaAlgKeys.append(keyname)
     metaAlgs = []
     for mAlgKey in metaAlgKeys:
         split = mAlgKey.split('-')
-        technique = split[0] + '-' + split[1]
+        technique = split[2] + '-' + split[3]
         metaAlg = meSchema.metaAlg(key_name = mAlgKey,
-                                   stopStep = 0, startStep = 0,
+                                   stopStep = stopStep, startStep = startStep,
                                    lastBuy = 0, lastSell = 0,
                                    percentReturn = 0.0, Positions = repr({}),
                                    PosVal = 0.0, PandL = 0.0, CashDelta = repr(deque([])),
@@ -193,5 +239,13 @@ def initializeMetaAlgs(FTLtype = ['FTLe'], Rtype = ['R1','R2','R3'], Vs = None):
         metaAlgs.append(metaAlg)
     db.put(metaAlgs)
     return Vs
-                                   
-        
+
+
+application = webapp.WSGIApplication([('/metaAlg/doMetaAlg', doMetaAlg)],
+                                     debug = True)
+
+def main():
+    run_wsgi_app(application)
+
+if __name__ == "__main__":
+    main()

@@ -111,19 +111,8 @@ class liveAlg(db.Model):
                                                             # Do Not Follow The Leader, Do Not Follow The Loser
                                                             # May also contain N-tersect value. E.G.: dnFTLe-N2, FTLo-N1, FTLo-N3
 '''
-  metaAlg will be a few entities. FTLe-R1, FTLe-R2, and FTLe-R3.
-  These techniques will tell it which of the liveAlgs to follow.
-  R1 == one with the best percentReturn for current week.
-  R2 == one with best R2 for current week.
-  R3 == one with best R3 for current week.
-  It will then trade using underlying liveAlg technique for next week.
-
-  Thus, metaAlg could trade using dnFTLe-R3 one week then switch to
-  FTLe-R2 next week then use FTLo-R4 the third week.  Depending on
-  how rapidly market structure changes.
-
-  One could also simply follow dnFTLe-R2 for several weeks.
-  Its technique will essentially be its key_name.
+  metaAlg will be a few entities. FTLe-R3 and dnFTLe-R3
+  key_name = startstep + '-' + stopstep
 '''
 class metaAlg(db.Model):
     stopStep      = db.IntegerProperty(required=True)

@@ -23,8 +23,20 @@ handlers:
 #- url: /stats.*
 #  script: $PYTHON_LIB/google/appengine/ext/appstats/ui.py
 
+- url: /metaAlg/.*
+  script: metaAlg.py
+  login: admin
+
 - url: /backtest/.*
   script: doBackTests.py
+  login: admin
+
+- url: /algorithms/go
+  script: meAlgorithm.py
+  login: admin
+
+- url: /algorithms/.*
+  script: makeAlgorithms.py
   login: admin
 
 - url: /config/.*
@@ -33,14 +45,6 @@ handlers:
 
 - url: /cron/.*
   script: statPutCron.py
-  login: admin
-
-- url: /test/.*
-  script: test.py
-  login: admin
-
-- url: /test2/.*
-  script: test2.py
   login: admin
 
 - url: /convert/delDesires
@@ -61,12 +65,4 @@ handlers:
 
 - url: /calculate/compounds/.*
   script: calculateCompoundReturns.py
-  login: admin
-
-- url: /algorithms/go
-  script: meAlgorithm.py
-  login: admin
-
-- url: /algorithms/.*
-  script: makeAlgorithms.py
   login: admin

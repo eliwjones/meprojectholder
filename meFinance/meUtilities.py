@@ -102,6 +102,27 @@ def wipeoutBackTests(name = '', cursor = None):
         i += 1
         cursor = query.cursor()
 
+def wipeoutMetaAlgs(namespace, name, cursor = None):
+    from google.appengine.api import namespace_manager
+    namespace_manager.set_namespace(namespace)
+    try:
+        i = 0
+        count = 50
+        while count == 50:
+            try:
+                query = db.Query(meSchema.metaAlg, keys_only=True)
+                if cursor is not None:
+                    query.with_cursor(cursor)
+                metaAlgKeys = query.fetch(50)
+            except:
+                wipeoutMetaAlgs(namespace, name, cursor)
+            count = len(metaAlgKeys)
+            addDeferred(repr(metaAlgKeys), name + '-batch' + str(i) + '-' + namespace)
+            i+= 1
+            cursor = query.cursor()
+    finally:
+        namespace_manager.set_namespace('')
+
 def wipeoutDeltas(cursor = None):
     count = 100
     while count == 100:
