@@ -1,7 +1,8 @@
 import meSchema
 import liveAlg
 from collections import deque
-from google.appengine.ext import webapp
+
+from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.ext import db
 from google.appengine.ext import deferred
@@ -19,6 +20,15 @@ class doMetaAlg(webapp.RequestHandler):
         stopStep = int(self.request.get('stopStep'))
         metaKey = str(self.request.get('metaKey'))
         playThatGame(startStep, stopStep, [metaKey])
+
+def doRangeOfBatches(globalStop, weeksBack, namespace, name):
+    FTLlist = ['FTLe']
+    Rs = ['R3']
+    rangeEnd = weeksBack*400
+    for i in range(0, rangeEnd, 400):
+        stopStep = globalStop - i
+        startStep = stopStep - 1600
+        doDeferredBatchAdd(startStep, stopStep, FTLlist, Rs, namespace, name)
 
 def doDeferredBatchAdd(startStep, stopStep, FTLlist, Rs, namespace, name):
     deferred.defer(taskAdd, startStep, stopStep, FTLlist, Rs, namespace, name)
@@ -157,6 +167,15 @@ def buildStopStepList(start, stop):
         stopStepList.append(liveAlgStop)
         liveAlgStop += 400
     return stopStepList
+
+def outputRangeOfStats(namespace, startStep, stopStep, globalStop, technique='FTLe-R3'):
+    stepsAway = globalStop - stopStep + 1
+    for steps in range(0, stepsAway, 400):
+        #print stopStep + steps, startStep + steps
+        print 'Start Step: ', startStep + steps, ' Stop Step: ', stopStep + steps
+        print '---------------------------------'
+        outputStats(namespace, startStep + steps, stopStep + steps, technique)
+    
 
 def outputStats(namespace, startStep, stopStep, technique='FTLe-R3', showFullStats=False):
     from math import floor, ceil
