@@ -21,13 +21,15 @@ class doMetaAlg(webapp.RequestHandler):
         metaKey = str(self.request.get('metaKey'))
         playThatGame(startStep, stopStep, [metaKey])
 
-def doRangeOfBatches(globalStop, weeksBack, namespace, name):
+def doRangeOfBatches(globalStop, weeksBack, runLength, namespace, name):
+    # runLength gives how long the metaAlg run should be. (1600,3200, etc)
     FTLlist = ['FTLe']
     Rs = ['R3']
     rangeEnd = weeksBack*400
     for i in range(0, rangeEnd, 400):
         stopStep = globalStop - i
-        startStep = stopStep - 1600
+        startStep = stopStep - runLength
+        #print startStep, stopStep
         doDeferredBatchAdd(startStep, stopStep, FTLlist, Rs, namespace, name)
 
 def doDeferredBatchAdd(startStep, stopStep, FTLlist, Rs, namespace, name):
@@ -171,15 +173,14 @@ def buildStopStepList(start, stop):
 def outputRangeOfStats(namespace, startStep, stopStep, globalStop, technique='FTLe-R3'):
     stepsAway = globalStop - stopStep + 1
     for steps in range(0, stepsAway, 400):
-        #print stopStep + steps, startStep + steps
-        print 'Start Step: ', startStep + steps, ' Stop Step: ', stopStep + steps
-        print '---------------------------------'
         outputStats(namespace, startStep + steps, stopStep + steps, technique)
-    
 
-def outputStats(namespace, startStep, stopStep, technique='FTLe-R3', showFullStats=False):
+def outputStats(namespace, startStep, stopStep, technique = 'FTLe-R3', showDistribution = False, showFullStats = False):
     from math import floor, ceil
     from google.appengine.api import namespace_manager
+
+    print 'Start Step: ', startStep, ' Stop Step: ', stopStep, '  ',
+    
     namespace_manager.set_namespace(namespace)
     metaAlgs = meSchema.metaAlg.all().filter('technique =', technique).filter('stopStep =', stopStep).filter('startStep =', startStep).fetch(500)
     meDict = {}
@@ -190,11 +191,18 @@ def outputStats(namespace, startStep, stopStep, technique='FTLe-R3', showFullSta
         meDict[metaAlg.technique].append(ret)
     dictKeys = meDict.keys()
     dictKeys.sort()
+    '''
+    Populate meDict with returns, but do not print
+      unless showDistribution = True
+    '''
     for key in dictKeys:
         meDict[key].sort()
         meDict[key] = [str(round(ret*100,2))[0:5] for ret in meDict[key]]
-        print key, ': ', meDict[key]
-    # Display Min, Med, Mean, Max
+        if showDistribution:
+            print key, ': ', meDict[key]
+    '''
+    Always calculate and display Min, Med, Mean, Max
+    '''
     for key in dictKeys:
         Min = meDict[key][0]
         Max = meDict[key][-1]
@@ -208,7 +216,7 @@ def outputStats(namespace, startStep, stopStep, technique='FTLe-R3', showFullSta
         else:
             Med = meDict[key][length/2]
         print 'Min: ', Min, 'Med: ', Med, 'Mean: ', Mean, 'Max: ', Max
-    
+        
     sumDict = {}
     totalSumDict = {'HBC': 0.0, 'CME': 0.0, 'GOOG': 0.0, 'INTC':0.0}
     for metaAlg in metaAlgs:
@@ -220,15 +228,18 @@ def outputStats(namespace, startStep, stopStep, technique='FTLe-R3', showFullSta
         for trade in CashDelta:
             sumDict[dictKey][trade['Symbol']] += trade['PandL']
             totalSumDict[trade['Symbol']] += trade['PandL']
-    print totalSumDict
-    totalSum = 0.0
-    for stock in totalSumDict:
-        totalSum += totalSumDict[stock]
-    for stock in totalSumDict:
-        print stock, ': ', 100*(totalSumDict[stock]/totalSum)
     dictKeys = sumDict.keys()
     dictKeys.sort()
+    '''
+    Only print out if showFullStats=True
+    '''
     if showFullStats:
+        print totalSumDict
+        totalSum = 0.0
+        for stock in totalSumDict:
+            totalSum += totalSumDict[stock]
+        for stock in totalSumDict:
+            print stock, ': ', 100*(totalSumDict[stock]/max(totalSum,0.0001))
         for key in dictKeys:
             for pos in sumDict[key]:
                 sumDict[key][pos] = int(sumDict[key][pos])
