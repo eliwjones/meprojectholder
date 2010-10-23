@@ -75,3 +75,46 @@ def outputMetaAlgStats(stepRange, namespace):
             lastPercent = res.Mean
     finally:
         namespace_manager.set_namespace('')
+
+def outputMetaAlgStatsForChart(stepRange, namespace):
+    namespace_manager.set_namespace(namespace)
+    try:
+        results = meSchema.metaAlgStat.all().filter('stepRange =', stepRange).fetch(100)
+        MaxList = []
+        MinList = []
+        MeanList = []
+        MedianList = []
+        PosList = []
+        StopList = []
+        for res in results:
+            MaxList.append('%1.4f'%(res.Max))
+            MinList.append('%1.4f'%(res.Min))
+            MeanList.append('%1.4f'%(res.Mean))
+            MedianList.append('%1.4f'%(res.Median))
+            PosList.append(res.Positive)
+            StopList.append(res.stopStep)
+        print 'Stop Steps:',
+        printSpaceDelimitedList(StopList)
+        print 'Max Val:',
+        printSpaceDelimitedList(MaxList)
+        print 'Mean Val:',
+        printSpaceDelimitedList(MeanList)
+        print 'Median Val:',
+        printSpaceDelimitedList(MedianList)
+        print 'Min Val:',
+        printSpaceDelimitedList(MinList)
+        print 'Pos Val:',
+        printSpaceDelimitedList(PosList)
+    finally:
+        namespace_manager.set_namespace('')
+
+def printSpaceDelimitedList(myList):
+    for i in range(len(myList)):
+        if i < len(myList) - 1:
+            print myList[i],
+        else:
+            print myList[i]
+
+
+
+
