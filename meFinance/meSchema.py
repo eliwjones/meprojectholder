@@ -128,6 +128,35 @@ class metaAlg(db.Model):
     numTrades     = db.IntegerProperty(required=True)
     history       = db.TextProperty(required=True)
     technique     = db.StringProperty(required=True)       # FTL method: Follow The Leader, Follow The Loser,
+
+class metaAlgStat(db.Model):
+    Min           = db.FloatProperty(required=True)
+    Median        = db.FloatProperty(required=True)
+    Mean          = db.FloatProperty(required=True)
+    Max           = db.FloatProperty(required=True)
+    Positive      = db.FloatProperty(required=True)
+    stopStep      = db.IntegerProperty(required=True)
+    startStep     = db.IntegerProperty(required=True)
+    technique     = db.StringProperty(required=True)
+    
+'''
+   The true gateway to insanity, the metaMetaAlg.
+   Keeps track of performance of process for choosing
+   which metAlg Technique to use.
+'''
+class metaMetaAlg(db.Model):
+    stopStep      = db.IntegerProperty(required=True)
+    startStep     = db.IntegerProperty(required=True)
+    lastBuy       = db.IntegerProperty(required=True)
+    lastSell      = db.IntegerProperty(required=True)
+    percentReturn = db.FloatProperty(required=True)
+    Positions     = db.TextProperty(required=True)
+    PosVal        = db.FloatProperty(required=True)
+    PandL         = db.FloatProperty(required=True)
+    CashDelta     = db.TextProperty(required=True)
+    Cash          = db.FloatProperty(required=True)
+    numTrades     = db.IntegerProperty(required=True)
+    history       = db.TextProperty(required=True)
     
 
 def batchPut(entities, cache=False, memkey=None, time=0):

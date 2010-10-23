@@ -1,7 +1,6 @@
 import meSchema
 import liveAlg
 from collections import deque
-
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.ext import db
@@ -22,14 +21,13 @@ class doMetaAlg(webapp.RequestHandler):
         playThatGame(startStep, stopStep, [metaKey])
 
 def doRangeOfBatches(globalStop, weeksBack, runLength, namespace, name):
-    # runLength gives how long the metaAlg run should be. (1600,3200, etc)
+    # For now fixing on runLength = 4800 (Three "months" ~ 3*4*400)
     FTLlist = ['FTLe']
     Rs = ['R3']
     rangeEnd = weeksBack*400
-    for i in range(0, rangeEnd, 400):
+    for i in range(0, rangeEnd + 1, 400):
         stopStep = globalStop - i
         startStep = stopStep - runLength
-        #print startStep, stopStep
         doDeferredBatchAdd(startStep, stopStep, FTLlist, Rs, namespace, name)
 
 def doDeferredBatchAdd(startStep, stopStep, FTLlist, Rs, namespace, name):
@@ -48,7 +46,6 @@ def taskAdd(startStep, stopStep, FTLlist, Rs, namespace, name=''):
             keyname = str(startStep).rjust(7,'0') + '-' + str(stopStep).rjust(7,'0')  + '-' + techne + '-' + v
             taskname = 'metaAlg-Calculator-' + name + '-' + keyname + '-' + namespace
             tasklist.append(taskCreate(startStep, stopStep, keyname, taskname))
-            #deferred.defer(playThatGame, startStep, stopStep, [keyname], _name = taskname)
     try:
         batchAdd(tasklist)
     finally:
@@ -81,7 +78,7 @@ def playThatGame(startStep, stopStep, metaKeys):
         lastLiveAlgStop = stopStepList[i]
         # This will contain the liveAlg.technique that
         # each metaAlg.technique likes.
-        # e.g. bestLiveAlgInfo['FTLe-R2'] = 'dnFTLo-R3'
+        # e.g. bestLiveAlgInfo['FTLe-R3'] = 'dnFTLo-R4'
         bestLiveAlgInfo = getBestLiveAlgs(lastLiveAlgStop, metaAlgInfo)
         bestAlgs = liveAlg.getBestAlgs(lastLiveAlgStop, bestLiveAlgInfo)
         if i < len(stopStepList)-1:
@@ -120,22 +117,6 @@ def getBestLiveAlgs(stopStep, metaAlgInfo):
         technique = metaAlgInfo[metaAlgKey].technique
         bestLiveAlgs[metaAlgKey] = getTopLiveAlg(stopStep, startStep, technique)
     return bestLiveAlgs
-
-def getTopLiveAlgNOINDEX(stopStep, startStep, technique):
-    # Only needed while R2,R3 indexes are building on liveAlg model.
-    topLiveAlgs = meSchema.liveAlg.all().filter("stopStep =", stopStep).filter("startStep =", startStep)
-    Rval = technique.split('-')[-1]
-    Rdict = {}
-    currentReturn = 0.0
-    topLiveAlgs = topLiveAlgs.fetch(20)
-    for liveAlg in topLiveAlgs:
-        Rdict['R1'] = liveAlg.percentReturn
-        Rdict['R2'] = liveAlg.R2
-        Rdict['R3'] = liveAlg.R3
-        if Rdict[Rval] > currentReturn:
-            currentReturn = Rdict[Rval]
-            bestLiveAlgTechnique = liveAlg
-    return bestLiveAlgTechnique
 
 def getTopLiveAlg(stopStep, startStep, technique):
     query = meSchema.liveAlg.all().filter("stopStep =", stopStep).filter("startStep =", startStep)
@@ -207,6 +188,10 @@ def outputStats(namespace, startStep, stopStep, technique = 'FTLe-R3', showDistr
         Min = meDict[key][0]
         Max = meDict[key][-1]
         nums = [float(ret) for ret in meDict[key]]
+        posReturns = 0
+        for num in nums:
+            if num >= 0.0:
+                posReturns += 1
         Mean = sum(nums)/len(nums)
         length = len(meDict[key])
         if length%2==0:
@@ -215,7 +200,7 @@ def outputStats(namespace, startStep, stopStep, technique = 'FTLe-R3', showDistr
             Med = str((float(meDict[key][Floor]) + float(meDict[key][Ceil]))/2)[0:5]
         else:
             Med = meDict[key][length/2]
-        print 'Min: ', Min, 'Med: ', Med, 'Mean: ', Mean, 'Max: ', Max
+        print 'Min: ', Min, 'Med: ', Med, 'Mean: ', Mean, 'Max: ', Max, '%Pos: ', posReturns/float(len(nums))
         
     sumDict = {}
     totalSumDict = {'HBC': 0.0, 'CME': 0.0, 'GOOG': 0.0, 'INTC':0.0}
