@@ -137,6 +137,7 @@ class metaAlgStat(db.Model):
     Positive      = db.FloatProperty(required=True)
     stopStep      = db.IntegerProperty(required=True)
     startStep     = db.IntegerProperty(required=True)
+    stepRange     = db.IntegerProperty(required=False)
     technique     = db.StringProperty(required=True)
     
 '''
