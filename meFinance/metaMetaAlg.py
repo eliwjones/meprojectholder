@@ -5,8 +5,7 @@
 import meSchema
 import liveAlg
 from collections import deque
-from google.appengine.ext import db
-from google.appengine.ext import deferred
+from google.appengine.ext import db, deferred
 from google.appengine.api.labs import taskqueue
 from google.appengine.api import memcache, namespace_manager
 
@@ -63,57 +62,6 @@ def convertMetaAlgToMetaAlgStats(startStep, stopStep, technique, namespace):
         db.put(metaAlgStat)
     finally:
         namespace_manager.set_namespace('')
-
-def outputMetaAlgStats(stepRange, namespace):
-    namespace_manager.set_namespace(namespace)
-    try:
-        results = meSchema.metaAlgStat.all().filter('stepRange =', stepRange).fetch(100)
-        lastPercent = 0.0
-        for res in results:
-            delta = res.Mean - lastPercent
-            print '%1.4f    %1.4f    %1.4f    %1.4f    %1.2f    %i    %i    %1.4f' % (res.Min, res.Median, res.Mean, res.Max, res.Positive, res.startStep, res.stopStep, delta)
-            lastPercent = res.Mean
-    finally:
-        namespace_manager.set_namespace('')
-
-def outputMetaAlgStatsForChart(stepRange, namespace):
-    namespace_manager.set_namespace(namespace)
-    try:
-        results = meSchema.metaAlgStat.all().filter('stepRange =', stepRange).fetch(100)
-        MaxList = []
-        MinList = []
-        MeanList = []
-        MedianList = []
-        PosList = []
-        StopList = []
-        for res in results:
-            MaxList.append('%1.4f'%(res.Max))
-            MinList.append('%1.4f'%(res.Min))
-            MeanList.append('%1.4f'%(res.Mean))
-            MedianList.append('%1.4f'%(res.Median))
-            PosList.append(res.Positive)
-            StopList.append(res.stopStep)
-        print 'Stop Steps:',
-        printSpaceDelimitedList(StopList)
-        print 'Max Val:',
-        printSpaceDelimitedList(MaxList)
-        print 'Mean Val:',
-        printSpaceDelimitedList(MeanList)
-        print 'Median Val:',
-        printSpaceDelimitedList(MedianList)
-        print 'Min Val:',
-        printSpaceDelimitedList(MinList)
-        print 'Pos Val:',
-        printSpaceDelimitedList(PosList)
-    finally:
-        namespace_manager.set_namespace('')
-
-def printSpaceDelimitedList(myList):
-    for i in range(len(myList)):
-        if i < len(myList) - 1:
-            print myList[i],
-        else:
-            print myList[i]
 
 
 

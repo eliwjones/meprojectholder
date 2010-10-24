@@ -26,6 +26,10 @@ handlers:
 #- url: /stats.*
 #  script: $PYTHON_LIB/google/appengine/ext/appstats/ui.py
 
+- url: /stats/.*
+  script: outputStats.py
+  login: admin
+
 - url: /metaAlg/.*
   script: metaAlg.py
   login: admin
