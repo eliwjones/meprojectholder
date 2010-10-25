@@ -158,6 +158,7 @@ class metaMetaAlg(db.Model):
     Cash          = db.FloatProperty(required=True)
     numTrades     = db.IntegerProperty(required=True)
     history       = db.TextProperty(required=True)
+    technique     = db.StringProperty(required=True)
     
 
 def batchPut(entities, cache=False, memkey=None, time=0):

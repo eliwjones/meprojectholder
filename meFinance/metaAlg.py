@@ -18,7 +18,12 @@ class doMetaAlg(webapp.RequestHandler):
         startStep = int(self.request.get('startStep'))
         stopStep = int(self.request.get('stopStep'))
         metaKey = str(self.request.get('metaKey'))
-        playThatGame(startStep, stopStep, [metaKey])
+        metaMeta = str(self.request.get('metaMeta'))
+        if metaMeta.lower() == 'true':
+            metaMeta = True
+        else:
+            metaMeta = False
+        playThatGame(startStep, stopStep, [metaKey], metaMeta)
 
 def doRangeOfBatches(globalStop, weeksBack, runLength, namespace, name):
     # For now fixing on runLength = 4800 (Three "months" ~ 3*4*400)
@@ -30,13 +35,17 @@ def doRangeOfBatches(globalStop, weeksBack, runLength, namespace, name):
         startStep = stopStep - runLength
         doDeferredBatchAdd(startStep, stopStep, FTLlist, Rs, namespace, name)
 
-def doDeferredBatchAdd(startStep, stopStep, FTLlist, Rs, namespace, name):
-    deferred.defer(taskAdd, startStep, stopStep, FTLlist, Rs, namespace, name)
+def doDeferredBatchAdd(startStep, stopStep, FTLlist, Rs, namespace, name, metaMeta):
+    deferred.defer(taskAdd, startStep, stopStep, FTLlist, Rs, namespace, name, metaMeta)
 
-def taskAdd(startStep, stopStep, FTLlist, Rs, namespace, name=''):
+def taskAdd(startStep, stopStep, FTLlist, Rs, namespace, name, metaMeta):
     tasklist = []
     namespace_manager.set_namespace(namespace)
-    Vs = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep)
+    if metaMeta.lower() == 'true':
+        metaModel = meSchema.metaMetaAlg
+    else:
+        metaModel = meSchema.metaAlg
+    Vs = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, metaModel)
     technes = []
     for FTL in FTLlist:
         for R in Rs:
@@ -45,7 +54,7 @@ def taskAdd(startStep, stopStep, FTLlist, Rs, namespace, name=''):
         for v in Vs:
             keyname = str(startStep).rjust(7,'0') + '-' + str(stopStep).rjust(7,'0')  + '-' + techne + '-' + v
             taskname = 'metaAlg-Calculator-' + name + '-' + keyname + '-' + namespace
-            tasklist.append(taskCreate(startStep, stopStep, keyname, taskname))
+            tasklist.append(taskCreate(startStep, stopStep, keyname, taskname, metaMeta))
     try:
         batchAdd(tasklist)
     finally:
@@ -62,20 +71,27 @@ def batchAdd(tasklist):
     if len(batchlist) > 0:
         queue.add(batchlist)
 
-def taskCreate(startStep, stopStep, metaKey, taskname):
+def taskCreate(startStep, stopStep, metaKey, taskname, metaMeta):
     meTask = taskqueue.Task(url = '/metaAlg/doMetaAlg', countdown = 0,
                             name = taskname,
                             params = {'startStep' : startStep,
                                       'stopStep'  : stopStep,
-                                      'metaKey'   : metaKey} )
+                                      'metaKey'   : metaKey,
+                                      'metaMeta'  : metaMeta} )
     return meTask
 
-def playThatGame(startStep, stopStep, metaKeys):
+def playThatGame(startStep, stopStep, metaKeys, metaMeta = False):
     currentStep = startStep
     stopStepList = buildStopStepList(startStep, stopStep)
-    metaAlgInfo = getMetaAlgInfo(metaKeys)
+    if metaMeta:
+        metaAlgInfo = getMetaAlgInfo(metaKeys, meSchema.metaMetaAlg)
+    else:
+        metaAlgInfo = getMetaAlgInfo(metaKeys, meSchema.metaAlg)
     for i in range(len(stopStepList)):
         lastLiveAlgStop = stopStepList[i]
+        if metaMeta:
+            # Get technique for metaMetaAlgs based on probability of best technique.
+            metaAlgInfo = getMetaMetaTechnique(lastLiveAlgStop, metaAlgInfo)
         # This will contain the liveAlg.technique that
         # each metaAlg.technique likes.
         # e.g. bestLiveAlgInfo['FTLe-R3'] = 'dnFTLo-R4'
@@ -102,10 +118,26 @@ def addLiveAlgTechne(metaAlgInfo, bestLiveAlgInfo):
         metaAlgInfo[metaAlgKey].history = repr(history)
     return metaAlgInfo
 
-def getMetaAlgInfo(metaKeys):
+def getMetaMetaTechnique(stopStep, metaMetaAlgInfo):
+    from random import random, shuffle
+    step4800Result = meSchema.metaAlgStat.all().filter('stopStep =', stopStep).filter('stepRange =', 4800).get()
+    step1200Result = meSchema.metaAlgStat.all().filter('stopStep =', stopStep).filter('stepRange =', 1200).get()
+    m = int(round(100 * step4800Result.Positive))
+    n = int(round(100 * step1200Result.Positive))
+    techneList = ['FTLe-R3' for i in range(0,m+n)]
+    l = 200 - (m+n)
+    techneList.extend(['dnFTLe-R3' for i in range(0,l)])
+    shuffle(techneList)
+    r = int(round(200*random()))
+    technique = techneList[r]
+    for alg in metaMetaAlgInfo:
+        metaMetaAlgInfo[alg].technique = technique
+    return metaMetaAlgInfo
+
+def getMetaAlgInfo(metaKeys, metaModel):
     metaAlgInfo = {}
-    #metaAlgs = meSchema.metaAlg.all().filter('technique =', techne).fetch(20)
-    metaAlgs = meSchema.metaAlg.get_by_key_name(metaKeys)
+    #metaAlgs = meSchema.metaAlg.get_by_key_name(metaKeys)
+    metaAlgs = metaModel.get_by_key_name(metaKeys)
     for alg in metaAlgs:
         metaAlgInfo[alg.key().name()] = alg
     return metaAlgInfo
@@ -156,14 +188,15 @@ def outputRangeOfStats(namespace, startStep, stopStep, globalStop, technique='FT
     for steps in range(0, stepsAway, 400):
         outputStats(namespace, startStep + steps, stopStep + steps, technique)
 
-def outputStats(namespace, startStep, stopStep, technique = 'FTLe-R3', showDistribution = False, showFullStats = False):
+def outputStats(namespace, startStep, stopStep, metaModel = meSchema.metaAlg, showDistribution = False, showFullStats = False):
     from math import floor, ceil
     from google.appengine.api import namespace_manager
 
     print 'Start Step: ', startStep, ' Stop Step: ', stopStep, '  ',
     
     namespace_manager.set_namespace(namespace)
-    metaAlgs = meSchema.metaAlg.all().filter('technique =', technique).filter('stopStep =', stopStep).filter('startStep =', startStep).fetch(500)
+    #metaAlgs = meSchema.metaAlg.all().filter('technique =', technique).filter('stopStep =', stopStep).filter('startStep =', startStep).fetch(500)
+    metaAlgs = metaModel.all().filter('stopStep =', stopStep).filter('startStep =', startStep).fetch(500)
     meDict = {}
     for metaAlg in metaAlgs:
         meDict[metaAlg.technique] = []
@@ -231,7 +264,7 @@ def outputStats(namespace, startStep, stopStep, technique = 'FTLe-R3', showDistr
             print key, ': ', sumDict[key]
     namespace_manager.set_namespace('')
 
-def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, Vs = None):
+def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, metaModel = meSchema.metaAlg, Vs = None):
     if Vs is None:
         Vs = ['V' + str(i).rjust(3,'0') for i in range(1,101)]
     metaAlgKeys = []
@@ -244,13 +277,13 @@ def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, Vs = None):
     for mAlgKey in metaAlgKeys:
         split = mAlgKey.split('-')
         technique = split[2] + '-' + split[3]
-        metaAlg = meSchema.metaAlg(key_name = mAlgKey,
-                                   stopStep = stopStep, startStep = startStep,
-                                   lastBuy = 0, lastSell = 0,
-                                   percentReturn = 0.0, Positions = repr({}),
-                                   PosVal = 0.0, PandL = 0.0, CashDelta = repr(deque([])),
-                                   Cash = 25000.0, numTrades = 0, history = repr(deque([])),
-                                   technique = technique)
+        metaAlg = metaModel(key_name = mAlgKey,
+                            stopStep = stopStep, startStep = startStep,
+                            lastBuy = 0, lastSell = 0,
+                            percentReturn = 0.0, Positions = repr({}),
+                            PosVal = 0.0, PandL = 0.0, CashDelta = repr(deque([])),
+                            Cash = 25000.0, numTrades = 0, history = repr(deque([])),
+                            technique = technique)
         metaAlgs.append(metaAlg)
     db.put(metaAlgs)
     return Vs
