@@ -266,7 +266,8 @@ def outputStats(namespace, startStep, stopStep, metaModel = meSchema.metaAlg, sh
 
 def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, metaModel = meSchema.metaAlg, Vs = None):
     if Vs is None:
-        Vs = ['V' + str(i).rjust(3,'0') for i in range(1,101)]
+        #Vs = ['V' + str(i).rjust(3,'0') for i in range(1,101)]
+        Vs = ['V' + str(i).rjust(3,'0') for i in range(1,2)]
     metaAlgKeys = []
     for FTL in FTLtype:
         for R in Rtype:

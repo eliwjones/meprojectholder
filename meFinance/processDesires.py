@@ -93,10 +93,14 @@ def doStops(step, statDict, alginfo, stopRange):
     for pos in statDict['Positions']:
         stckID = meSchema.getStckID(pos)
         stckDeltas = calculateDeltas(stckID,step)
+        stdDev, mean = getStandardDeviation(stckDeltas)
+        
+        ''' Taking out random selection code.
         n = len(stckDeltas) - 2
         r = random()
         index = int(round(n*r)) + 1                                # Don't want to choose 0 index.
         choose = stckDeltas[index]
+        '''
         shares = statDict['Positions'][pos]['Shares']
         longshort = cmp(shares,0)                                  # -1 for short, +1 for long
         stckQuote = stckQuotes[pos]
@@ -104,11 +108,16 @@ def doStops(step, statDict, alginfo, stopRange):
                                        Quote = stckQuote,
                                        CueKey = '0000')
         dictDesire = convertDesireToDict(offsetDesire, -1*longshort, alginfo.TradeSize, alginfo.Cash, -1*shares)
+        if abs(stckDeltas[0]-mean) > stdDev:
+            if statDict['Positions'][pos]['Step'] < step - stopRange:
+                stopDesires.append(dictDesire)
+        '''
         if (longshort == 1 and choose < stckDeltas[0]) or (longshort == -1 and choose > stckDeltas[0]):
             # Possibly consider looking at whether choose is simply negative or positive.
             # Must make sure this position wasn't modified within the stopRange.
             if statDict['Positions'][pos]['Step'] < step - stopRange:
                 stopDesires.append(dictDesire)
+        '''
     for stop in stopDesires:
         tradeCash, PandL, position = princeFunc.mergePosition(eval(stop), eval(repr(statDict['Positions'])), step)
         cash = tradeCash + eval(repr(statDict['Cash']))
@@ -125,6 +134,13 @@ def doStops(step, statDict, alginfo, stopRange):
         statDict['PandL'] += PandL
         statDict['Positions'] = position
     return statDict
+
+def getStandardDeviation(stckDeltas):
+    from math import sqrt
+    mean = sum(stckDeltas[1:])/float(len(stckDeltas[1:]))
+    deviationList = [(p-mean)**2 for p in stckDeltas[1:]]  # Not including current days move (hence the [1:]).
+    stdDev = sqrt(sum(deviationList)/float(len(deviationList)))
+    return stdDev, mean
 
 def calculateDeltas(stckID, step):
     stckKeyList = []
