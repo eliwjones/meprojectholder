@@ -43,9 +43,11 @@ def taskAdd(startStep, stopStep, FTLlist, Rs, namespace, name, metaMeta):
     namespace_manager.set_namespace(namespace)
     if metaMeta.lower() == 'true':
         metaModel = meSchema.metaMetaAlg
+        Vs = ['V' + str(i).rjust(3,'0') for i in range(1,101)]
+        Vs = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, metaModel,Vs)
     else:
         metaModel = meSchema.metaAlg
-    Vs = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, metaModel)
+        Vs = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, metaModel)
     technes = []
     for FTL in FTLlist:
         for R in Rs:
@@ -81,6 +83,8 @@ def taskCreate(startStep, stopStep, metaKey, taskname, metaMeta):
     return meTask
 
 def playThatGame(startStep, stopStep, metaKeys, metaMeta = False):
+    originalNamespace = namespace_manager.get_namespace()
+    
     currentStep = startStep
     stopStepList = buildStopStepList(startStep, stopStep)
     if metaMeta:
@@ -102,8 +106,12 @@ def playThatGame(startStep, stopStep, metaKeys, metaMeta = False):
         else:
             lastStep = stopStep
         if currentStep < lastStep:
-            metaAlgInfo = liveAlg.processStepRangeDesires(currentStep, lastStep, bestAlgs, metaAlgInfo, 25000.00, 0.85)
-            metaAlgInfo = liveAlg.getCurrentReturn(metaAlgInfo, lastStep, 25000.00)
+            if originalNamespace != '':
+                metaAlgInfo = liveAlg.processStepRangeDesires(currentStep, lastStep, bestAlgs, metaAlgInfo, 25000.00, 0.85)
+                metaAlgInfo = liveAlg.getCurrentReturn(metaAlgInfo, lastStep, 25000.00)
+            else:
+                metaAlgInfo = liveAlg.processStepRangeDesires(currentStep, lastStep, bestAlgs, metaAlgInfo)
+                metaAlgInfo = liveAlg.getCurrentReturn(metaAlgInfo, lastStep)
             metaAlgInfo = addLiveAlgTechne(metaAlgInfo, bestLiveAlgInfo)
             currentStep = lastStep + 1
     putList = []
@@ -265,6 +273,11 @@ def outputStats(namespace, startStep, stopStep, metaModel = meSchema.metaAlg, sh
     namespace_manager.set_namespace('')
 
 def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, metaModel = meSchema.metaAlg, Vs = None):
+    namespace = namespace_manager.get_namespace()
+    if namespace == '':
+        Cash = 100000.0
+    else:
+        Cash = 25000.0
     if Vs is None:
         #Vs = ['V' + str(i).rjust(3,'0') for i in range(1,101)]
         Vs = ['V' + str(i).rjust(3,'0') for i in range(1,2)]
@@ -283,7 +296,7 @@ def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, metaModel = meSchema
                             lastBuy = 0, lastSell = 0,
                             percentReturn = 0.0, Positions = repr({}),
                             PosVal = 0.0, PandL = 0.0, CashDelta = repr(deque([])),
-                            Cash = 25000.0, numTrades = 0, history = repr(deque([])),
+                            Cash = Cash, numTrades = 0, history = repr(deque([])),
                             technique = technique)
         metaAlgs.append(metaAlg)
     db.put(metaAlgs)
