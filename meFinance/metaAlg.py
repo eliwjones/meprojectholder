@@ -279,7 +279,10 @@ def outputPLstats(keyname, namespace = ''):
     try:
         meta = meSchema.metaAlg.get_by_key_name(keyname)
         trades = eval(meta.CashDelta)
-        stockList = ['HBC','CME','GOOG','INTC']
+        if namespace == '':
+            stockList = ['HBC','CME','GOOG','INTC']
+        else:
+            stockList = [namespace]
         tradeDict = {}
         for stock in stockList:
             tradeDict[stock] = {'P':0.0,'L':0.0,'Ptrades':[],'Ltrades':[]}
