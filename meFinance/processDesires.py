@@ -93,7 +93,7 @@ def doStops(step, statDict, alginfo, stopRange):
     for pos in statDict['Positions']:
         stckID = meSchema.getStckID(pos)
         stckDeltas = calculateDeltas(stckID,step)
-        stdDev, mean = getStandardDeviation(stckDeltas)
+        stdDev, mean = getStandardDeviation(stckDeltas[1:])
         
         ''' Taking out random selection code.
         n = len(stckDeltas) - 2
@@ -137,8 +137,8 @@ def doStops(step, statDict, alginfo, stopRange):
 
 def getStandardDeviation(stckDeltas):
     from math import sqrt
-    mean = sum(stckDeltas[1:])/float(len(stckDeltas[1:]))
-    deviationList = [(p-mean)**2 for p in stckDeltas[1:]]  # Not including current days move (hence the [1:]).
+    mean = sum(stckDeltas)/float(len(stckDeltas))
+    deviationList = [(p-mean)**2 for p in stckDeltas]
     stdDev = sqrt(sum(deviationList)/float(len(deviationList)))
     return stdDev, mean
 

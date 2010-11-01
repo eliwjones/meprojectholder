@@ -272,6 +272,37 @@ def outputStats(namespace, startStep, stopStep, metaModel = meSchema.metaAlg, sh
             print key, ': ', sumDict[key]
     namespace_manager.set_namespace('')
 
+def outputPLstats(keyname, namespace = ''):
+    import processDesires
+    originalNamespace = namespace_manager.get_namespace()
+    namespace_manager.set_namespace(namespace)
+    try:
+        meta = meSchema.metaAlg.get_by_key_name(keyname)
+        trades = eval(meta.CashDelta)
+        stockList = ['HBC','CME','GOOG','INTC']
+        tradeDict = {}
+        for stock in stockList:
+            tradeDict[stock] = {'P':0.0,'L':0.0,'Ptrades':[],'Ltrades':[]}
+        for trade in trades:
+            stock = trade['Symbol']
+            if trade['PandL'] != -10.0 and trade['PandL'] - 10.0 > 0.0:
+                tradeDict[stock]['P'] += trade['PandL'] - 10.0
+                tradeDict[stock]['Ptrades'].append(trade['PandL'] - 10.0)
+            elif trade['PandL'] != -10.0 and trade['PandL'] - 10.0 < 0.0:
+                tradeDict[stock]['L'] += trade['PandL'] - 10.0
+                tradeDict[stock]['Ltrades'].append(trade['PandL'] - 10.0)
+        for stock in tradeDict:
+            #meanP = sum(tradeDict[stock]['Ptrades'])/len(tradeDict[stock]['Ptrades'])
+            stdDevP, meanP = processDesires.getStandardDeviation(tradeDict[stock]['Ptrades'])
+            #meanL = sum(tradeDict[stock]['Ltrades'])/len(tradeDict[stock]['Ltrades'])
+            stdDevL, meanL = processDesires.getStandardDeviation(tradeDict[stock]['Ltrades'])
+            print stock, ':', tradeDict[stock]['P'], ':', max(tradeDict[stock]['Ptrades']),
+            print ':', len(tradeDict[stock]['Ptrades']), ':', meanP, ' stdDev:', stdDevP
+            print stock, ':', tradeDict[stock]['L'], ':', min(tradeDict[stock]['Ltrades']),
+            print ':', len(tradeDict[stock]['Ltrades']), ':', meanL, ' stdDev:', stdDevL
+    finally:
+        namespace_manager.set_namespace(originalNamespace)
+
 def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, metaModel = meSchema.metaAlg, Vs = None):
     namespace = namespace_manager.get_namespace()
     if namespace == '':
