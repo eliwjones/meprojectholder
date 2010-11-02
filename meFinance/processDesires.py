@@ -93,7 +93,7 @@ def doStops(step, statDict, alginfo, stopRange):
     for pos in statDict['Positions']:
         stckID = meSchema.getStckID(pos)
         stckDeltas = calculateDeltas(stckID,step)
-        stdDev, mean = getStandardDeviation(stckDeltas[1:])
+        stdDev, mean = getStandardDeviation(stckDeltas['1'][1:])
         
         ''' Taking out random selection code.
         n = len(stckDeltas) - 2
@@ -108,7 +108,7 @@ def doStops(step, statDict, alginfo, stopRange):
                                        Quote = stckQuote,
                                        CueKey = '0000')
         dictDesire = convertDesireToDict(offsetDesire, -1*longshort, alginfo.TradeSize, alginfo.Cash, -1*shares)
-        if abs(stckDeltas[0]-mean) > stdDev:
+        if abs(stckDeltas['1'][0]-mean) > stdDev:
             if statDict['Positions'][pos]['Step'] < step - stopRange:
                 stopDesires.append(dictDesire)
         '''
@@ -144,22 +144,25 @@ def getStandardDeviation(stckDeltas):
 
 def calculateDeltas(stckID, step):
     stckKeyList = []
-    # Create list of stckKeys starting from current step and going backwards to 400 steps.
-    #   stckKeyList ~ ['1_1300', '1_1299', ..., '1_900'] for stckID =1 and step=1300
-    # Trying with daily checks over past 4 weeks.
-    for i in range(0,1601,80):
+    # Now creating deltaLists of 1, 2, and 3 day percent changes.
+    # Create list of stckKeys starting from current step and going backwards to 1600 steps.
+    #   stckKeyList ~ ['1_2300', '1_2220', ..., '1_700'] for stckID = 1 and step = 2300
+    for i in range(0,2321,80):
         keyStep = step - i
         if keyStep > 0:
             stckKey = str(stckID) + '_' + str(keyStep)
             stckKeyList.append(stckKey)
     stockQuotes = memGetStcks(stckKeyList)
-    deltaList = []
-    for i in range(len(stockQuotes)-1):
-        if stockQuotes[i] is not None and stockQuotes[i+1] is not None and float(stockQuotes[i].quote) != 0.0 and float(stockQuotes[i+1].quote) != 0.0:
-            medelta = (stockQuotes[i].quote - float(stockQuotes[i+1].quote))/float(stockQuotes[i+1].quote)
-        else:
-            medelta = 0.0
-        deltaList.append(medelta)
+    deltaList = {'1':[], '2':[], '3':[], '4':[]}
+    for i in range(len(stockQuotes) - len(deltaList)):
+        for j in range(1, len(deltaList)+1):
+            if stockQuotes[i] is not None and stockQuotes[i+j] is not None and float(stockQuotes[i].quote) != 0.0 and float(stockQuotes[i+j].quote) != 0.0:
+                medelta = (stockQuotes[i].quote - float(stockQuotes[i+j].quote))/float(stockQuotes[i+j].quote)
+            else:
+                medelta = 0.0
+            deltaList[str(j)].append(medelta)
+    for k in deltaList:
+        deltaList[k].sort()
     return deltaList
 
 def memGetStcks(stckKeyList):
