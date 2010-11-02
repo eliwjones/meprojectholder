@@ -106,12 +106,14 @@ def playThatGame(startStep, stopStep, metaKeys, metaMeta = False):
         else:
             lastStep = stopStep
         if currentStep < lastStep:
+            ''' Skipping cash change since 100000 cash level seems important for averaging in.
             if originalNamespace != '':
                 metaAlgInfo = liveAlg.processStepRangeDesires(currentStep, lastStep, bestAlgs, metaAlgInfo, 25000.00, 0.85)
                 metaAlgInfo = liveAlg.getCurrentReturn(metaAlgInfo, lastStep, 25000.00)
-            else:
-                metaAlgInfo = liveAlg.processStepRangeDesires(currentStep, lastStep, bestAlgs, metaAlgInfo)
-                metaAlgInfo = liveAlg.getCurrentReturn(metaAlgInfo, lastStep)
+            else: '''
+            metaAlgInfo = liveAlg.processStepRangeDesires(currentStep, lastStep, bestAlgs, metaAlgInfo)
+            metaAlgInfo = liveAlg.getCurrentReturn(metaAlgInfo, lastStep)
+            
             metaAlgInfo = addLiveAlgTechne(metaAlgInfo, bestLiveAlgInfo)
             currentStep = lastStep + 1
     putList = []
@@ -288,10 +290,10 @@ def outputPLstats(keyname, namespace = ''):
             tradeDict[stock] = {'P':0.0,'L':0.0,'Ptrades':[],'Ltrades':[]}
         for trade in trades:
             stock = trade['Symbol']
-            if trade['PandL'] != -10.0 and trade['PandL'] - 10.0 > 0.0:
+            if not (trade['PandL'] <= -10.0 and trade['PandL'] >= -14.0) and trade['PandL'] - 10.0 > 0.0:
                 tradeDict[stock]['P'] += trade['PandL'] - 10.0
                 tradeDict[stock]['Ptrades'].append(trade['PandL'] - 10.0)
-            elif trade['PandL'] != -10.0 and trade['PandL'] - 10.0 < 0.0:
+            elif not (trade['PandL'] <= -10.0 and trade['PandL'] >= -14.0) and trade['PandL'] - 10.0 < 0.0:
                 tradeDict[stock]['L'] += trade['PandL'] - 10.0
                 tradeDict[stock]['Ltrades'].append(trade['PandL'] - 10.0)
         for stock in tradeDict:
@@ -311,7 +313,8 @@ def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, metaModel = meSchema
     if namespace == '':
         Cash = 100000.0
     else:
-        Cash = 25000.0
+        #Cash = 25000.0
+        Cash = 100000.0
     if Vs is None:
         #Vs = ['V' + str(i).rjust(3,'0') for i in range(1,101)]
         Vs = ['V' + str(i).rjust(3,'0') for i in range(1,2)]
