@@ -84,6 +84,8 @@ def getAlgQueryStr(alphaAlg='0',omegaAlg='999999'):
        price:  price when position was entered.
        value:  shares*price for convenience.
        step:   last step when position was modified.
+       stopLoss: quote used to close out potentially for loss. Default = -10%
+       stopProfit: quote used to close out hopefully for profit. Default = +16%
 '''
 
 def mergePosition(desire,positions,step):
@@ -124,10 +126,19 @@ def mergePosition(desire,positions,step):
                 positions[pos]['Step'] = step
         else:
             cash += -abs(desire[pos]['Value'])
-            positions[pos] = {'Shares' : float(desire[pos]['Shares']),
-                              'Price'  : desire[pos]['Price'],
-                              'Value'  : desire[pos]['Value'],
-                              'Step'   : step}
+            longshort = cmp(desire[pos]['Shares'],0)
+            if longshort == -1:
+                stopLoss = desire[pos]['Price']*1.1
+                stopProfit = desire[pos]['Price']*0.84
+            elif longshort == 1:
+                stopLoss = desire[pos]['Price']*0.9
+                stopProfit = desire[pos]['Price']*1.16
+            positions[pos] = {'Shares'     : float(desire[pos]['Shares']),
+                              'Price'      : desire[pos]['Price'],
+                              'Value'      : desire[pos]['Value'],
+                              'Step'       : step,
+                              'StopLoss'   : stopLoss,
+                              'StopProfit' : stopProfit}
         commission = max(10.00, desire[pos]['Shares']*0.01)
         PandL -= commission
         cash -= commission

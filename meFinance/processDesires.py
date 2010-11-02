@@ -19,13 +19,6 @@ def updateAllAlgStats(alphaAlg=1,omegaAlg=10620):
 def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_"):
     lastStep = stopStep
     alginfo = meSchema.memGet(meSchema.meAlg,algKey)
-    # Not using this.. want to leave backtTestReturn level at .25 TradeSize.
-    '''
-    if namespace != '':
-        # If using stock namespace, set Cash to fraction equal to tradesize and TradeSize = 100%
-        alginfo.Cash = alginfo.Cash*alginfo.TradeSize
-        alginfo.TradeSize = 1.0
-        '''
     desires = liveAlg.getStepRangeAlgDesires(algKey, alginfo, startStep, stopStep)
     stats = resetAlgstats(memprefix, alginfo.Cash, int(algKey), int(algKey))[memprefix + algKey]
     buydelta = meSchema.memGet(meSchema.tradeCue,alginfo.BuyCue).TimeDelta
@@ -77,9 +70,6 @@ def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_
     return bTestReturns
 
 def doStops(step, statDict, alginfo, stopRange):
-    # Use desireFunc.memGetStcks(stckKeyList) to get stock values for last N steps
-    # for each stckID and step in N, calculate percentReturns for (step, step-1)
-    # This should give recent range of single step percentReturns.
     from random import random
     stopDesires = []
     stckKeys = [str(stckID) + '_' + str(step) for stckID in [1,2,3,4]]
@@ -93,14 +83,7 @@ def doStops(step, statDict, alginfo, stopRange):
     for pos in statDict['Positions']:
         stckID = meSchema.getStckID(pos)
         stckDeltas = calculateDeltas(stckID,step)
-        stdDev, mean = getStandardDeviation(stckDeltas['1'][1:])
-        
-        ''' Taking out random selection code.
-        n = len(stckDeltas) - 2
-        r = random()
-        index = int(round(n*r)) + 1                                # Don't want to choose 0 index.
-        choose = stckDeltas[index]
-        '''
+        stdDev, mean = getStandardDeviationMean(stckDeltas['1'][1:])
         shares = statDict['Positions'][pos]['Shares']
         longshort = cmp(shares,0)                                  # -1 for short, +1 for long
         stckQuote = stckQuotes[pos]
@@ -108,10 +91,19 @@ def doStops(step, statDict, alginfo, stopRange):
                                        Quote = stckQuote,
                                        CueKey = '0000')
         dictDesire = convertDesireToDict(offsetDesire, -1*longshort, alginfo.TradeSize, alginfo.Cash, -1*shares)
+        # Stuff stckDeltas['1'] through stckDeltas['4'] into appropriate negDeltas, posDeltas lists.
+        # Calculate stdDev and mean for each list.
+        # If longshort ==  1, stopLoss = max(statDict['Positions'][pos]['StopLoss'], stckQuote*Min(1 + (negDev-negMean)))
+        #                   stopProfit = min(statDict['Positions'][pos]['StopProfit'], stckQuote*Max(1 + (posDev+posMean)))
+        # If longshort == -1, stopLoss = min(statDict['Positions'][pos]['StopLoss'], stckQuote*Max(1 + (posDev+posMean)))
+        #                   stopProfit = max(statDict['Positions'][pos]['StopProfit'], stckQuote*Min(1 + (negDev-negMean))
+        ### Before updating Positions with new StopLoss, StopProfit data.. check if existing stops have been hit.
+        ''' # No longer using this method.
         if abs(stckDeltas['1'][0]-mean) > stdDev:
             if statDict['Positions'][pos]['Step'] < step - stopRange:
                 stopDesires.append(dictDesire)
         '''
+        ''' # Old Old method here for temporary reference.
         if (longshort == 1 and choose < stckDeltas[0]) or (longshort == -1 and choose > stckDeltas[0]):
             # Possibly consider looking at whether choose is simply negative or positive.
             # Must make sure this position wasn't modified within the stopRange.
@@ -124,7 +116,7 @@ def doStops(step, statDict, alginfo, stopRange):
         Symbol = eval(stop).keys()[0]
         buysell = cmp(eval(stop)[Symbol]['Shares'], 0)
         statDict['CashDelta'].appendleft({'Symbol'  : Symbol,
-                                          'buysell' : 'stop',
+                                          'buysell' : str(buysell) + '_stop',
                                           'value'   : tradeCash,
                                           'PandL'   : PandL,
                                           'step'    : step})
@@ -135,11 +127,11 @@ def doStops(step, statDict, alginfo, stopRange):
         statDict['Positions'] = position
     return statDict
 
-def getStandardDeviation(stckDeltas):
+def getStandardDeviationMean(stckDeltas):
     from math import sqrt
     mean = sum(stckDeltas)/float(len(stckDeltas))
     deviationList = [(p-mean)**2 for p in stckDeltas]
-    stdDev = sqrt(sum(deviationList)/float(len(deviationList)))
+    stdDev = sqrt(sum(deviationList)/float(len(deviationList)-1)) # Using Sample Standard Deviation method.
     return stdDev, mean
 
 def calculateDeltas(stckID, step):
