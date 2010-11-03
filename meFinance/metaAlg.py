@@ -298,9 +298,9 @@ def outputPLstats(keyname, namespace = ''):
                 tradeDict[stock]['Ltrades'].append(trade['PandL'] - 10.0)
         for stock in tradeDict:
             #meanP = sum(tradeDict[stock]['Ptrades'])/len(tradeDict[stock]['Ptrades'])
-            stdDevP, meanP = processDesires.getStandardDeviation(tradeDict[stock]['Ptrades'])
+            stdDevP, meanP = processDesires.getStandardDeviationMean(tradeDict[stock]['Ptrades'])
             #meanL = sum(tradeDict[stock]['Ltrades'])/len(tradeDict[stock]['Ltrades'])
-            stdDevL, meanL = processDesires.getStandardDeviation(tradeDict[stock]['Ltrades'])
+            stdDevL, meanL = processDesires.getStandardDeviationMean(tradeDict[stock]['Ltrades'])
             print stock, ':', tradeDict[stock]['P'], ':', max(tradeDict[stock]['Ptrades']),
             print ':', len(tradeDict[stock]['Ptrades']), ':', meanP, ' stdDev:', stdDevP
             print stock, ':', tradeDict[stock]['L'], ':', min(tradeDict[stock]['Ltrades']),
