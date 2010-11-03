@@ -83,7 +83,7 @@ def doStops(step, statDict, alginfo, stopRange):
     for pos in statDict['Positions']:
         stckID = meSchema.getStckID(pos)
         stckDeltas = calculateDeltas(stckID,step)
-        stdDev, mean = getStandardDeviationMean(stckDeltas['1'][1:])
+        # stdDev, mean = getStandardDeviationMean(stckDeltas['1'][1:])
         shares = statDict['Positions'][pos]['Shares']
         longshort = cmp(shares,0)                                  # -1 for short, +1 for long
         stckQuote = stckQuotes[pos]
@@ -157,6 +157,12 @@ def getMaxMinDevMeans(stckDeltas):
 
 def getStandardDeviationMean(stckDeltas):
     from math import sqrt
+    mean = 0.0
+    stdDev = 0.0
+    if len(stckDeltas) == 1:
+        return stckDeltas[0], mean
+    elif len(stckDeltas) == 0:
+        return stdDev, mean
     mean = sum(stckDeltas)/float(len(stckDeltas))
     deviationList = [(p-mean)**2 for p in stckDeltas]
     stdDev = sqrt(sum(deviationList)/float(len(deviationList)-1)) # Using Sample Standard Deviation method.

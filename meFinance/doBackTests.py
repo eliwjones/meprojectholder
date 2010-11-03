@@ -66,12 +66,11 @@ class doBackTestBatch(webapp.RequestHandler):
         namespace = str(self.request.get('namespace'))
         backTestBatch(algBatch, monthBatch, stopStep, namespace)
 
-def addTaskRange(initialStopStep, globalStop, unique, namespace):
+def addTaskRange(initialStopStep, globalStop, unique, namespace, batchSize=5):
     from google.appengine.api import namespace_manager
     namespace_manager.set_namespace('')
     startAlg = 1
     stopAlg = 3540
-    batchSize = 5
     for i in range(initialStopStep, globalStop+1, 400):
         stopStep = i
         stepRange = [stopStep - 1600]
@@ -128,7 +127,7 @@ def runBackTests(alglist, stop, batchSize = 5, stepRange=None, uniquifier='', na
             batchTaskAdd(batchName, algBatch, monthList, stop, namespace)
             algBatch = []
     if len(algBatch) > 0:
-        batchName = str(algBatch[0]) + '-' + str(algBatch[-1]) + '-' + str(monthList[0]) + '-' + str(monthlist[-1]) + '-' + str(stop) + '-' + uniquifier
+        batchName = str(algBatch[0]) + '-' + str(algBatch[-1]) + '-' + str(monthList[0]) + '-' + str(monthList[-1]) + '-' + str(stop) + '-' + uniquifier
         batchTaskAdd(batchName, algBatch, monthList, stop, namespace)
         algBatch = []
     keylist = []
