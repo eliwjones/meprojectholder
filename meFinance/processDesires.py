@@ -91,25 +91,32 @@ def doStops(step, statDict, alginfo, stopRange):
                                        Quote = stckQuote,
                                        CueKey = '0000')
         dictDesire = convertDesireToDict(offsetDesire, -1*longshort, alginfo.TradeSize, alginfo.Cash, -1*shares)
-        # Stuff stckDeltas['1'] through stckDeltas['4'] into appropriate negDeltas, posDeltas lists.
-        # Calculate stdDev and mean for each list.
-        # If longshort ==  1, stopLoss = max(statDict['Positions'][pos]['StopLoss'], stckQuote*Min(1 + (negDev-negMean)))
-        #                   stopProfit = min(statDict['Positions'][pos]['StopProfit'], stckQuote*Max(1 + (posDev+posMean)))
-        # If longshort == -1, stopLoss = min(statDict['Positions'][pos]['StopLoss'], stckQuote*Max(1 + (posDev+posMean)))
-        #                   stopProfit = max(statDict['Positions'][pos]['StopProfit'], stckQuote*Min(1 + (negDev-negMean))
+        maxPosDevMean, minNegDevMean = getMaxMinDevMeans(stckDeltas)
+        
+        ### Can either use max() on StopProfit for long positions.. which lets StopProfit float upwards,
+        ###   or use min() which will squeeze StopLoss and StopProfit together.  (Do reverse for short positions.)
+        # If longshort ==  1, stopLoss = max(statDict['Positions'][pos]['StopLoss'], stckQuote*minNegDevMean)
+        #                   stopProfit = min(statDict['Positions'][pos]['StopProfit'], stckQuote*maxPosDevMean)
+        # If longshort == -1, stopLoss = min(statDict['Positions'][pos]['StopLoss'], stckQuote*maxPosDevMean)
+        #                   stopProfit = max(statDict['Positions'][pos]['StopProfit'], stckQuote*minNegDevMean)
         ### Before updating Positions with new StopLoss, StopProfit data.. check if existing stops have been hit.
-        ''' # No longer using this method.
-        if abs(stckDeltas['1'][0]-mean) > stdDev:
-            if statDict['Positions'][pos]['Step'] < step - stopRange:
+
+        stopLoss = statDict['Positions'][pos]['StopLoss']
+        stopProfit = statDict['Positions'][pos]['StopProfit']
+        if longshort == 1:
+            if stckQuote < stopLoss or stckQuote > stopProfit:
                 stopDesires.append(dictDesire)
-        '''
-        ''' # Old Old method here for temporary reference.
-        if (longshort == 1 and choose < stckDeltas[0]) or (longshort == -1 and choose > stckDeltas[0]):
-            # Possibly consider looking at whether choose is simply negative or positive.
-            # Must make sure this position wasn't modified within the stopRange.
-            if statDict['Positions'][pos]['Step'] < step - stopRange:
+            else:
+                stopLoss = max(statDict['Positions'][pos]['StopLoss'], stckQuote*minNegDevMean)
+                stopProfit = min(statDict['Positions'][pos]['StopProfit'], stckQuote*maxPosDevMean)
+        elif longshort == -1:
+            if stckQuote > stopLoss or stckQuote < stopProfit:
                 stopDesires.append(dictDesire)
-        '''
+            else:
+                stopLoss = min(statDict['Positions'][pos]['StopLoss'], stckQuote*maxPosDevMean)
+                stopProfit = max(statDict['Positions'][pos]['StopProfit'], stckQuote*minNegDevMean)
+        statDict['Positions'][pos]['StopLoss'] = stopLoss
+        statDict['Positions'][pos]['StopProfit'] = stopProfit
     for stop in stopDesires:
         tradeCash, PandL, position = princeFunc.mergePosition(eval(stop), eval(repr(statDict['Positions'])), step)
         cash = tradeCash + eval(repr(statDict['Cash']))
@@ -126,6 +133,27 @@ def doStops(step, statDict, alginfo, stopRange):
         statDict['PandL'] += PandL
         statDict['Positions'] = position
     return statDict
+
+def getMaxMinDevMeans(stckDeltas):
+    negDeltas = {}
+    posDeltas = {}
+    negDevMeans = []
+    posDevMeans = []
+    for key in stckDeltas:
+        negDeltas[key] = []
+        posDeltas[key] = []
+        for i in range(len(stckDeltas[key])):
+            if stckDeltas[key][i] > 0.0:
+                posDeltas[key].append(stckDeltas[key][i])
+            elif stckDeltas[key][i] < 0.0:
+                negDeltas[key].append(stckDeltas[key][i])
+        negDev, negMean = getStandardDeviationMean(negDeltas[key])
+        posDev, posMean = getStandardDeviationMean(posDeltas[key])
+        negDevMeans.append(negMean - negDev)
+        posDevMeans.append(posMean + posDev)
+    maxPosDevMean = 1 + max(posDevMeans)
+    minNegDevMean = 1 + min(negDevMeans)
+    return maxPosDevMean, minNegDevMean
 
 def getStandardDeviationMean(stckDeltas):
     from math import sqrt
