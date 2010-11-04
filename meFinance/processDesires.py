@@ -91,7 +91,10 @@ def doStops(step, statDict, alginfo, stopRange):
                                        Quote = stckQuote,
                                        CueKey = '0000')
         dictDesire = convertDesireToDict(offsetDesire, -1*longshort, alginfo.TradeSize, alginfo.Cash, -1*shares)
-        maxPosDevMean, minNegDevMean = getMaxMinDevMeans(stckDeltas)
+        #maxPosDevMean, minNegDevMean = getMaxMinDevMeans(stckDeltas)
+        
+        # Using maxDev, minDev to scale down StopProfit slightly to increase odds of P.
+        maxPosDevMean, minNegDevMean, maxDev, minDev = getMaxMinDevMeansV2(stckDeltas)
         
         ### Can either use max() on StopProfit for long positions.. which lets StopProfit float upwards,
         ###   or use min() which will squeeze StopLoss and StopProfit together.  (Do reverse for short positions.)
@@ -108,17 +111,19 @@ def doStops(step, statDict, alginfo, stopRange):
                 stopDesires.append(dictDesire)
             else:
                 stopLoss = max(statDict['Positions'][pos]['StopLoss'], stckQuote*minNegDevMean)
-                stopProfit = min(statDict['Positions'][pos]['StopProfit'], stckQuote*maxPosDevMean)
+                if stopProfit > 1.15*statDict['Positions'][pos]['Price']:
+                    stopProfit = min(statDict['Positions'][pos]['StopProfit'], stckQuote*(maxPosDevMean - 0.5*maxDev))
         elif longshort == -1:
             if stckQuote > stopLoss or stckQuote < stopProfit:
                 stopDesires.append(dictDesire)
             else:
                 stopLoss = min(statDict['Positions'][pos]['StopLoss'], stckQuote*maxPosDevMean)
-                stopProfit = max(statDict['Positions'][pos]['StopProfit'], stckQuote*minNegDevMean)
+                if stopProfit < 0.85*statDict['Positions'][pos]['Price']:
+                    stopProfit = max(statDict['Positions'][pos]['StopProfit'], stckQuote*(minNegDevMean + 0.5*minDev))
         statDict['Positions'][pos]['StopLoss'] = stopLoss
         statDict['Positions'][pos]['StopProfit'] = stopProfit
     for stop in stopDesires:
-        tradeCash, PandL, position = princeFunc.mergePosition(eval(stop), eval(repr(statDict['Positions'])), step)
+        tradeCash, PandL, position = princeFunc.mergePosition(eval(stop), eval(repr(statDict['Positions'])), step, True)
         cash = tradeCash + eval(repr(statDict['Cash']))
         Symbol = eval(stop).keys()[0]
         buysell = cmp(eval(stop)[Symbol]['Shares'], 0)
@@ -154,6 +159,31 @@ def getMaxMinDevMeans(stckDeltas):
     maxPosDevMean = 1 + max(posDevMeans)
     minNegDevMean = 1 + min(negDevMeans)
     return maxPosDevMean, minNegDevMean
+
+def getMaxMinDevMeansV2(stckDeltas):
+    # Used to get general max min expected deviations from mean.
+    negDevMeans = []
+    posDevMeans = []
+    for key in stckDeltas:
+        dev,mean = getStandardDeviationMean(stckDeltas[key])
+        negDevMeans.append([mean - dev, dev])
+        posDevMeans.append([mean + dev, dev])
+    maxDevMean = 0.0
+    for devMean in posDevMeans:
+        if devMean[0] > maxDevMean:
+            maxDevMean = devMean[0]
+            maxDev = devMean[1]
+    minDevMean = 100.0
+    for devMean in negDevMeans:
+        if devMean[0] < minDevMean:
+            minDevMean = devMean[0]
+            minDev = devMean[1]
+    maxDevMean = max(1 + maxDevMean, 1.01)
+    minDevMean = min(1 + minDevMean, 0.99)
+            
+    #maxDevMean = max(1 + max(posDevMeans), 1.01)  # Making sure the value is at least +1%
+    #minDevMean = min(1 + min(negDevMeans), 0.99)  #    or -1%
+    return maxDevMean, minDevMean, maxDev, minDev
 
 def getStandardDeviationMean(stckDeltas):
     from math import sqrt
