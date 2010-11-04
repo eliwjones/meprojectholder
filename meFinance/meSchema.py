@@ -130,6 +130,7 @@ class metaAlg(db.Model):
     numTrades     = db.IntegerProperty(required=True)
     history       = db.TextProperty(required=True)
     technique     = db.StringProperty(required=True)       # FTL method: Follow The Leader, Follow The Loser,
+    StockIDOrder  = db.TextProperty(required=False)        # default is [1,2,3,4] for [HBC,CME,GOOG,INTC]
 
 class metaAlgStat(db.Model):
     Min           = db.FloatProperty(required=True)

@@ -38,16 +38,16 @@ def doRangeOfBatches(globalStop, weeksBack, runLength, namespace, name):
 def doDeferredBatchAdd(startStep, stopStep, FTLlist, Rs, namespace, name, metaMeta):
     deferred.defer(taskAdd, startStep, stopStep, FTLlist, Rs, namespace, name, metaMeta)
 
-def taskAdd(startStep, stopStep, FTLlist, Rs, namespace, name, metaMeta):
+def taskAdd(startStep, stopStep, FTLlist, Rs, namespace, name, stckIDorder, metaMeta):
     tasklist = []
     namespace_manager.set_namespace(namespace)
     if metaMeta.lower() == 'true':
         metaModel = meSchema.metaMetaAlg
         Vs = ['V' + str(i).rjust(3,'0') for i in range(1,101)]
-        Vs = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, metaModel,Vs)
+        Vs = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, metaModel, Vs)
     else:
         metaModel = meSchema.metaAlg
-        Vs = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, metaModel)
+        Vs = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, stckIDorder, metaModel)
     technes = []
     for FTL in FTLlist:
         for R in Rs:
@@ -91,6 +91,11 @@ def playThatGame(startStep, stopStep, metaKeys, metaMeta = False):
         metaAlgInfo = getMetaAlgInfo(metaKeys, meSchema.metaMetaAlg)
     else:
         metaAlgInfo = getMetaAlgInfo(metaKeys, meSchema.metaAlg)
+        key = metaAlgInfo.keys()[0]
+        # Naively assuming all metaAlgs in batch have same StockIDOrder.
+        # Don't feel like munging liveAlg.py to check for prop and use there.
+        stckIDorder = eval(metaAlgInfo[key].StockIDOrder)
+        
     for i in range(len(stopStepList)):
         lastLiveAlgStop = stopStepList[i]
         if metaMeta:
@@ -111,7 +116,7 @@ def playThatGame(startStep, stopStep, metaKeys, metaMeta = False):
                 metaAlgInfo = liveAlg.processStepRangeDesires(currentStep, lastStep, bestAlgs, metaAlgInfo, 25000.00, 0.85)
                 metaAlgInfo = liveAlg.getCurrentReturn(metaAlgInfo, lastStep, 25000.00)
             else: '''
-            metaAlgInfo = liveAlg.processStepRangeDesires(currentStep, lastStep, bestAlgs, metaAlgInfo)
+            metaAlgInfo = liveAlg.processStepRangeDesires(currentStep, lastStep, bestAlgs, metaAlgInfo, stckIDorder)
             metaAlgInfo = liveAlg.getCurrentReturn(metaAlgInfo, lastStep)
             
             metaAlgInfo = addLiveAlgTechne(metaAlgInfo, bestLiveAlgInfo)
@@ -308,7 +313,7 @@ def outputPLstats(keyname, namespace = ''):
     finally:
         namespace_manager.set_namespace(originalNamespace)
 
-def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, metaModel = meSchema.metaAlg, Vs = None):
+def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, stckIDorder, metaModel = meSchema.metaAlg, Vs = None):
     namespace = namespace_manager.get_namespace()
     if namespace == '':
         Cash = 100000.0
@@ -323,6 +328,9 @@ def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, metaModel = meSchema
         for R in Rtype:
             for v in Vs:
                 keyname = str(startStep).rjust(7,'0') + '-' + str(stopStep).rjust(7,'0')  + '-' + FTL + '-' + R + '-' + v
+                keyname = keyname + '-'
+                for stckID in stckIDorder:
+                    keyname = keyname + str(stckID)
                 metaAlgKeys.append(keyname)
     metaAlgs = []
     for mAlgKey in metaAlgKeys:
@@ -334,7 +342,8 @@ def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, metaModel = meSchema
                             percentReturn = 0.0, Positions = repr({}),
                             PosVal = 0.0, PandL = 0.0, CashDelta = repr(deque([])),
                             Cash = Cash, numTrades = 0, history = repr(deque([])),
-                            technique = technique)
+                            technique = technique,
+                            StockIDOrder = repr(stckIDorder))
         metaAlgs.append(metaAlg)
     db.put(metaAlgs)
     return Vs

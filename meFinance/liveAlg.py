@@ -108,7 +108,7 @@ def getCurrentReturn(liveAlgInfo,stopStep, Cash = None):
     return liveAlgInfo
         
 
-def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, Cash = None, TradeSize = None):
+def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,3,4], Cash = None, TradeSize = None):
     originalNameSpace = namespace_manager.get_namespace()
     namespace_manager.set_namespace('')
     for liveAlgKey in bestAlgs:
@@ -142,10 +142,10 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, Cash = None, TradeS
                 liveAlgInfo[liveAlgKey].PandL     = stats['PandL']
                 liveAlgInfo[liveAlgKey].Cash      = stats['Cash']
             if originalNameSpace == '':
-                potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in [1,2,3,4]]
+                potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in stckIDorder]
             else:
                 potentialDesires = [meSchema.buildDesireKey(step, algKey, meSchema.getStckID(originalNameSpace))]
-            potentialDesires.sort()
+            # potentialDesires.sort()    # Not sorting so can use given stckID order.
             for key in potentialDesires:
                 if key in orderDesires:
                     currentDesire = eval(desires[key])
