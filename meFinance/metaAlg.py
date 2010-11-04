@@ -47,7 +47,8 @@ def taskAdd(startStep, stopStep, FTLlist, Rs, namespace, name, stckIDorder, meta
         Vs = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, metaModel, Vs)
     else:
         metaModel = meSchema.metaAlg
-        Vs = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, stckIDorder, metaModel)
+        keynames = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, stckIDorder, metaModel)
+    '''
     technes = []
     for FTL in FTLlist:
         for R in Rs:
@@ -57,6 +58,10 @@ def taskAdd(startStep, stopStep, FTLlist, Rs, namespace, name, stckIDorder, meta
             keyname = str(startStep).rjust(7,'0') + '-' + str(stopStep).rjust(7,'0')  + '-' + techne + '-' + v
             taskname = 'metaAlg-Calculator-' + name + '-' + keyname + '-' + namespace
             tasklist.append(taskCreate(startStep, stopStep, keyname, taskname, metaMeta))
+            '''
+    for keyname in keynames:
+        taskname = 'metaAlg-Calculator-' + name + '-' + keyname + '-' + namespace
+        tasklist.append(taskCreate(startStep, stopStep, keyname, taskname, metaMeta))
     try:
         batchAdd(tasklist)
     finally:
@@ -346,7 +351,8 @@ def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, stckIDorder, metaMod
                             StockIDOrder = repr(stckIDorder))
         metaAlgs.append(metaAlg)
     db.put(metaAlgs)
-    return Vs
+    #return Vs
+    return metaAlgKeys
 
 
 application = webapp.WSGIApplication([('/metaAlg/doMetaAlg', doMetaAlg)],
