@@ -1,11 +1,58 @@
 import meSchema
+import cachepy
 from google.appengine.api import memcache
 from google.appengine.ext import db
-import cachepy
+from google.appengine.ext import webapp
+from google.appengine.ext.webapp.util import run_wsgi_app
+from google.appengine.api.labs import taskqueue
 
 # New Desire calculation function.
 
+class doDesireStep(webapp.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.out.write('I calculate TradeCue Desires.')
+        
+    def post(self):
+        step = int(self.request.get('step'))
+        primecache = str(self.request.get('primecache'))
+        uniquifier = str(self.request.get('uniquifier'))
+        
+        globalstop = str(self.request.get('globalstop'))
+        doRange = False
+        if globalstop != '':
+            globalstop = int(globalstop)
+            doRange = True
+
+        if primecache.lower() == 'true':
+            primeDesireCache(step)
+            # Only want to prime cache on first step
+            # so set = 'false' to prevent thrashing.
+            primecache = 'false'
+        
+        doDesires(step)
+        
+        if doRange and step < globalstop:
+            step += 1
+            taskname = 'Desires-' + str(step) + '-' + uniquifier
+            taskAdd(taskname, step, globalstop, primecache, uniquifier)
+
 cvalDict = {}
+
+def taskAdd(taskname, step, globalstop, primecache, uniquifier, wait = .5):
+    try:
+        taskqueue.add(url = '/desire/doDesireStep', countdown = 0,
+                      name = taskname,
+                      params = {'step'       : step,
+                                'globalstop' : globalstop,
+                                'uniquifier' : uniquifier,
+                                'primecache' : primecache} )
+    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
+        pass
+    except:
+        from time import sleep
+        sleep(wait)
+        taskAdd(taskname, step, globalstop, uniquifier, 2*wait)
 
 def doDesires(step, startKey=1, stopKey=60):
     global cvalDict
@@ -130,7 +177,16 @@ def primeDesireCache(step):
             memdict[memkey] = step
         elif memdict[memkey] < step:
             memdict[memkey] = step
-    memcache.set_multi(memdict) 
+    memcache.set_multi(memdict)
+
+application = webapp.WSGIApplication([('/desire/doDesireStep',doDesireStep)],
+                                     debug = True)
+
+def main():
+    run_wsgi_app(application)
+
+if __name__ == "__main__":
+    main()
 
 
 

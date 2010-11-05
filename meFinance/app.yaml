@@ -38,6 +38,10 @@ handlers:
   script: doBackTests.py
   login: admin
 
+- url: /desire/.*
+  script: desireFunc.py
+  login: admin
+
 - url: /algorithms/go
   script: meAlgorithm.py
   login: admin
