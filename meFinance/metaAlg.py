@@ -42,26 +42,18 @@ def taskAdd(startStep, stopStep, FTLlist, Rs, namespace, name, stckIDorder, meta
     tasklist = []
     namespace_manager.set_namespace(namespace)
     if metaMeta.lower() == 'true':
+        # Not sure if want to keep metaMetaAlg around.
+        # Possibly useful if ever need to move between metaAlg R-vals.
         metaModel = meSchema.metaMetaAlg
-        Vs = ['V' + str(i).rjust(3,'0') for i in range(1,101)]
-        Vs = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, metaModel, Vs)
+        Vs = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, stckIDorder, metaModel)
     else:
         metaModel = meSchema.metaAlg
         keynames = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, stckIDorder, metaModel)
-    '''
-    technes = []
-    for FTL in FTLlist:
-        for R in Rs:
-            technes.append(FTL + '-' + R)
-    for techne in technes:
-        for v in Vs:
-            keyname = str(startStep).rjust(7,'0') + '-' + str(stopStep).rjust(7,'0')  + '-' + techne + '-' + v
-            taskname = 'metaAlg-Calculator-' + name + '-' + keyname + '-' + namespace
-            tasklist.append(taskCreate(startStep, stopStep, keyname, taskname, metaMeta))
-            '''
+        
     for keyname in keynames:
         taskname = 'metaAlg-Calculator-' + name + '-' + keyname + '-' + namespace
         tasklist.append(taskCreate(startStep, stopStep, keyname, taskname, metaMeta))
+        
     try:
         batchAdd(tasklist)
     finally:
@@ -89,26 +81,26 @@ def taskCreate(startStep, stopStep, metaKey, taskname, metaMeta):
 
 def playThatGame(startStep, stopStep, metaKeys, metaMeta = False):
     originalNamespace = namespace_manager.get_namespace()
-    
     currentStep = startStep
     stopStepList = buildStopStepList(startStep, stopStep)
     if metaMeta:
+        # Not sure about metaMetaAlg helpfulness.
         metaAlgInfo = getMetaAlgInfo(metaKeys, meSchema.metaMetaAlg)
     else:
         metaAlgInfo = getMetaAlgInfo(metaKeys, meSchema.metaAlg)
         key = metaAlgInfo.keys()[0]
-        # Naively assuming all metaAlgs in batch have same StockIDOrder.
-        # Don't feel like munging liveAlg.py to check for prop and use there.
         stckIDorder = eval(metaAlgInfo[key].StockIDOrder)
         
     for i in range(len(stopStepList)):
         lastLiveAlgStop = stopStepList[i]
         if metaMeta:
-            # Get technique for metaMetaAlgs based on probability of best technique.
+            # Again, not sure if want metaMetaAlg around anymore.
             metaAlgInfo = getMetaMetaTechnique(lastLiveAlgStop, metaAlgInfo)
-        # This will contain the liveAlg.technique that
-        # each metaAlg.technique likes.
-        # e.g. bestLiveAlgInfo['FTLe-R3'] = 'dnFTLo-R4'
+        '''
+          This will contain the liveAlg.technique that
+          each metaAlg.technique likes.
+          e.g. bestLiveAlgInfo['FTLe-R3'] = 'dnFTLo-R4'
+        '''
         bestLiveAlgInfo = getBestLiveAlgs(lastLiveAlgStop, metaAlgInfo)
         bestAlgs = liveAlg.getBestAlgs(lastLiveAlgStop, bestLiveAlgInfo)
         if i < len(stopStepList)-1:
@@ -116,14 +108,8 @@ def playThatGame(startStep, stopStep, metaKeys, metaMeta = False):
         else:
             lastStep = stopStep
         if currentStep < lastStep:
-            ''' Skipping cash change since 100000 cash level seems important for averaging in.
-            if originalNamespace != '':
-                metaAlgInfo = liveAlg.processStepRangeDesires(currentStep, lastStep, bestAlgs, metaAlgInfo, 25000.00, 0.85)
-                metaAlgInfo = liveAlg.getCurrentReturn(metaAlgInfo, lastStep, 25000.00)
-            else: '''
             metaAlgInfo = liveAlg.processStepRangeDesires(currentStep, lastStep, bestAlgs, metaAlgInfo, stckIDorder)
             metaAlgInfo = liveAlg.getCurrentReturn(metaAlgInfo, lastStep)
-            
             metaAlgInfo = addLiveAlgTechne(metaAlgInfo, bestLiveAlgInfo)
             currentStep = lastStep + 1
     putList = []
@@ -156,7 +142,6 @@ def getMetaMetaTechnique(stopStep, metaMetaAlgInfo):
 
 def getMetaAlgInfo(metaKeys, metaModel):
     metaAlgInfo = {}
-    #metaAlgs = meSchema.metaAlg.get_by_key_name(metaKeys)
     metaAlgs = metaModel.get_by_key_name(metaKeys)
     for alg in metaAlgs:
         metaAlgInfo[alg.key().name()] = alg
@@ -215,7 +200,6 @@ def outputStats(namespace, startStep, stopStep, metaModel = meSchema.metaAlg, sh
     print 'Start Step: ', startStep, ' Stop Step: ', stopStep, '  ',
     
     namespace_manager.set_namespace(namespace)
-    #metaAlgs = meSchema.metaAlg.all().filter('technique =', technique).filter('stopStep =', stopStep).filter('startStep =', startStep).fetch(500)
     metaAlgs = metaModel.all().filter('stopStep =', stopStep).filter('startStep =', startStep).fetch(500)
     meDict = {}
     for metaAlg in metaAlgs:
@@ -254,7 +238,6 @@ def outputStats(namespace, startStep, stopStep, metaModel = meSchema.metaAlg, sh
         else:
             Med = meDict[key][length/2]
         print 'Min: ', Min, 'Med: ', Med, 'Mean: ', Mean, 'Max: ', Max, '%Pos: ', posReturns/float(len(nums))
-        
     sumDict = {}
     totalSumDict = {'HBC': 0.0, 'CME': 0.0, 'GOOG': 0.0, 'INTC':0.0}
     for metaAlg in metaAlgs:
@@ -307,9 +290,7 @@ def outputPLstats(keyname, namespace = ''):
                 tradeDict[stock]['L'] += trade['PandL'] - 10.0
                 tradeDict[stock]['Ltrades'].append(trade['PandL'] - 10.0)
         for stock in tradeDict:
-            #meanP = sum(tradeDict[stock]['Ptrades'])/len(tradeDict[stock]['Ptrades'])
             stdDevP, meanP = processDesires.getStandardDeviationMean(tradeDict[stock]['Ptrades'])
-            #meanL = sum(tradeDict[stock]['Ltrades'])/len(tradeDict[stock]['Ltrades'])
             stdDevL, meanL = processDesires.getStandardDeviationMean(tradeDict[stock]['Ltrades'])
             print stock, ':', tradeDict[stock]['P'], ':', max(tradeDict[stock]['Ptrades']),
             print ':', len(tradeDict[stock]['Ptrades']), ':', meanP, ' stdDev:', stdDevP
@@ -319,14 +300,8 @@ def outputPLstats(keyname, namespace = ''):
         namespace_manager.set_namespace(originalNamespace)
 
 def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, stckIDorder, metaModel = meSchema.metaAlg, Vs = None):
-    namespace = namespace_manager.get_namespace()
-    if namespace == '':
-        Cash = 100000.0
-    else:
-        #Cash = 25000.0
-        Cash = 100000.0
+    Cash = 100000.0
     if Vs is None:
-        #Vs = ['V' + str(i).rjust(3,'0') for i in range(1,101)]
         Vs = ['V' + str(i).rjust(3,'0') for i in range(1,2)]
     metaAlgKeys = []
     for FTL in FTLtype:
@@ -351,7 +326,6 @@ def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, stckIDorder, metaMod
                             StockIDOrder = repr(stckIDorder))
         metaAlgs.append(metaAlg)
     db.put(metaAlgs)
-    #return Vs
     return metaAlgKeys
 
 
