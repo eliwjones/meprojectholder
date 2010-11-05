@@ -32,10 +32,6 @@ def calculateWeeklyLiveAlgs(stopStep, stepRange, namespace, name = ''):
     namespace_manager.set_namespace('')
     alginfo = meSchema.memGet(meSchema.meAlg, meSchema.buildAlgKey(1))
     namespace_manager.set_namespace(namespace)
-    '''
-    if namespace != '':
-        Cash = alginfo.Cash*alginfo.TradeSize
-    else: '''
     Cash = alginfo.Cash
     initializeLiveAlgs(stopStep,stepRange, Cash)
     # Get liveAlgs and branch out the different FTL, dnFTL Ntypes.
@@ -108,24 +104,12 @@ def getCurrentReturn(liveAlgInfo,stopStep, Cash = None):
     return liveAlgInfo
         
 
-def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,3,4], Cash = None, TradeSize = None):
+def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,3,4]):
     originalNameSpace = namespace_manager.get_namespace()
     namespace_manager.set_namespace('')
     for liveAlgKey in bestAlgs:
         algKey = bestAlgs[liveAlgKey]
         alginfo = meSchema.memGet(meSchema.meAlg,algKey)
-        # Don't want to munge .Cash, .TradeSize except for with metaAlg.
-        
-        if Cash is not None and TradeSize is not None:
-            algCash = Cash*(1.0 + liveAlgInfo[liveAlgKey].percentReturn)
-            alginfo.Cash = algCash
-            alginfo.TradeSize = 0.95
-            history = eval(liveAlgInfo[liveAlgKey].history)
-            if len(history) != 0:
-                history[0]['Cash'] = alginfo.Cash
-                liveAlgInfo[liveAlgKey].history = repr(history)
-            #alginfo.Cash = Cash
-            #alginfo.TradeSize = TradeSize
         desires = getStepRangeAlgDesires(algKey,alginfo,start,stop)
         buydelta = meSchema.memGet(meSchema.tradeCue,alginfo.BuyCue).TimeDelta
         selldelta = meSchema.memGet(meSchema.tradeCue,alginfo.SellCue).TimeDelta
@@ -135,6 +119,21 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,
         for step in range(start, stop+1):
             stopRange = 80
             if (step - start - 44)%stopRange==0:
+                '''
+                    Makes sure to doStops() once a day during midday.
+                    At the moment, this only works for algorithms done
+                    in batches that have a range of start, stop steps.
+
+                    No use for processing a single step since step-start
+                    will always = 0.
+
+                    Possibly consider something like:
+                      step - (min(start,ZeroDayWed) - 44) % stopRange
+
+                    Thus, if start date happened before ZeroDayWed, then
+                    do calculation as before.  Otherwise, steps should
+                    be consistent if compared to fixed day.
+                '''
                 stats = convertLiveAlgInfoToStatDict(liveAlgInfo[liveAlgKey])
                 stats = processDesires.doStops(step, stats, alginfo, stopRange)
                 liveAlgInfo[liveAlgKey].CashDelta = repr(stats['CashDelta'])
@@ -145,7 +144,6 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,
                 potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in stckIDorder]
             else:
                 potentialDesires = [meSchema.buildDesireKey(step, algKey, meSchema.getStckID(originalNameSpace))]
-            # potentialDesires.sort()    # Not sorting so can use given stckID order.
             for key in potentialDesires:
                 if key in orderDesires:
                     currentDesire = eval(desires[key])
@@ -176,7 +174,6 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,
                         liveAlgInfo[liveAlgKey].Cash      = cash
                         liveAlgInfo[liveAlgKey].PandL    += PandL
                         liveAlgInfo[liveAlgKey].Positions = repr(position)
-                #liveAlgInfo[liveAlgKey].lastStep  = stop
     namespace_manager.set_namespace(originalNameSpace)
     return liveAlgInfo
 
@@ -211,13 +208,10 @@ def getBestAlgs(stopStep, liveAlgInfo):
 
 def getTopAlg(stopStep, startStep, technique):
     query = meSchema.backTestResult.all(keys_only = True).filter("stopStep =", stopStep).filter("startStep =", startStep)
-    # get -NR  value.. add filter("N =", Nvalue) for N val..
     NRval = technique.split('-')[-1]
     if NRval.find('N') != -1:
         N = int(NRval.replace('N',''))
         query = query.filter("N =", N)
-    # if technique contains 'FTLe-', orderBy = '-percentReturn' unless NRval.find('R') != -1, then orderBy = '-' + NRval
-    # if technique contains 'FTLo-', orderBY = 'percentReturn' unless NRval.find('R') != -1, then orderBy = NRval
     if technique.find('FTLe-') != -1:
         if NRval.find('R') != -1 and NRval != "R1":
             orderBy = '-' + NRval
@@ -228,30 +222,19 @@ def getTopAlg(stopStep, startStep, technique):
             orderBy = NRval
         else:
             orderBy = 'percentReturn'
-    #topAlg = query.order(orderBy).get()
     query = query.order(orderBy)
-    #memKey = str(dumps(query).__hash__())
-    #topAlg = memcache.get(memKey)
-    #if topAlg is None:
     topAlg = query.get()
-    #    memcache.set(memKey, topAlg)
     bestAlgKey = topAlg.name().split('_')[0]    # meAlg key is just first part of backTestResult key_name.
-    # if technique contains 'dnFTL', bestAlg = opposite alg.
     if technique.find('dnFTL') != -1:
         bestAlgKey = getOppositeAlg(bestAlgKey)
     return bestAlgKey
 
 def getOppositeAlg(meAlgKey):
-    #meAlg = meSchema.meAlg.get_by_key_name(meAlgKey)
     originalNameSpace = namespace_manager.get_namespace()
     namespace_manager.set_namespace('')
     meAlg = meSchema.memGet(meSchema.meAlg, meAlgKey)
     query = meSchema.meAlg.all(keys_only = True).filter("BuyCue =", meAlg.SellCue).filter("SellCue =", meAlg.BuyCue)
-    #memKey = str(dumps(query).__hash__())
-    #oppositeAlg = memcache.get(memKey)
-    #if oppositeAlg is None:
     oppositeAlg = query.get()
-    #    memcache.set(memKey, oppositeAlg)
     oppositeAlgKey = oppositeAlg.name()
     namespace_manager.set_namespace(originalNameSpace)
     return oppositeAlgKey
@@ -268,7 +251,6 @@ def getStepRangeAlgDesires(algKey, alginfo, startStep,stopStep):
     buyList = []
     sellList = []
     desireDict = {}
-    #alginfo = meSchema.memGet(meSchema.meAlg, algKey)    # passing in alginfo.
     buyCue = alginfo.BuyCue
     sellCue = alginfo.SellCue
     buyStartKey = meSchema.buildDesireKey(startStep,buyCue,0)
@@ -279,10 +261,6 @@ def getStepRangeAlgDesires(algKey, alginfo, startStep,stopStep):
     sellStopKey = meSchema.buildDesireKey(stopStep,sellCue,99)
     sellQuery  = "Select * From desire Where CueKey = '%s' " % (sellCue)
     sellQuery += " AND __key__ >= Key('desire','%s') AND __key__ <= Key('desire','%s')" % (sellStartKey,sellStopKey)
-    '''
-    buyList = db.GqlQuery(buyQuery).fetch(1000)
-    sellList = db.GqlQuery(sellQuery).fetch(1000)
-    '''
     buyList = meSchema.cachepy.get(buyQuery)
     if buyList is None:
         buyList = memcache.get(buyQuery)

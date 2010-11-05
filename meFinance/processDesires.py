@@ -83,7 +83,6 @@ def doStops(step, statDict, alginfo, stopRange):
     for pos in statDict['Positions']:
         stckID = meSchema.getStckID(pos)
         stckDeltas = calculateDeltas(stckID,step)
-        # stdDev, mean = getStandardDeviationMean(stckDeltas['1'][1:])
         shares = statDict['Positions'][pos]['Shares']
         longshort = cmp(shares,0)                                  # -1 for short, +1 for long
         stckQuote = stckQuotes[pos]
@@ -91,7 +90,6 @@ def doStops(step, statDict, alginfo, stopRange):
                                        Quote = stckQuote,
                                        CueKey = '0000')
         dictDesire = convertDesireToDict(offsetDesire, -1*longshort, alginfo.TradeSize, alginfo.Cash, -1*shares)
-        #maxPosDevMean, minNegDevMean = getMaxMinDevMeans(stckDeltas)
         
         # Using maxDev, minDev to scale down StopProfit slightly to increase odds of P.
         maxPosDevMean, minNegDevMean, maxDev, minDev = getMaxMinDevMeansV2(stckDeltas)
@@ -112,14 +110,20 @@ def doStops(step, statDict, alginfo, stopRange):
             else:
                 stopLoss = max(statDict['Positions'][pos]['StopLoss'], stckQuote*minNegDevMean)
                 if stopProfit > 1.15*statDict['Positions'][pos]['Price']:
-                    stopProfit = min(statDict['Positions'][pos]['StopProfit'], stckQuote*(maxPosDevMean - 0.5*maxDev))
+                    # Must use max() here to make sure StopProfit is not set below current stckQuote
+                    # Could be seen in case of one way market. And, dumb algorithm goes opposite way.
+                    # Highly improbable since would require 5 weeks of 1,2,3,4 day periods with
+                    # lopsided means.
+                    stopQuote = stckQuote*(max(1.001, maxPosDevMean - 0.5*maxDev))
+                    stopProfit = min(statDict['Positions'][pos]['StopProfit'], stopQuote)
         elif longshort == -1:
             if stckQuote > stopLoss or stckQuote < stopProfit:
                 stopDesires.append(dictDesire)
             else:
                 stopLoss = min(statDict['Positions'][pos]['StopLoss'], stckQuote*maxPosDevMean)
                 if stopProfit < 0.85*statDict['Positions'][pos]['Price']:
-                    stopProfit = max(statDict['Positions'][pos]['StopProfit'], stckQuote*(minNegDevMean + 0.5*minDev))
+                    stopQuote = stckQuote*(min(0.999, minNegDevMean + 0.5*minDev))
+                    stopProfit = max(statDict['Positions'][pos]['StopProfit'], stopQuote)
         statDict['Positions'][pos]['StopLoss'] = stopLoss
         statDict['Positions'][pos]['StopProfit'] = stopProfit
     for stop in stopDesires:
@@ -180,9 +184,7 @@ def getMaxMinDevMeansV2(stckDeltas):
             minDev = devMean[1]
     maxDevMean = max(1 + maxDevMean, 1.01)
     minDevMean = min(1 + minDevMean, 0.99)
-            
-    #maxDevMean = max(1 + max(posDevMeans), 1.01)  # Making sure the value is at least +1%
-    #minDevMean = min(1 + min(negDevMeans), 0.99)  #    or -1%
+
     return maxDevMean, minDevMean, maxDev, minDev
 
 def getStandardDeviationMean(stckDeltas):
