@@ -165,6 +165,21 @@ class metaMetaAlg(db.Model):
 
 '''
     currentTrader
+
+    This is model used for actual live step trading.
+    After statPutCron.py runs, currentTrader task will run.
+    1. currentTrader pulled from datastore.
+    2. If doStops() step,
+           A. get stock quotes for [step,step-1,step-80,step-160,step-240,step-320,step-400]
+           B. use to update HistoricalRets and MeanStdDevs
+           C. doStops()
+           D. calc desires, e-mail stops AND desires.
+               (Modify Positions in memory to pretend stops were processed.. to get accurate desires.
+                Just do not put Positions changes back to datastore.)
+       Else,
+           A. get stock quotes for [step, step-BuyTimeDelta, step-SellTimeDelta]
+           B. calc desires, e-mail desires.
+    
 '''
 
 class currentTrader(db.Model):
@@ -176,14 +191,18 @@ class currentTrader(db.Model):
     lastBuy        = db.IntegerProperty(required=True)
     lastSell       = db.IntegerProperty(required=True)
     Cash           = db.FloatProperty(required=True)       # Records what should be the available cash level.
-    TradeSize      = db.IntegerProperty(required=True)     # Amount risked per trade. ~$25K
+    TradeSize      = db.FloatProperty(required=True)     # Amount risked per trade. ~$25K
     Positions      = db.TextProperty(required=True)        # Contains open positions, which contain StopProfit, StopLoss settings.
     PosVal         = db.FloatProperty(required=True)
+    PandL          = db.FloatProperty(required=True)
+    percentReturn  = db.FloatProperty(required=True)
     HistoricalRets = db.TextProperty(required=True)        # repr(Dict(Collection)) of last 5 weeks of 1,2,3,4 day returns. From doStops() step.
-    MeanStdDevs    = db.TextProperty(required=True)        # repr(Dict(Collection)) of Mean, Standard Deviation for 1,2,3,4 day returns.
-    StockQuotes    = db.TextProperty(required=True)        # repr(Dict(Collection)) of quotes for [step-1,step-80,step-160,step-240,step-320,step-400]
+    # MeanStdDevs    = db.TextProperty(required=True)        # repr(Dict(Collection)) of Mean, Standard Deviation for 1,2,3,4 day returns.
+    ## Not sure why either of these needed.. will have to re-get and re-calculate at each step.
+    # StockQuotes    = db.TextProperty(required=True)        # repr(Dict(Collection)) of quotes for [step,step-1,step-80,step-160,step-240,step-320,step-400]
     TradeDesires   = db.TextProperty(required=True)        # repr(Collection) of emailed desires for each step.
     TradeFills     = db.TextProperty(required=True)        # repr(Collection) of actually filled trades.
+    LiveAlgTechne  = db.StringProperty(required=True)    # Informational.. lets me know which LiveAlg technique is in use.
 
 def batchPut(entities, cache=False, memkey=None, time=0):
     batch = []
