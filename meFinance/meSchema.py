@@ -162,7 +162,28 @@ class metaMetaAlg(db.Model):
     numTrades     = db.IntegerProperty(required=True)
     history       = db.TextProperty(required=True)
     technique     = db.StringProperty(required=True)
-    
+
+'''
+    currentTrader
+'''
+
+class currentTrader(db.Model):
+    meAlgKey       = db.StringProperty(required=True)
+    BuyQuoteDelta  = db.FloatProperty(required=True)
+    BuyTimeDelta   = db.IntegerProperty(required=True)
+    SellQuoteDelta = db.FloatProperty(required=True)
+    SellTimeDelta  = db.IntegerProperty(required=True)
+    lastBuy        = db.IntegerProperty(required=True)
+    lastSell       = db.IntegerProperty(required=True)
+    Cash           = db.FloatProperty(required=True)       # Records what should be the available cash level.
+    TradeSize      = db.IntegerProperty(required=True)     # Amount risked per trade. ~$25K
+    Positions      = db.TextProperty(required=True)        # Contains open positions, which contain StopProfit, StopLoss settings.
+    PosVal         = db.FloatProperty(required=True)
+    HistoricalRets = db.TextProperty(required=True)        # repr(Dict(Collection)) of last 5 weeks of 1,2,3,4 day returns. From doStops() step.
+    MeanStdDevs    = db.TextProperty(required=True)        # repr(Dict(Collection)) of Mean, Standard Deviation for 1,2,3,4 day returns.
+    StockQuotes    = db.TextProperty(required=True)        # repr(Dict(Collection)) of quotes for [step-1,step-80,step-160,step-240,step-320,step-400]
+    TradeDesires   = db.TextProperty(required=True)        # repr(Collection) of emailed desires for each step.
+    TradeFills     = db.TextProperty(required=True)        # repr(Collection) of actually filled trades.
 
 def batchPut(entities, cache=False, memkey=None, time=0):
     batch = []
