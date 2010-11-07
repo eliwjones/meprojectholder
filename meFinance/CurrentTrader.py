@@ -58,13 +58,14 @@ def initCurrentTrader(keyname, step=20000, Cash=100000.0, TradeSize = 25000.0):
     SellTimeDelta = SellInfo.TimeDelta
 
     # Build currentTrader.
+    HistoricalRets = initHistoricalRets(step, stopStep)
 
     newCurrentTrader = meSchema.currentTrader(key_name = keyname, meAlgKey = bestMeAlgKey,
                                               BuyQuoteDelta = BuyQuoteDelta, BuyTimeDelta = BuyTimeDelta,
                                               SellQuoteDelta = SellQuoteDelta, SellTimeDelta = SellTimeDelta,
                                               lastBuy = 0, lastSell = 0, Cash = Cash, TradeSize = TradeSize,
                                               Positions = repr({}), PosVal = 0.0, PandL = 0.0, percentReturn = 0.0,
-                                              HistoricalRets = repr({}), TradeDesires = repr({}), TradeFills = repr({}),
+                                              HistoricalRets = repr(HistoricalRets), TradeDesires = repr({}), TradeFills = repr({}),
                                               LiveAlgTechne = bestLiveAlgTechne)
     db.put(newCurrentTrader)
 
@@ -111,6 +112,15 @@ def getStdDevMeans(histRets):
             stdDev,mean = processDesires.getStandardDeviationMean(histRets[stckKey][key])
             stdDevMeanDict[stckKey][key] = {'StdDev' : stdDev, 'Mean' : mean}
     return stdDevMeanDict
+
+def getMaxMinDevMeans(histRets):
+    import processDesires
+    maxMinDevMeans = {}
+    for stck in histRets:
+        maxDevMean, minDevMean, maxDev, minDev = processDesires.getMaxMinDevMeansV2(histRets[stck])
+        maxMinDevMeans[stck] = {'maxDevMean' : maxDevMean, 'minDevMean' : minDevMean,
+                                'maxDev' : maxDev, 'minDev' : minDev}
+    return maxMinDevMeans
 
 
 

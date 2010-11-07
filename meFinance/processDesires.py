@@ -182,8 +182,8 @@ def getMaxMinDevMeansV2(stckDeltas):
         if devMean[0] < minDevMean:
             minDevMean = devMean[0]
             minDev = devMean[1]
-    maxDevMean = max(1 + maxDevMean, 1.01)
-    minDevMean = min(1 + minDevMean, 0.99)
+    maxDevMean = max(1 + maxDevMean, 1.001)
+    minDevMean = min(1 + minDevMean, 0.999)
 
     return maxDevMean, minDevMean, maxDev, minDev
 
