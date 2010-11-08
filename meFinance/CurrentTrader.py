@@ -103,6 +103,33 @@ def initHistoricalRets(currentStep, lastLiveAlgStop, stckIDs = [1,2,3,4]):
                 histRetDict['Stock_' + str(stckID)][str(daysback)].append(dayRangeRet)
     return histRetDict
 
+def getMedianMedians(histRets):
+    c = 1.1926    # Used as scale factor.
+    SnDict = {}
+    for stck in histRets:
+        SnDict[stck] = {}
+        for daysback in histRets[stck]:
+            medianDistances = []
+            for val1 in histRets[stck][daysback]:
+                distances = []
+                for val2 in histRets[stck][daysback]:
+                    distances.append(abs(val1-val2))
+                medDistance = getMedian(distances)
+                medianDistances.append(medDistance)
+            medianMedianDistance = getMedian(medianDistances)
+            SnDict[stck][daysback] = medianMedianDistance
+    return SnDict
+            
+def getMedian(numList):
+    numList.sort()
+    n = len(numList)
+    mid = n/2
+    if n%2 == 0:
+        Median = (numList[mid-1] + numList[mid])/2
+    else:
+        Median = numList[mid]
+    return Median
+
 def getStdDevMeans(histRets):
     import processDesires
     stdDevMeanDict = {}
