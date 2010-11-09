@@ -4,5 +4,5 @@ queue:
   bucket_size: 100
 
 - name: backTestQueue
-  rate: 13/s
-  bucket_size: 13
+  rate: 30/s
+  bucket_size: 30
