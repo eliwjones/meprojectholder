@@ -104,23 +104,54 @@ def initHistoricalRets(currentStep, lastLiveAlgStop, stckIDs = [1,2,3,4]):
     return histRetDict
 
 def getMedianMedians(histRets):
-    c = 1.1926    # Used as scale factor.
+    c = 1.1926    # Used as scale factor. But don't figure I'll use this.
     SnDict = {}
     for stck in histRets:
-        SnDict[stck] = {}
-        for daysback in histRets[stck]:
-            medianDistances = []
-            for val1 in histRets[stck][daysback]:
-                distances = []
-                for val2 in histRets[stck][daysback]:
-                    distances.append(abs(val1-val2))
-                medDistance = getMedian(distances)
-                medianDistances.append(medDistance)
-            medianMedianDistance = getMedian(medianDistances)
-            SnDict[stck][daysback] = medianMedianDistance
+        SnDict[stck] = getStckMedianMedians(histRets[stck])
     return SnDict
+
+def getStckMaxMinMedianMedians(histStckRets):
+    '''
+    This will be used for StopProfit setting
+    while processDesires.getMaxMinDevMeansV2() is for StopLoss setting.
+    '''
+    maxMedianMedian = -1
+    minMedianMedian = 1
+    medianMedians = getStckMedianMedians(histStckRets)
+    for daysback in histStckRets:
+        medianRet = getMedian(histStckRets[daysback])
+        posRet = medianRet + medianMedians[daysback]
+        negRet = medianRet - medianMedians[daysback]
+        if posRet > maxMedianMedian:
+            maxMedianMedian = posRet
+        if negRet < minMedianMedian:
+            minMedianMedian = negRet
+    return max(1+maxMedianMedian,1.001), min(1+minMedianMedian,0.999)
+
+def getStckMedianMedians(deltaDict):
+    SnDict = {}
+    for daysback in deltaDict:
+        medianDistances = getMedianMedian(deltaDict[daysback])
+        medianMedianDistance = getMedian(medianDistances)
+        SnDict[daysback] = medianMedianDistance
+    return SnDict
+
+def getMedianMedian(deltaList):
+    '''
+    For each element, calculates distance to all other elements and appends median distance to a list.
+    Not sure why can't just sort list and do medians for half.. but optimization is unnecessary and potentially wrong.
+    '''
+    medianDistances = []
+    for val1 in deltaList:
+        distances = []
+        for val2 in deltaList:
+            distances.append(abs(val1-val2))
+        medDistance = getMedian(distances)
+        medianDistances.append(medDistance)
+    return medianDistances
             
 def getMedian(numList):
+    numList = list(numList)
     numList.sort()
     n = len(numList)
     mid = n/2

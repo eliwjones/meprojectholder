@@ -94,13 +94,9 @@ def doStops(step, statDict, alginfo, stopRange):
         # Using maxDev, minDev to scale down StopProfit slightly to increase odds of P.
         maxPosDevMean, minNegDevMean, maxDev, minDev = getMaxMinDevMeansV2(stckDeltas)
         
-        ### Can either use max() on StopProfit for long positions.. which lets StopProfit float upwards,
-        ###   or use min() which will squeeze StopLoss and StopProfit together.  (Do reverse for short positions.)
-        # If longshort ==  1, stopLoss = max(statDict['Positions'][pos]['StopLoss'], stckQuote*minNegDevMean)
-        #                   stopProfit = min(statDict['Positions'][pos]['StopProfit'], stckQuote*maxPosDevMean)
-        # If longshort == -1, stopLoss = min(statDict['Positions'][pos]['StopLoss'], stckQuote*maxPosDevMean)
-        #                   stopProfit = max(statDict['Positions'][pos]['StopProfit'], stckQuote*minNegDevMean)
-        ### Before updating Positions with new StopLoss, StopProfit data.. check if existing stops have been hit.
+        # MaxMinDevMeans for StopLoss :  Gives slightly more leeway to "downside" but follows current quote.
+        # MaxMinMedianMedian for StopProfit : Is fixed but generally more probable of being hit than first StopLoss.
+        #     Obviates need to scale down max or minDev for StopProfit.
 
         stopLoss = statDict['Positions'][pos]['StopLoss']
         stopProfit = statDict['Positions'][pos]['StopProfit']
