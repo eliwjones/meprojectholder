@@ -118,6 +118,18 @@ def doStops(step, statDict, alginfo, stopRange):
                     '''
                     maxMedianMedian not as well behaved (R3 was flat). Trying with magic Phi.
                     '''
+                    #posDev = maxDevStopProfit - 1.0
+                    #maxDevStopProfit = 1.0 + 0.50*posDev
+                    #########################################
+                    #stdDev = (maxDevStopLoss - minDevStopLoss)/2.0
+                    ''' This version gives great Returns.
+                        But because it allows Shorts more profit, and trims Long profit significantly.
+                    maxDevStopProfit = maxDevStopProfit - 0.5*stdDev
+                    '''
+                    #maxDevStopProfit = maxDevStopLoss - 0.5*stdDev
+                    #########################################
+                    # Temp test creating backTestResults using normal deviation from StopLoss
+                    maxDevStopProfit = maxDevStopLoss
                     stopProfit = min(statDict['Positions'][pos]['StopProfit'], stckQuote*maxDevStopProfit)
         elif longshort == -1:
             if stckQuote > stopLoss or stckQuote < stopProfit:
@@ -129,6 +141,18 @@ def doStops(step, statDict, alginfo, stopRange):
                     Now with new "improved" minMedianMedian StopProfit.
                     '''
                     #stopProfit = max(statDict['Positions'][pos]['StopProfit'], stckQuote*minMedianMedian)
+                    #negDev = 1.0 - minDevStopProfit
+                    #minDevStopProfit = 1.0 - 0.50*negDev
+                    ############################################
+                    #stdDev = (maxDevStopLoss - minDevStopLoss)/2.0
+                    ''' This version gives great Returns.
+                        But because it allows Shorts more profit, and trims Long profit significantly.
+                    minDevStopProfit = minDevStopProfit - 0.5*stdDev
+                    '''
+                    #minDevStopProfit = minDevStopLoss + 0.5*stdDev
+                    #############################################
+                    # Temp test creating backTestResults using normal deviation from StopLoss
+                    minDevStopProfit = minDevStopLoss
                     stopProfit = max(statDict['Positions'][pos]['StopProfit'], stckQuote*minDevStopProfit)
         statDict['Positions'][pos]['StopLoss'] = stopLoss
         statDict['Positions'][pos]['StopProfit'] = stopProfit
