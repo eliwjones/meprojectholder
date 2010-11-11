@@ -26,6 +26,10 @@ handlers:
 #- url: /stats.*
 #  script: $PYTHON_LIB/google/appengine/ext/appstats/ui.py
 
+- url: /CurrentTrader/.*
+  script: CurrentTrader.py
+  login: admin
+
 - url: /stats/.*
   script: outputStats.py
   login: admin

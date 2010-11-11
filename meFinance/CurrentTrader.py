@@ -1,5 +1,3 @@
-# CurrentTrader.py uses currentTrader Model to do live steps.
-
 import meSchema
 from collections import deque
 from google.appengine.ext import webapp
@@ -7,18 +5,28 @@ from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.api.labs import taskqueue
 from google.appengine.ext import db
 
-
 symbolToID = {'HBC':1, 'CME':2, 'GOOG':3, 'INTC':4}  # Hard coding these dicts since don't want to hit memcache for conversion.
 IDtoSymbol = {1:'HBC', 2:'CME', 3:'GOOG', 4:'INTC'}  # When have nothing better to do.. must convert stck key_names to actual Symbol. (And then all the code)
 
 class goCurrentTrader(webapp.RequestHandler):
     def get(self):
-        self.response.header['Content-Type'] = 'text/plain'
+        self.response.headers['Content-Type'] = 'text/plain'
         self.response.out.write('I go.')
 
     def post(self):
         step = int(self.request.get('step'))
         doCurrentTrading(step)
+
+class updateFilledTrades(webapp.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.out.write('I am used to input filled trades or stops.')
+        self.response.out.write('Add code here to update PandL, Positions, TradeFills, lastBuy, lastStell')
+        # Still not sure how should handle Cash update or percentReturn.
+        # Currently, only lastBuy, lastSell will govern an emailed desire.
+        # Cash amount is only for monitoring purposes.. but I can simply
+        #  look at Cash level in actual account. Same for percentReturn.
+        # TradeDesires may be impractical since I do not want to db.put() for each step.
 
 def taskAdd(step,taskname,wait=.5):
     try:
@@ -51,9 +59,9 @@ def doCurrentTrading(step):
         stops = doStops(step, eval(cTrader.Positions), quoteDict)                               # Look for hit stops first.
         HistoricalRets = updateHistoricalRets(eval(cTrader.HistoricalRets), step, quoteDict)    # Update daysback ranges
         cTrader.HistoricalRets = repr(HistoricalRets)
-        cTrader = updateStops(cTrader, step, quoteDict)                                          # Update Position Stops last.
+        cTrader = updateStops(cTrader, step, quoteDict)                                         # Update Position Stops last.
     desires = buildDesires(cTrader, step, quoteDict)
-    emailStopsDesires(stops,desires)
+    emailStopsDesires(stops,desires,step)
     if (step - baseStopStep)%80 == 0 or (step - lastStop) > 80:
         db.put(cTrader)
 
@@ -86,7 +94,7 @@ def updateHistoricalRets(HistoricalRets, step, quoteDict):
     return HistoricalRets
 
 def buildDesires(cTrader, step, quoteDict):
-    '''  # Not sure how best to determine how a simultaneous Buy,Sell should be settled. Possibly check HistoricalRets for least likely move.
+    '''
     desires = {'Buy':
                      {'HBC'  :
                          {'Shares' : 467, 'LimitPrice' : quote, 'StopLoss': 0.85*quote, 'StopProfit' : 1.15*quote},
@@ -100,24 +108,31 @@ def buildDesires(cTrader, step, quoteDict):
                }
     '''
     desires = {'Buy' : {}, 'Sell' : {}}
+    # Adding in proper StopLoss,StopProfit calculation at desire creation.
+    # Don't like waiting for technical StopStep to do this even if Simulation does.
+    meStops = getMaxMinDevMeans(eval(cTrader.HistoricalRets))
     if step - cTrader.lastBuy > cTrader.BuyTimeDelta:
         for symbol in quoteDict:
+            minDevStop = meStops[symbol]['minDevStop']
+            maxDevStop = meStops[symbol]['maxDevStop']
             currentQuote = quoteDict[symbol][step]
             percentReturn = getCurrentReturn(step, cTrader.BuyTimeDelta, quoteDict[symbol])
             shares = calculateShares(currentQuote,'Buy',cTrader.TradeSize)
             if cTrader.BuyQuoteDelta < 0 and percentReturn < cTrader.BuyQuoteDelta:
-                desires['Buy'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : 0.84*currentQuote, 'StopProfit' : 1.50*currentQuote}
+                desires['Buy'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : minDevStop*currentQuote, 'StopProfit' : maxDevStop*currentQuote}
             elif cTrader.BuyQuoteDelta > 0 and percentReturn > cTrader.BuyQuoteDelta:
-                desires['Buy'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : 0.84*currentQuote, 'StopProfit' : 1.50*currentQuote}
+                desires['Buy'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : minDevStop*currentQuote, 'StopProfit' : maxDevStop*currentQuote}
     if step - cTrader.lastSell > cTrader.SellTimeDelta:
         for symbol in quoteDict:
+            minDevStop = meStops[symbol]['minDevStop']
+            maxDevStop = meStops[symbol]['maxDevStop']
             currentQuote = quoteDict[symbol][step]
             percentReturn = getCurrentReturn(step, cTrader.SellTimeDelta, quoteDict[symbol])
             shares = calculateShares(currentQuote,'Sell',cTrader.TradeSize)
             if cTrader.SellQuoteDelta < 0 and percentReturn < cTrader.SellQuoteDelta:
-                desires['Sell'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : 1.16*currentQuote, 'StopProfit' : 0.50*currentQuote}
+                desires['Sell'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : maxDevStop*currentQuote, 'StopProfit' : minDevStop*currentQuote}
             elif cTrader.SellQuoteDelta > 0 and percentReturn > cTrader.SellQuoteDelta:
-                desires['Sell'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : 1.16*currentQuote, 'StopProfit' : 0.50*currentQuote}
+                desires['Sell'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : maxDevStop*currentQuote, 'StopProfit' : minDevStop*currentQuote}
     # Check for simultaneous Buy and Sell.
     buySymbols = set(desires['Buy'].keys())
     sellSymbols = set(desires['Sell'].keys())
@@ -166,7 +181,6 @@ def getCurrentReturn(step,TimeDelta,quoteDict):
     return percentReturn
 
 def calculateShares(quote, BuySell, tradesize):
-    # Calculate how many shares can buy for cTrader.TradeSize
     shares = int(tradesize/quote)
     commission = max(9.95,shares*0.01)
     cost = shares*quote + commission
@@ -216,9 +230,30 @@ def updateStops(cTrader, step, quoteDict):
     cTrader.lastStop = step
     return cTrader
 
-def emailStopsDesires(stops,desires):
-    # Compose email with stops first and desires second and send.
-    print stops,desires
+def emailStopsDesires(stops,desires,step):
+    from google.appengine.api import mail
+    email = 'eli.jones@gmail.com'
+    subject = 'Blackbox Trades and Stops'
+    body = 'Stops and Trades for Step: ' + str(step) + '\n'
+    body += '-----------------------------------\n\n'
+    
+    body += 'STOPS:\n'
+    for symbol in stops:
+        body += symbol + ': ' + str(stops[symbol]) + '\n'
+    body += '\n********************************\n'
+    
+    body += 'BUYS:\n'
+    for symbol in desires['Buy']:
+        body += symbol + ': ' + str(desires['Buy'][symbol]) + '\n'
+    body += '\n********************************\n'
+    
+    body += 'SELLS:\n'
+    for symbol in desires['Sell']:
+        body += symbol + ': ' + str(desires['Sell'][symbol]) + '\n'
+    body += '\n********************************\n'
+    body +=  "That's all there is for now!\n"
+        
+    mail.send_mail(email,email,subject,body)
 
 def initCurrentTrader(keyname, step=20000, Cash=100000.0, TradeSize = 25000.0):
     import liveAlg
@@ -374,7 +409,8 @@ def getMaxMinDevMeans(histRets):
     return maxMinDevMeans
 
 
-application = webapp.WSGIApplication([('/CurrentTrader/go',goCurrentTrader)],
+application = webapp.WSGIApplication([('/CurrentTrader/go',goCurrentTrader),
+                                      ('/CurrentTrader/fillTrades',updateFilledTrades)],
                                      debug = True)
 
 def main():
