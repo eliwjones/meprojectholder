@@ -170,9 +170,9 @@ def getMaxMinDevMeansV2(stckDeltas):
     for key in stckDeltas:
         dev,mean = getStandardDeviationMean(stckDeltas[key])
         negDevStopLosses.append(mean - dev)
-        negDevStopProfits.append(mean - Phi*dev)
+        #negDevStopProfits.append(mean - Phi*dev)
         posDevStopLosses.append(mean + dev)
-        posDevStopProfits.append(mean + Phi*dev)
+        #posDevStopProfits.append(mean + Phi*dev)
     '''
     maxDevMean = 0.0
     for devMean in posDevMeans:
@@ -185,15 +185,15 @@ def getMaxMinDevMeansV2(stckDeltas):
             minDevMean = devMean[0]
             minDev = devMean[1]
     '''
-    maxDevStopLoss = max(posDevStopLosses)
-    maxDevStopProfit = max(posDevStopProfits)
-    minDevStopLoss = min(negDevStopLosses)
-    minDevStopProfit = min(negDevStopProfits)
+    maxDevStop = max(posDevStopLosses)
+    #maxDevStopProfit = max(posDevStopProfits)
+    minDevStop = min(negDevStopLosses)
+    #minDevStopProfit = min(negDevStopProfits)
 
-    maxDevStopLoss = max(1 + maxDevStopLoss, 1.001)
-    maxDevStopProfit = max(1 + maxDevStopProfit, 1.001)
-    minDevStopLoss = min(1 + minDevStopLoss, 0.999)
-    minDevStopProfit = min(1 + minDevStopProfit, 0.999)
+    maxDevStop = max(1 + maxDevStop, 1.001)
+    #maxDevStopProfit = max(1 + maxDevStopProfit, 1.001)
+    minDevStop = min(1 + minDevStop, 0.999)
+    #minDevStopProfit = min(1 + minDevStopProfit, 0.999)
     '''
     maxDevMean = max(1 + maxDevMean, 1.001)
     minDevMean = min(1 + minDevMean, 0.999)

@@ -48,10 +48,10 @@ def doCurrentTrading(step):
     quoteDict = getStockQuotes(step)   # Get stock quotes for last 5 days (or last 5*((step-LastHistStep)/80) days)
     
     if (step - baseStopStep)%80 == 0 or (step - lastStop) > 80:
-        stops = doStops(eval(cTrader.Positions), quoteDict)                               # Look for hit stops first.
+        stops = doStops(step, eval(cTrader.Positions), quoteDict)                               # Look for hit stops first.
         HistoricalRets = updateHistoricalRets(eval(cTrader.HistoricalRets), step, quoteDict)    # Update daysback ranges
         cTrader.HistoricalRets = repr(HistoricalRets)
-        cTrader = updateStops(cTrader, step)                                          # Update Position Stops last.
+        cTrader = updateStops(cTrader, step, quoteDict)                                          # Update Position Stops last.
     desires = buildDesires(cTrader, step, quoteDict)
     emailStopsDesires(stops,desires)
     if (step - baseStopStep)%80 == 0 or (step - lastStop) > 80:
@@ -63,7 +63,7 @@ def getStockQuotes(currentStep,daysback=5):
     quoteDict = {'HBC':{}, 'CME':{}, 'GOOG':{}, 'INTC':{}}
     steps = [i for i in range(currentStep-80*daysback, currentStep+1,80)]
     steps.append(currentStep-1)    # Should now have [1,80,160,240,320,400] stepsback periods.
-    steps.order(reverse=True)
+    steps.sort(reverse=True)
     stckKeyList = []
     for stckID in IDtoSymbol.keys():
         stckKeyList.extend([str(stckID)+'_'+str(step) for step in steps])
@@ -76,7 +76,7 @@ def getStockQuotes(currentStep,daysback=5):
             quoteDict[symbol][stck.step] = stck.quote
     return quoteDict
     
-def updateHistoricalRets(step, HistoricalRets, quoteDict):
+def updateHistoricalRets(HistoricalRets, step, quoteDict):
     for symbol in HistoricalRets:
         for daysback in HistoricalRets[symbol]:
             TimeDelta = int(daysback)*80
@@ -146,10 +146,10 @@ def buildDesires(cTrader, step, quoteDict):
             else:
                 sellPercent = getCurrentReturn(step,sellTime,quoteDict[symbol])
                 buyPercent  = getCurrentReturn(step,buyTime,quoteDict[symbol])
-                sellMean = stdDevMeans[symbol][sellTime/80]['Mean']
-                sellDev = stdDevMeans[symbol][sellTime/80]['StdDev']
-                buyMean = stdDevMeans[symbol][buyTime/80]['Mean']
-                buyDev = stdDevMeans[symbol][buyTime/80]['StdDev']
+                sellMean = stdDevMeans[symbol][str(sellTime/80)]['Mean']
+                sellDev = stdDevMeans[symbol][str(sellTime/80)]['StdDev']
+                buyMean = stdDevMeans[symbol][str(buyTime/80)]['Mean']
+                buyDev = stdDevMeans[symbol][str(buyTime/80)]['StdDev']
 
                 sellFactor = abs(sellPercent-sellMean)/sellDev
                 buyFactor = abs(buyPercent-buyMean)/buyDev
@@ -178,7 +178,7 @@ def calculateShares(quote, BuySell, tradesize):
     
 def doStops(step, Positions, quoteDict):
     '''
-    Positions ~ {'HBC':{'Shares':467, 'Price':54.38, 'StopProfit': 55.01, 'StopLoss': 53.80}}
+    Positions = {'HBC':{'Shares':467, 'Price':54.38, 'StopProfit': 55.01, 'StopLoss': 53.80}}
     '''
     stops = {}
     for symbol in Positions:
@@ -226,7 +226,7 @@ def initCurrentTrader(keyname, step=20000, Cash=100000.0, TradeSize = 25000.0):
     R = 'R5'
     # Get last completed liveAlg stopStep, startStep within last 400 steps.
     # If none, will throw error.
-    lastLiveAlg = meSchema.liveAlg.all().filter('stopStep >', step - 401).order('-stopStep').get()
+    lastLiveAlg = meSchema.liveAlg.all().filter('stopStep >', step - 401).order('stopStep').get()
     stopStep = lastLiveAlg.stopStep
     startStep = lastLiveAlg.startStep
     
