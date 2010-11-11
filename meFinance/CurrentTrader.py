@@ -49,9 +49,9 @@ def doCurrentTrading(step):
     
     if (step - baseStopStep)%80 == 0 or (step - lastStop) > 80:
         stops = doStops(eval(cTrader.Positions), quoteDict)                               # Look for hit stops first.
-        HistoricalRets = updateHistoricalRets(eval(cTrader.HistoricalRets), quoteDict)    # Update daysback ranges
+        HistoricalRets = updateHistoricalRets(eval(cTrader.HistoricalRets), step, quoteDict)    # Update daysback ranges
         cTrader.HistoricalRets = repr(HistoricalRets)
-        cTrader = updateStops(cTrader, stop)                                              # Update Position Stops last.
+        cTrader = updateStops(cTrader, step)                                          # Update Position Stops last.
     desires = buildDesires(cTrader, step, quoteDict)
     emailStopsDesires(stops,desires)
     if (step - baseStopStep)%80 == 0 or (step - lastStop) > 80:
@@ -76,10 +76,14 @@ def getStockQuotes(currentStep,daysback=5):
             quoteDict[symbol][stck.step] = stck.quote
     return quoteDict
     
-def updateHistoricalRets(HistoricalRets, quoteDict):
-    # for each daysback for symbol in HistoricalRets pop off last entry
-    #     and appendleft newly calculated daysback return.
-    pass
+def updateHistoricalRets(step, HistoricalRets, quoteDict):
+    for symbol in HistoricalRets:
+        for daysback in HistoricalRets[symbol]:
+            TimeDelta = int(daysback)*80
+            currentReturn = getCurrentReturn(step, TimeDelta, quoteDict[symbol])
+            HistoricalRets[symbol][daysback].pop()
+            HistoricalRets[symbol][daysback].appendleft(currentReturn)
+    return HistoricalRets
 
 def buildDesires(cTrader, step, quoteDict):
     '''  # Not sure how best to determine how a simultaneous Buy,Sell should be settled. Possibly check HistoricalRets for least likely move.
@@ -102,24 +106,27 @@ def buildDesires(cTrader, step, quoteDict):
             percentReturn = getCurrentReturn(step, cTrader.BuyTimeDelta, quoteDict[symbol])
             shares = calculateShares(currentQuote,'Buy',cTrader.TradeSize)
             if cTrader.BuyQuoteDelta < 0 and percentReturn < cTrader.BuyQuoteDelta:
-                desires['Buy'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : 0.85*currentQuote, 'StopProfit' : 1.15*currentQuote}
+                desires['Buy'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : 0.84*currentQuote, 'StopProfit' : 1.50*currentQuote}
             elif cTrader.BuyQuoteDelta > 0 and percentReturn > cTrader.BuyQuoteDelta:
-                desires['Buy'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : 0.85*currentQuote, 'StopProfit' : 1.15*currentQuote}
+                desires['Buy'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : 0.84*currentQuote, 'StopProfit' : 1.50*currentQuote}
     if step - cTrader.lastSell > cTrader.SellTimeDelta:
         for symbol in quoteDict:
             currentQuote = quoteDict[symbol][step]
             percentReturn = getCurrentReturn(step, cTrader.SellTimeDelta, quoteDict[symbol])
             shares = calculateShares(currentQuote,'Sell',cTrader.TradeSize)
             if cTrader.SellQuoteDelta < 0 and percentReturn < cTrader.SellQuoteDelta:
-                desires['Sell'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : 1.15*currentQuote, 'StopProfit' : 0.85*currentQuote}
+                desires['Sell'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : 1.16*currentQuote, 'StopProfit' : 0.50*currentQuote}
             elif cTrader.SellQuoteDelta > 0 and percentReturn > cTrader.SellQuoteDelta:
-                desires['Sell'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : 1.15*currentQuote, 'StopProfit' : 0.85*currentQuote}
+                desires['Sell'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : 1.16*currentQuote, 'StopProfit' : 0.50*currentQuote}
     # Check for simultaneous Buy and Sell.
     buySymbols = set(desires['Buy'].keys())
     sellSymbols = set(desires['Sell'].keys())
     buysellSymbols = buySymbols&sellSymbols
     # Determine winner by comparing percentReturn to TimeDelta Deviation.
     #  i.e. abs(sellPReturn-mean)/SellTimeDeltaDev vs. abs(buyPReturn-mean)/BuyTimeDeltaDev.. larger value wins.
+    #
+    #  Will probably have to backport this check process into processDesires and liveAlg since can't be sure how it
+    #    may effect the entire simulation.  Though, not even certain I can check stdDeviations with each desire get.
     if len(buysellSymbols) > 0:
         sellTime    = cTrader.SellTimeDelta
         sellPercent = cTrader.SellQuoteDelta
@@ -137,13 +144,19 @@ def buildDesires(cTrader, step, quoteDict):
             elif buyTime == 1:
                 del desires['Sell'][symbol]
             else:
-                # stdDevMeanDict[stckKey][key] = {'StdDev' : stdDev, 'Mean' : mean}
                 sellPercent = getCurrentReturn(step,sellTime,quoteDict[symbol])
                 buyPercent  = getCurrentReturn(step,buyTime,quoteDict[symbol])
                 sellMean = stdDevMeans[symbol][sellTime/80]['Mean']
                 sellDev = stdDevMeans[symbol][sellTime/80]['StdDev']
                 buyMean = stdDevMeans[symbol][buyTime/80]['Mean']
                 buyDev = stdDevMeans[symbol][buyTime/80]['StdDev']
+
+                sellFactor = abs(sellPercent-sellMean)/sellDev
+                buyFactor = abs(buyPercent-buyMean)/buyDev
+                if sellFactor > buyFactor:
+                    del desires['Buy'][symbol]
+                else:
+                    del desires['Sell'][symbol]
     return desires
 
 def getCurrentReturn(step,TimeDelta,quoteDict):
@@ -171,17 +184,35 @@ def doStops(step, Positions, quoteDict):
     for symbol in Positions:
         longshort = cmp(Positions[symbol]['Shares'], 0)
         quote = quoteDict[symbol][step]
-        if longshort == 1 and (quote < Positions[symbol]['StopLoss'] or quote > Positions[symbol]['StopProfit']):
+        stopLoss = Positions[symbol]['StopLoss']
+        stopProfit = Positions[symbol]['StopProfit']
+        if longshort == 1 and (quote < stopLoss or quote > stopProfit):
             stops[symbol] = {'Shares' : -1*Positions[symbol]['Shares'], 'LimitPrice' : quote}
-        elif longshort == -1 and (quote > Positions[symbol]['StopLoss'] or quote < Positions[symbol]['StopProfit']):
+        elif longshort == -1 and (quote > stopLoss or quote < stopProfit):
             stops[symbol] = {'Shares' : -1*Positions[symbol]['Shares'], 'LimitPrice' : quote}
     return stops
 
-def updateStops(cTrader, step):
-    # Make sure to set LastStop property.
-    # Since it will get checked on each step, and will call stops if greater than 80.
-    # Check StopProfit and StopLoss on each Position to see if needs updating.
-    # cTrader.HistoricalRets should have most recent data.
+def updateStops(cTrader, step, quoteDict):
+    meStops = getMaxMinDevMeans(eval(cTrader.HistoricalRets))
+    Positions = eval(cTrader.Positions)
+    for pos in Positions:
+        longshort = cmp(Positions[pos]['Shares'],0)
+        stckQuote = quoteDict[pos][step]
+        minDevStop = meStops[pos]['minDevStop']
+        maxDevStop = meStops[pos]['maxDevStop']
+        stopLoss = Positions[pos]['StopLoss']
+        stopProfit = Positions[pos]['StopProfit']
+        if longshort == 1:
+            stopLoss = max(Positions[pos]['StopLoss'],stckQuote*minDevStop)
+            if Positions[pos]['StopProfit'] > 1.25*Positions[pos]['Price']:
+                stopProfit = min(Positions[pos]['StopProfit'], stckQuote*maxDevStop)
+        elif longshort == -1:
+            stopLoss = min(Positions[pos]['StopLoss'],stckQuote*maxDevStop)
+            if Positions[pos]['StopProfit'] < 0.75*Positions[pos]['Price']:
+                stopProfit = max(Positions[pos]['StopProfit'], stckQuote*minDevStop)
+        Positions[pos]['StopProfit'] = stopProfit
+        Positions[pos]['StopLoss'] = stopLoss
+    cTrader.Positions = repr(Positions)         
     cTrader.lastStop = step
     return cTrader
 
@@ -338,9 +369,8 @@ def getMaxMinDevMeans(histRets):
     import processDesires
     maxMinDevMeans = {}
     for stck in histRets:
-        maxDevMean, minDevMean, maxDev, minDev = processDesires.getMaxMinDevMeansV2(histRets[stck])
-        maxMinDevMeans[stck] = {'maxDevMean' : maxDevMean, 'minDevMean' : minDevMean,
-                                'maxDev' : maxDev, 'minDev' : minDev}
+        maxDevStop, minDevStop = processDesires.getMaxMinDevMeansV2(histRets[stck])
+        maxMinDevMeans[stck] = {'maxDevStop' : maxDevStop, 'minDevStop' : minDevStop}
     return maxMinDevMeans
 
 
