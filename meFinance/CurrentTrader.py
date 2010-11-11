@@ -8,6 +8,9 @@ from google.appengine.api.labs import taskqueue
 from google.appengine.ext import db
 
 
+symbolToID = {'HBC':1, 'CME':2, 'GOOG':3, 'INTC':4}  # Hard coding these dicts since don't want to hit memcache for conversion.
+IDtoSymbol = {1:'HBC', 2:'CME', 3:'GOOG', 4:'INTC'}  # When have nothing better to do.. must convert stck key_names to actual Symbol. (And then all the code)
+
 class goCurrentTrader(webapp.RequestHandler):
     def get(self):
         self.response.header['Content-Type'] = 'text/plain'
@@ -35,8 +38,6 @@ def doCurrentTrading(step):
     Only updating cTrader.HistoricalRets, cTrader.lastStop and cTrader.Positions Stops during stopSteps.
     Everything else will get updated by a form manually if/when I fill an emailed stop,desire.
     '''
-    symbolToID = {'HBC':1, 'CME':2, 'GOOG':3, 'INTC':4}  # Hard coding these dicts since don't want to hit memcache for conversion.
-    IDtoSymbol = {1:'HBC', 2:'CME', 3:'GOOG', 4:'INTC'}  # When have nothing better to do.. must convert stck key_names to actual Symbol. (And then all the code)
     
     stops = {}
     desires = {}
@@ -44,7 +45,7 @@ def doCurrentTrading(step):
     cTrader = meSchema.currentTrader.get_by_key_name('1')
     baseStopStep = getBaseStopStep(cTrader.LastAlgUpdateStep)
     lastStop = cTrader.lastStop
-    quoteDict = getStockQuotes(step, IDtoSymbol, symbolToID)   # Get stock quotes for last 5 days (or last 5*((step-LastHistStep)/80) days)
+    quoteDict = getStockQuotes(step)   # Get stock quotes for last 5 days (or last 5*((step-LastHistStep)/80) days)
     
     if (step - baseStopStep)%80 == 0 or (step - lastStop) > 80:
         stops = doStops(eval(cTrader.Positions), quoteDict)                               # Look for hit stops first.
@@ -56,7 +57,7 @@ def doCurrentTrading(step):
     if (step - baseStopStep)%80 == 0 or (step - lastStop) > 80:
         db.put(cTrader)
 
-def getStockQuotes(currentStep,IDtoSymbol,symbolToID,daysback=5):
+def getStockQuotes(currentStep,daysback=5):
     # get stck quotes for last 5 days and currentStep-1.
     # sort so that quotes[0] is always currentStep quote.
     quoteDict = {'HBC':{}, 'CME':{}, 'GOOG':{}, 'INTC':{}}
@@ -94,12 +95,73 @@ def buildDesires(cTrader, step, quoteDict):
                        }
                }
     '''
-    desires = {}
+    desires = {'Buy' : {}, 'Sell' : {}}
     if step - cTrader.lastBuy > cTrader.BuyTimeDelta:
-        print "check cTrader.HistoricalRets for trigger."
+        for symbol in quoteDict:
+            currentQuote = quoteDict[symbol][step]
+            percentReturn = getCurrentReturn(step, cTrader.BuyTimeDelta, quoteDict[symbol])
+            shares = calculateShares(currentQuote,'Buy',cTrader.TradeSize)
+            if cTrader.BuyQuoteDelta < 0 and percentReturn < cTrader.BuyQuoteDelta:
+                desires['Buy'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : 0.85*currentQuote, 'StopProfit' : 1.15*currentQuote}
+            elif cTrader.BuyQuoteDelta > 0 and percentReturn > cTrader.BuyQuoteDelta:
+                desires['Buy'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : 0.85*currentQuote, 'StopProfit' : 1.15*currentQuote}
     if step - cTrader.lastSell > cTrader.SellTimeDelta:
-        print "check cTrader"
+        for symbol in quoteDict:
+            currentQuote = quoteDict[symbol][step]
+            percentReturn = getCurrentReturn(step, cTrader.SellTimeDelta, quoteDict[symbol])
+            shares = calculateShares(currentQuote,'Sell',cTrader.TradeSize)
+            if cTrader.SellQuoteDelta < 0 and percentReturn < cTrader.SellQuoteDelta:
+                desires['Sell'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : 1.15*currentQuote, 'StopProfit' : 0.85*currentQuote}
+            elif cTrader.SellQuoteDelta > 0 and percentReturn > cTrader.SellQuoteDelta:
+                desires['Sell'][symbol] = {'Shares' : shares, 'LimitPrice' : currentQuote, 'StopLoss' : 1.15*currentQuote, 'StopProfit' : 0.85*currentQuote}
+    # Check for simultaneous Buy and Sell.
+    buySymbols = set(desires['Buy'].keys())
+    sellSymbols = set(desires['Sell'].keys())
+    buysellSymbols = buySymbols&sellSymbols
+    # Determine winner by comparing percentReturn to TimeDelta Deviation.
+    #  i.e. abs(sellPReturn-mean)/SellTimeDeltaDev vs. abs(buyPReturn-mean)/BuyTimeDeltaDev.. larger value wins.
+    if len(buysellSymbols) > 0:
+        sellTime    = cTrader.SellTimeDelta
+        sellPercent = cTrader.SellQuoteDelta
+        buyTime     = cTrader.BuyTimeDelta
+        buyPercent  = cTrader.BuyQuoteDelta
+        stdDevMeans = getStdDevMeans(eval(cTrader.HistoricalRets))
+        for symbol in buysellSymbols:
+            if sellTime == buyTime:                        # if BuySell periods same, delete smallest magnitude signal.
+                if abs(buyPercent) > abs(sellPercent):
+                    del desires['Sell'][symbol]
+                else:
+                    del desires['Buy'][symbol]
+            elif sellTime == 1:                            # If one or the other is a 1 step signal, keep it.
+                del desires['Buy'][symbol]
+            elif buyTime == 1:
+                del desires['Sell'][symbol]
+            else:
+                # stdDevMeanDict[stckKey][key] = {'StdDev' : stdDev, 'Mean' : mean}
+                sellPercent = getCurrentReturn(step,sellTime,quoteDict[symbol])
+                buyPercent  = getCurrentReturn(step,buyTime,quoteDict[symbol])
+                sellMean = stdDevMeans[symbol][sellTime/80]['Mean']
+                sellDev = stdDevMeans[symbol][sellTime/80]['StdDev']
+                buyMean = stdDevMeans[symbol][buyTime/80]['Mean']
+                buyDev = stdDevMeans[symbol][buyTime/80]['StdDev']
     return desires
+
+def getCurrentReturn(step,TimeDelta,quoteDict):
+    currentQuote = quoteDict[step]
+    backQuote = quoteDict[step - TimeDelta]
+    percentReturn = (currentQuote - backQuote)/backQuote
+    return percentReturn
+
+def calculateShares(quote, BuySell, tradesize):
+    # Calculate how many shares can buy for cTrader.TradeSize
+    shares = int(tradesize/quote)
+    commission = max(9.95,shares*0.01)
+    cost = shares*quote + commission
+    if cost > tradesize:
+        shares = shares - 1
+    if BuySell == 'Sell':
+        shares = -1*shares
+    return shares
     
 def doStops(step, Positions, quoteDict):
     '''
@@ -186,20 +248,22 @@ def initHistoricalRets(currentStep, lastLiveAlgStop, stckIDs = [1,2,3,4]):
     quoteDict = {}
     histRetDict = {}
     for stckID in stckIDs:
+        symbol = IDtoSymbol[stckID]
         quoteDict[str(stckID)] = {}
-        histRetDict['Stock_' + str(stckID)] = {}
+        histRetDict[symbol] = {}
         for daysback in range(1,5):
-            histRetDict['Stock_' + str(stckID)][str(daysback)] = deque([])
+            histRetDict[symbol][str(daysback)] = deque([])
             
     for stck in histQuotes:
         quoteDict[str(stck.ID)][str(stck.step)] = stck.quote
     for stckID in stckIDs:
+        symbol = IDtoSymbol[stckID]
         for i in range(len(histRetSteps) - 4):
             for daysback in range(1,5):
                 baseStep = histRetSteps[i]
                 backStep = baseStep - 80*daysback
                 dayRangeRet = (quoteDict[str(stckID)][str(baseStep)] - quoteDict[str(stckID)][str(backStep)])/quoteDict[str(stckID)][str(backStep)]
-                histRetDict['Stock_' + str(stckID)][str(daysback)].append(dayRangeRet)
+                histRetDict[symbol][str(daysback)].append(dayRangeRet)
     return histRetDict
 
 def getMedianMedians(histRets):
