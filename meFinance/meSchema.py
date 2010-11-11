@@ -183,6 +183,7 @@ class metaMetaAlg(db.Model):
 '''
 
 class currentTrader(db.Model):
+    LastAlgUpdateStep = db.IntegerProperty(required=True)
     meAlgKey       = db.StringProperty(required=True)
     BuyQuoteDelta  = db.FloatProperty(required=True)
     BuyTimeDelta   = db.IntegerProperty(required=True)
@@ -190,6 +191,7 @@ class currentTrader(db.Model):
     SellTimeDelta  = db.IntegerProperty(required=True)
     lastBuy        = db.IntegerProperty(required=True)
     lastSell       = db.IntegerProperty(required=True)
+    lastStop       = db.IntegerProperty(required=True)
     Cash           = db.FloatProperty(required=True)       # Records what should be the available cash level.
     TradeSize      = db.FloatProperty(required=True)     # Amount risked per trade. ~$25K
     Positions      = db.TextProperty(required=True)        # Contains open positions, which contain StopProfit, StopLoss settings.

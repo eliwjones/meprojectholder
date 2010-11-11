@@ -30,12 +30,107 @@ def taskAdd(step,taskname,wait=.5):
         taskAdd(step,taskname,2*wait)
 
 def doCurrentTrading(step):
+    '''
+    Most everything in here will be read and forget.  Not updating position info or lastBuy, lastSell.
+    Only updating cTrader.HistoricalRets, cTrader.lastStop and cTrader.Positions Stops during stopSteps.
+    Everything else will get updated by a form manually if/when I fill an emailed stop,desire.
+    '''
+    symbolToID = {'HBC':1, 'CME':2, 'GOOG':3, 'INTC':4}  # Hard coding these dicts since don't want to hit memcache for conversion.
+    IDtoSymbol = {1:'HBC', 2:'CME', 3:'GOOG', 4:'INTC'}  # When have nothing better to do.. must convert stck key_names to actual Symbol. (And then all the code)
+    
+    stops = {}
+    desires = {}
+    quoteDict = {}
     cTrader = meSchema.currentTrader.get_by_key_name('1')
+    baseStopStep = getBaseStopStep(cTrader.LastAlgUpdateStep)
+    lastStop = cTrader.lastStop
+    quoteDict = getStockQuotes(step, IDtoSymbol, symbolToID)   # Get stock quotes for last 5 days (or last 5*((step-LastHistStep)/80) days)
+    
+    if (step - baseStopStep)%80 == 0 or (step - lastStop) > 80:
+        stops = doStops(eval(cTrader.Positions), quoteDict)                               # Look for hit stops first.
+        HistoricalRets = updateHistoricalRets(eval(cTrader.HistoricalRets), quoteDict)    # Update daysback ranges
+        cTrader.HistoricalRets = repr(HistoricalRets)
+        cTrader = updateStops(cTrader, stop)                                              # Update Position Stops last.
+    desires = buildDesires(cTrader, step, quoteDict)
+    emailStopsDesires(stops,desires)
+    if (step - baseStopStep)%80 == 0 or (step - lastStop) > 80:
+        db.put(cTrader)
+
+def getStockQuotes(currentStep,IDtoSymbol,symbolToID,daysback=5):
+    # get stck quotes for last 5 days and currentStep-1.
+    # sort so that quotes[0] is always currentStep quote.
+    quoteDict = {'HBC':{}, 'CME':{}, 'GOOG':{}, 'INTC':{}}
+    steps = [i for i in range(currentStep-80*daysback, currentStep+1,80)]
+    steps.append(currentStep-1)    # Should now have [1,80,160,240,320,400] stepsback periods.
+    steps.order(reverse=True)
+    stckKeyList = []
+    for stckID in IDtoSymbol.keys():
+        stckKeyList.extend([str(stckID)+'_'+str(step) for step in steps])
+    stckQuotes = meSchema.stck.get_by_key_name(stckKeyList)
+    for stck in stckQuotes:
+        if stck is None:
+            raise Exception('One of returned stock quotes is None!')
+        else:
+            symbol = IDtoSymbol[stck.ID]
+            quoteDict[symbol][stck.step] = stck.quote
+    return quoteDict
+    
+def updateHistoricalRets(HistoricalRets, quoteDict):
+    # for each daysback for symbol in HistoricalRets pop off last entry
+    #     and appendleft newly calculated daysback return.
+    pass
+
+def buildDesires(cTrader, step, quoteDict):
+    '''  # Not sure how best to determine how a simultaneous Buy,Sell should be settled. Possibly check HistoricalRets for least likely move.
+    desires = {'Buy':
+                     {'HBC'  :
+                         {'Shares' : 467, 'LimitPrice' : quote, 'StopLoss': 0.85*quote, 'StopProfit' : 1.15*quote},
+                      'INTC' :
+                         {'Shares' : 1130, 'LimitPrice': quote, 'StopLoss': 0.85*quote, 'StopProfit' : 1.15*quote}
+                       },
+               'Sell':
+                     {'GOOG' :
+                         {'Shares' : -42, 'LimitPrice' : quote, 'StopLoss': 1.15*quote, 'StopProfit' : 0.85*quote}
+                       }
+               }
+    '''
+    desires = {}
+    if step - cTrader.lastBuy > cTrader.BuyTimeDelta:
+        print "check cTrader.HistoricalRets for trigger."
+    if step - cTrader.lastSell > cTrader.SellTimeDelta:
+        print "check cTrader"
+    return desires
+    
+def doStops(step, Positions, quoteDict):
+    '''
+    Positions ~ {'HBC':{'Shares':467, 'Price':54.38, 'StopProfit': 55.01, 'StopLoss': 53.80}}
+    '''
+    stops = {}
+    for symbol in Positions:
+        longshort = cmp(Positions[symbol]['Shares'], 0)
+        quote = quoteDict[symbol][step]
+        if longshort == 1 and (quote < Positions[symbol]['StopLoss'] or quote > Positions[symbol]['StopProfit']):
+            stops[symbol] = {'Shares' : -1*Positions[symbol]['Shares'], 'LimitPrice' : quote}
+        elif longshort == -1 and (quote > Positions[symbol]['StopLoss'] or quote < Positions[symbol]['StopProfit']):
+            stops[symbol] = {'Shares' : -1*Positions[symbol]['Shares'], 'LimitPrice' : quote}
+    return stops
+
+def updateStops(cTrader, step):
+    # Make sure to set LastStop property.
+    # Since it will get checked on each step, and will call stops if greater than 80.
+    # Check StopProfit and StopLoss on each Position to see if needs updating.
+    # cTrader.HistoricalRets should have most recent data.
+    cTrader.lastStop = step
+    return cTrader
+
+def emailStopsDesires(stops,desires):
+    # Compose email with stops first and desires second and send.
+    print stops,desires
 
 def initCurrentTrader(keyname, step=20000, Cash=100000.0, TradeSize = 25000.0):
     import liveAlg
-    technique = 'FTLe-R3'
-    R = 'R3'
+    technique = 'FTLe-R5'
+    R = 'R5'
     # Get last completed liveAlg stopStep, startStep within last 400 steps.
     # If none, will throw error.
     lastLiveAlg = meSchema.liveAlg.all().filter('stopStep >', step - 401).order('-stopStep').get()
@@ -60,17 +155,21 @@ def initCurrentTrader(keyname, step=20000, Cash=100000.0, TradeSize = 25000.0):
     # Build currentTrader.
     HistoricalRets = initHistoricalRets(step, stopStep)
 
-    newCurrentTrader = meSchema.currentTrader(key_name = keyname, meAlgKey = bestMeAlgKey,
+    newCurrentTrader = meSchema.currentTrader(key_name = keyname, LastAlgUpdateStep = stopStep, meAlgKey = bestMeAlgKey,
                                               BuyQuoteDelta = BuyQuoteDelta, BuyTimeDelta = BuyTimeDelta,
                                               SellQuoteDelta = SellQuoteDelta, SellTimeDelta = SellTimeDelta,
-                                              lastBuy = 0, lastSell = 0, Cash = Cash, TradeSize = TradeSize,
+                                              lastBuy = 0, lastSell = 0, lastStop = step, Cash = Cash, TradeSize = TradeSize,
                                               Positions = repr({}), PosVal = 0.0, PandL = 0.0, percentReturn = 0.0,
                                               HistoricalRets = repr(HistoricalRets), TradeDesires = repr({}), TradeFills = repr({}),
                                               LiveAlgTechne = bestLiveAlgTechne)
     db.put(newCurrentTrader)
 
+def getBaseStopStep(LastAlgUpdateStep):
+    baseStopStep = LastAlgUpdateStep - 43
+    return baseStopStep
+
 def initHistoricalRets(currentStep, lastLiveAlgStop, stckIDs = [1,2,3,4]):
-    baseStopStep = lastLiveAlgStop - 43  # 37,43  Should give Stop point of 12:30
+    baseStopStep = getBaseStopStep(lastLiveAlgStop)
     # Must build out list of 29 total daily stop steps to calculate collection of 1,2,3 and 4 day return values over last 25 days.
     daysSinceBaseStop = [step for step in range(baseStopStep, currentStep, 80)]
     daysBeforeBaseStop = [step for step in range(baseStopStep - 80*(29 - len(daysSinceBaseStop)), baseStopStep, 80)]
@@ -179,6 +278,16 @@ def getMaxMinDevMeans(histRets):
         maxMinDevMeans[stck] = {'maxDevMean' : maxDevMean, 'minDevMean' : minDevMean,
                                 'maxDev' : maxDev, 'minDev' : minDev}
     return maxMinDevMeans
+
+
+application = webapp.WSGIApplication([('/CurrentTrader/go',goCurrentTrader)],
+                                     debug = True)
+
+def main():
+    run_wsgi_app(application)
+
+if __name__ == "__main__":
+    main()
 
 
 
