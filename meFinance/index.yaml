@@ -159,3 +159,8 @@ indexes:
   - name: startStep
   - name: R6
     direction: desc
+    
+- kind: desire
+  properties:
+  - name: __key__
+    direction: desc
