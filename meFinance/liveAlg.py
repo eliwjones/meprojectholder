@@ -110,6 +110,8 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,
     for liveAlgKey in bestAlgs:
         algKey = bestAlgs[liveAlgKey]
         alginfo = meSchema.memGet(meSchema.meAlg,algKey)
+        if len(stckIDorder) == 3:
+            alginfo.TradeSize = 0.315
         desires = getStepRangeAlgDesires(algKey,alginfo,start,stop)
         buydelta = meSchema.memGet(meSchema.tradeCue,alginfo.BuyCue).TimeDelta
         selldelta = meSchema.memGet(meSchema.tradeCue,alginfo.SellCue).TimeDelta

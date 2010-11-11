@@ -290,12 +290,15 @@ def outputPLstats(keyname, namespace = ''):
                 tradeDict[stock]['L'] += trade['PandL'] - 10.0
                 tradeDict[stock]['Ltrades'].append(trade['PandL'] - 10.0)
         for stock in tradeDict:
-            stdDevP, meanP = processDesires.getStandardDeviationMean(tradeDict[stock]['Ptrades'])
-            stdDevL, meanL = processDesires.getStandardDeviationMean(tradeDict[stock]['Ltrades'])
-            print stock, ':', tradeDict[stock]['P'], ':', max(tradeDict[stock]['Ptrades']),
-            print ':', len(tradeDict[stock]['Ptrades']), ':', meanP, ' stdDev:', stdDevP
-            print stock, ':', tradeDict[stock]['L'], ':', min(tradeDict[stock]['Ltrades']),
-            print ':', len(tradeDict[stock]['Ltrades']), ':', meanL, ' stdDev:', stdDevL
+            try:
+                stdDevP, meanP = processDesires.getStandardDeviationMean(tradeDict[stock]['Ptrades'])
+                stdDevL, meanL = processDesires.getStandardDeviationMean(tradeDict[stock]['Ltrades'])
+                print stock, ':', tradeDict[stock]['P'], ':', max(tradeDict[stock]['Ptrades']),
+                print ':', len(tradeDict[stock]['Ptrades']), ':', meanP, ' stdDev:', stdDevP
+                print stock, ':', tradeDict[stock]['L'], ':', min(tradeDict[stock]['Ltrades']),
+                print ':', len(tradeDict[stock]['Ltrades']), ':', meanL, ' stdDev:', stdDevL
+            except:
+                print 'Error Encountered!'
     finally:
         namespace_manager.set_namespace(originalNamespace)
 
