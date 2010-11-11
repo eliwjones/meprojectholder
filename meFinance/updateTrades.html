@@ -1,0 +1,26 @@
+<html>
+  <body>
+    <b>CurrentTrader Positions:</b><br>
+    <b>------------------------</b><br>
+    {% for pos in Positions %}
+        Step       = {{Positions[pos]['Step']}}<br>
+        Symbol     = {{pos}}<br>
+        Shares     = {{Positions[pos]['Shares']}}<br>
+        Price      = {{Positions[pos]['Price']}}<br>
+        StopLoss   = {{Positions[pos]['StopLoss']}}<br>
+        StopProfit = {{Positions[pos]['StopProfit']}}<br>
+        *************************************<br>
+    {% endfor %}
+    <br><b>Put New Trade!</b><br>
+    <form action="/CurrentTrader/putNewTrade" method="Post">
+        <div><textarea name="Step" rows="1" cols="50"></textarea><b>:Step</b></div>
+        <div><textarea name="Symbol" rows="1" cols="50"></textarea><b>:Symbol</b></div>
+        <div><textarea name="Shares" rows="1" cols="50"></textarea><b>:Shares</b></div>
+        <div><textarea name="Price" rows="1" cols="50"></textarea><b>:Price</b></div>
+        <div><textarea name="StopLoss" rows="1" cols="50"></textarea><b>:StopLoss</b></div>
+        <div><textarea name="StopProfit" rows="1" cols="50"></textarea><b>:StopProfit</b></div>
+        <div><input type="submit" value="Put New Trade"></div>
+    </form>
+    <br>
+  </body>
+</html>

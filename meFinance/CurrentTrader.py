@@ -1,6 +1,7 @@
 import meSchema
 from collections import deque
 from google.appengine.ext import webapp
+from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.api.labs import taskqueue
 from google.appengine.ext import db
@@ -18,15 +19,44 @@ class goCurrentTrader(webapp.RequestHandler):
         doCurrentTrading(step)
 
 class updateFilledTrades(webapp.RequestHandler):
+    '''
+     Still not sure how should handle Cash update or percentReturn.
+     Currently, only lastBuy, lastSell will govern an emailed desire.
+     Cash amount is only for monitoring purposes.. but I can simply
+       look at Cash level in actual account. Same for percentReturn.
+     TradeDesires may be impractical since I do not want to db.put() for each step.
+    '''
     def get(self):
-        self.response.headers['Content-Type'] = 'text/plain'
-        self.response.out.write('I am used to input filled trades or stops.')
-        self.response.out.write('Add code here to update PandL, Positions, TradeFills, lastBuy, lastStell')
-        # Still not sure how should handle Cash update or percentReturn.
-        # Currently, only lastBuy, lastSell will govern an emailed desire.
-        # Cash amount is only for monitoring purposes.. but I can simply
-        #  look at Cash level in actual account. Same for percentReturn.
-        # TradeDesires may be impractical since I do not want to db.put() for each step.
+        cTrader = meSchema.currentTrader.get_by_key_name('1')
+        Positions = eval(cTrader.Positions)
+
+        template_values = {'cTrader' : cTrader,
+                           'Positions' : Positions}
+        
+        path = os.path.join(os.path.dirname(__file__), 'updateTrades.html')
+        self.response.out.write(template.render(path, template_values))
+
+class putNewTrade(webapp.RequestHandler):
+    def post(self):
+        # get params for trade, get cTrader, update positions, lastBuy or lastSell
+        Step       = int(self.request.get('Step'))
+        Symbol     = str(self.request.get('Symbol')).upper()
+        Shares     = int(self.request.get('Shares'))
+        Price      = float(self.request.get('Price'))
+        StopLoss   = float(self.request.get('StopLoss'))
+        StopProfit = float(self.request.get('StopProfit'))
+        
+        cTrader = meSchema.currentTrader.get_by_key_name('1')
+        Positions = eval(cTrader.Positions)
+        Positions[Symbol] = {'Step':Step, 'Shares':Shares, 'Price':Price, 'StopLoss':StopLoss, 'StopProfit':StopProfit}
+        cTrader.Positions = repr(Positions)
+        buysell = cmp(Shares,0)
+        if buysell == 1:
+            cTrader.lastBuy = Step
+        elif buysell == -1:
+            cTrader.lastSell = Step
+        db.put(cTrader)
+        self.redirect('/CurrentTrader/fillTrades')
 
 def taskAdd(step,taskname,wait=.5):
     try:
@@ -192,7 +222,7 @@ def calculateShares(quote, BuySell, tradesize):
     
 def doStops(step, Positions, quoteDict):
     '''
-    Positions = {'HBC':{'Shares':467, 'Price':54.38, 'StopProfit': 55.01, 'StopLoss': 53.80}}
+    Positions = {'HBC':{'Shares':467, 'Price':54.38, 'StopProfit': 55.01, 'StopLoss': 53.80, 'Step':19992}}
     '''
     stops = {}
     for symbol in Positions:
@@ -410,7 +440,8 @@ def getMaxMinDevMeans(histRets):
 
 
 application = webapp.WSGIApplication([('/CurrentTrader/go',goCurrentTrader),
-                                      ('/CurrentTrader/fillTrades',updateFilledTrades)],
+                                      ('/CurrentTrader/fillTrades',updateFilledTrades),
+                                      ('/CurrentTrader/putNewTrade',putNewTrade)],
                                      debug = True)
 
 def main():
