@@ -129,7 +129,7 @@ def doLiveAlgCompounds(stopStep, startStep, name, i, liveAlgs):
     memKeys = []
     for LAlg in liveAlgs:
         technique = LAlg.technique
-        for stepback in [1,2,3,4]:
+        for stepback in [1,2,3,4,5]:
             newStop = stopStep - 400*stepback
             newStart = startStep - 400*stepback
             memkey = buildMemKey(newStop, newStart, technique, 'LAR-')
@@ -140,10 +140,12 @@ def doLiveAlgCompounds(stopStep, startStep, name, i, liveAlgs):
         R3 = R2*(1.0 + getRReturn(stopStep, startStep, LAlg.technique, 2, prevReturns, 'LAR-'))
         R4 = R3*(1.0 + getRReturn(stopStep, startStep, LAlg.technique, 3, prevReturns, 'LAR-'))
         R5 = R4*(1.0 + getRReturn(stopStep, startStep, LAlg.technique, 4, prevReturns, 'LAR-'))
+        R6 = R5*(1.0 + getRReturn(stopStep, startStep, LAlg.technique, 5, prevReturns, 'LAR-'))
         LAlg.R2 = R2
         LAlg.R3 = R3
         LAlg.R4 = R4
         LAlg.R5 = R5
+        LAlg.R6 = R6
         putList.append(LAlg)
     db.put(putList)
 

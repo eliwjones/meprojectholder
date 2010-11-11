@@ -152,3 +152,10 @@ indexes:
   - name: startStep
   - name: R5
     direction: desc
+
+- kind: liveAlg
+  properties:
+  - name: stopStep
+  - name: startStep
+  - name: R6
+    direction: desc
