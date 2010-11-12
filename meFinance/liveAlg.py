@@ -104,14 +104,15 @@ def getCurrentReturn(liveAlgInfo,stopStep, Cash = None):
     return liveAlgInfo
         
 
-def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,3,4]):
+def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,3,4], MaxTrade = False):
     originalNameSpace = namespace_manager.get_namespace()
     namespace_manager.set_namespace('')
     for liveAlgKey in bestAlgs:
         algKey = bestAlgs[liveAlgKey]
         alginfo = meSchema.memGet(meSchema.meAlg,algKey)
-        if len(stckIDorder) == 3:
-            alginfo.TradeSize = 0.315
+        if MaxTrade:
+            alginfo.Cash = alginfo.Cash + liveAlgInfo[liveAlgKey].PandL
+            alginfo.TradeSize = (0.94/len(stckIDorder))
         desires = getStepRangeAlgDesires(algKey,alginfo,start,stop)
         buydelta = meSchema.memGet(meSchema.tradeCue,alginfo.BuyCue).TimeDelta
         selldelta = meSchema.memGet(meSchema.tradeCue,alginfo.SellCue).TimeDelta
