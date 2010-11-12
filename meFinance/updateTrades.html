@@ -2,13 +2,8 @@
   <body>
     <b>CurrentTrader Positions:</b><br>
     <b>------------------------</b><br>
-    {% for pos in Positions %}
-        Step       = {{Positions[pos]['Step']}}<br>
-        Symbol     = {{pos}}<br>
-        Shares     = {{Positions[pos]['Shares']}}<br>
-        Price      = {{Positions[pos]['Price']}}<br>
-        StopLoss   = {{Positions[pos]['StopLoss']}}<br>
-        StopProfit = {{Positions[pos]['StopProfit']}}<br>
+    {% for pos in Positions.items %}
+        {{ pos.0 }}: {{ pos.1 }} <br>
         *************************************<br>
     {% endfor %}
     <br><b>Put New Trade!</b><br>

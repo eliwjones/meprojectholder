@@ -27,6 +27,7 @@ class updateFilledTrades(webapp.RequestHandler):
      TradeDesires may be impractical since I do not want to db.put() for each step.
     '''
     def get(self):
+        import os
         cTrader = meSchema.currentTrader.get_by_key_name('1')
         Positions = eval(cTrader.Positions)
 
@@ -48,6 +49,9 @@ class putNewTrade(webapp.RequestHandler):
         
         cTrader = meSchema.currentTrader.get_by_key_name('1')
         Positions = eval(cTrader.Positions)
+        # Can add code here to see if Symbol in Positions
+        #   If found, get price difference and calculate PandL.
+        # For now, not worrying about this since PandL is implicit.
         Positions[Symbol] = {'Step':Step, 'Shares':Shares, 'Price':Price, 'StopLoss':StopLoss, 'StopProfit':StopProfit}
         cTrader.Positions = repr(Positions)
         buysell = cmp(Shares,0)
