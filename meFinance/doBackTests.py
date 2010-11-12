@@ -70,7 +70,8 @@ def addTaskRange(initialStopStep, globalStop, unique, namespace, batchSize=5):
     from google.appengine.api import namespace_manager
     namespace_manager.set_namespace('')
     startAlg = 1
-    stopAlg = 3540
+    #stopAlg = 3540
+    stopAlg = int(meSchema.meAlg.all(keys_only=True).order('-__key__').get().name())
     for i in range(initialStopStep, globalStop+1, 400):
         stopStep = i
         stepRange = [stopStep - 1600]

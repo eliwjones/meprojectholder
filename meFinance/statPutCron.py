@@ -6,6 +6,7 @@ from google.appengine.datastore import entity_pb
 from google.appengine.api import memcache
 from datetime import datetime, date
 import meSchema
+import CurrentTrader
 
 
 class putStats(webapp.RequestHandler):
@@ -40,6 +41,7 @@ class putStats(webapp.RequestHandler):
             result = db.GqlQuery("Select * from stepDate Order By step desc").fetch(1)
             step = result[0].step + 1
         putEm(step)
+        CurrentTrader.taskAdd(step,'doCTrader-' + str(step) + '-LiveTrade')
         if count <= 79:
             now = datetime.today()
             seconds = 60*(now.minute) + now.second

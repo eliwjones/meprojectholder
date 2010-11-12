@@ -164,3 +164,8 @@ indexes:
   properties:
   - name: __key__
     direction: desc
+
+- kind: meAlg
+  properties:
+  - name: __key__
+    direction: desc

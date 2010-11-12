@@ -1,7 +1,6 @@
 import meSchema
 from collections import deque
 from google.appengine.ext import webapp
-from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.api.labs import taskqueue
 from google.appengine.ext import db
@@ -28,6 +27,7 @@ class updateFilledTrades(webapp.RequestHandler):
     '''
     def get(self):
         import os
+        from google.appengine.ext.webapp import template
         cTrader = meSchema.currentTrader.get_by_key_name('1')
         Positions = eval(cTrader.Positions)
 
@@ -286,8 +286,8 @@ def emailStopsDesires(stops,desires,step):
         body += symbol + ': ' + str(desires['Sell'][symbol]) + '\n'
     body += '\n********************************\n'
     body +=  "That's all there is for now!\n"
-        
-    mail.send_mail(email,email,subject,body)
+    if len(desires['Buy']) > 0 or len(desires['Sell']) > 0 or len(stops) > 0:
+        mail.send_mail(email,email,subject,body)
 
 def initCurrentTrader(keyname, step=20000, Cash=100000.0, TradeSize = 25000.0):
     import liveAlg
