@@ -302,6 +302,44 @@ def outputPLstats(keyname, namespace = ''):
     finally:
         namespace_manager.set_namespace(originalNamespace)
 
+def outputHistoryForChart(keyname):
+    meta = meSchema.metaAlg.get_by_key_name(keyname)
+    history = eval(meta.history)
+    returns = deque([])
+    steps = deque([])
+    for hist in history:
+        steps.appendleft(hist['step'])
+        returns.appendleft(hist['return'])
+
+    # Need to get stock quotes for step in steps.. and calculate averaged return
+    # step[0] - 400 is the reference step.
+    quoteSteps = [steps[0] - 400]
+    quoteSteps.extend(steps)
+    stckKeys = []
+    for step in quoteSteps:
+        for stckID in [1,2,3,4]:
+            stckKeys.append(str(stckID) + '_' + str(step))
+    stckQuotes = meSchema.stck.get_by_key_name(stckKeys)
+    stckReturns = []
+    for i in range(4, len(stckQuotes), 4):
+        rets = []
+        for j in range(0,4):
+            rets.append((stckQuotes[i+j].quote - stckQuotes[j].quote)/stckQuotes[j].quote)
+        average = sum(rets)/len(rets)
+        stckReturns.append(average)
+    print 'Long Basket Returns: ',
+    for ret in stckReturns:
+        print '%2.3f' % (100*ret),
+    print ''
+    print 'Returns: ',
+    for ret in returns:
+        print '%2.3f' % (100*ret),
+    print ''
+    print 'Steps: ',
+    for step in steps:
+        print step,
+    print ''
+
 def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, stckIDorder, metaModel = meSchema.metaAlg, Vs = None):
     Cash = 100000.0
     if Vs is None:
