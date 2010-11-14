@@ -17,6 +17,12 @@ def updateAllAlgStats(alphaAlg=1,omegaAlg=10620):
         updateAlgStat(key_name)
 
 def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_"):
+    if namespace == '':
+        stckIDs = [1,2,3,4]
+        accumulate = False
+    else:
+        stckIDs = [meSchema.getStckID(namespace)]
+        accumulate = True
     lastStep = stopStep
     alginfo = meSchema.memGet(meSchema.meAlg,algKey)
     desires = liveAlg.getStepRangeAlgDesires(algKey, alginfo, startStep, stopStep)
@@ -33,11 +39,7 @@ def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_
         # Shift back step - start by 44 to get midday stop.
         if (step - int(startStep) - 44)%stopRange == 0:
             stats = doStops(step, eval(repr(stats)), alginfo, stopRange)
-        if namespace == '':
-            potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in [1,2,3,4]]
-        else:
-            # If namespace nonempty, build desire key for that stckID only.
-            potentialDesires = [meSchema.buildDesireKey(step, algKey, meSchema.getStckID(namespace))]
+        potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in stckIDs]
         potentialDesires.sort()
         for key in potentialDesires:
             if key in orderDesires:
@@ -46,7 +48,7 @@ def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_
                 for des in currentDesire:
                     buysell = cmp(currentDesire[des]['Shares'],0)
                     Symbol = des
-                tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(repr(stats['Positions'])), step)
+                tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(repr(stats['Positions'])), step, accumulate)
                 cash = tradeCash + eval(repr(stats['Cash']))
                 if buysell == -1:
                     timedelta = selldelta

@@ -302,8 +302,19 @@ def outputPLstats(keyname, namespace = ''):
     finally:
         namespace_manager.set_namespace(originalNamespace)
 
-def outputHistoryForChart(keyname):
-    meta = meSchema.metaAlg.get_by_key_name(keyname)
+def outputHistoryForChart(keyname, namespace = ''):
+    originalNamespace = namespace_manager.get_namespace()
+    if namespace == '':
+        stckIDs = [1,2,3,4]
+    else:
+        stckIDs = [meSchema.getStckID(namespace)]
+
+    try:
+        namespace_manager.set_namespace(namespace)
+        meta = meSchema.metaAlg.get_by_key_name(keyname)
+    finally:
+        namespace_manager.set_namespace(originalNamespace)
+        
     history = eval(meta.history)
     returns = deque([])
     steps = deque([])
@@ -317,13 +328,13 @@ def outputHistoryForChart(keyname):
     quoteSteps.extend(steps)
     stckKeys = []
     for step in quoteSteps:
-        for stckID in [1,2,3,4]:
+        for stckID in stckIDs:
             stckKeys.append(str(stckID) + '_' + str(step))
     stckQuotes = meSchema.stck.get_by_key_name(stckKeys)
     stckReturns = []
-    for i in range(4, len(stckQuotes), 4):
+    for i in range(len(stckIDs), len(stckQuotes), len(stckIDs)):
         rets = []
-        for j in range(0,4):
+        for j in range(0,len(stckIDs)):
             rets.append((stckQuotes[i+j].quote - stckQuotes[j].quote)/stckQuotes[j].quote)
         average = sum(rets)/len(rets)
         stckReturns.append(average)
@@ -339,6 +350,7 @@ def outputHistoryForChart(keyname):
     for step in steps:
         print step,
     print ''
+
 
 def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, stckIDorder, metaModel = meSchema.metaAlg, Vs = None):
     Cash = 100000.0

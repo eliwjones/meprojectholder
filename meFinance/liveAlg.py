@@ -107,6 +107,12 @@ def getCurrentReturn(liveAlgInfo,stopStep, Cash = None):
 def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,3,4], MaxTrade = False):
     originalNameSpace = namespace_manager.get_namespace()
     namespace_manager.set_namespace('')
+    if originalNameSpace == '':
+        accumulate = False
+    else:
+        accumulate = True
+        stckIDorder = [meSchema.getStckID(originalNameSpace)]
+    
     for liveAlgKey in bestAlgs:
         algKey = bestAlgs[liveAlgKey]
         alginfo = meSchema.memGet(meSchema.meAlg,algKey)
@@ -143,10 +149,7 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,
                 liveAlgInfo[liveAlgKey].Positions = repr(stats['Positions'])
                 liveAlgInfo[liveAlgKey].PandL     = stats['PandL']
                 liveAlgInfo[liveAlgKey].Cash      = stats['Cash']
-            if originalNameSpace == '':
-                potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in stckIDorder]
-            else:
-                potentialDesires = [meSchema.buildDesireKey(step, algKey, meSchema.getStckID(originalNameSpace))]
+            potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in stckIDorder]
             for key in potentialDesires:
                 if key in orderDesires:
                     currentDesire = eval(desires[key])
@@ -154,7 +157,7 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,
                     for des in currentDesire:
                         buysell = cmp(currentDesire[des]['Shares'],0)
                         Symbol = des
-                    tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(liveAlgInfo[liveAlgKey].Positions), step)
+                    tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(liveAlgInfo[liveAlgKey].Positions), step, accumulate)
                     cash = tradeCash + eval(repr(liveAlgInfo[liveAlgKey].Cash))
                     if buysell == -1:
                         timedelta = selldelta

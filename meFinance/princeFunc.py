@@ -88,7 +88,7 @@ def getAlgQueryStr(alphaAlg='0',omegaAlg='999999'):
        stopProfit: quote used to close out hopefully for profit. Default = +16%
 '''
 
-def mergePosition(desire,positions,step,isStop=False):
+def mergePosition(desire,positions,step,accumulate=False):
     cash = 0
     PandL = 0
     for pos in desire:
@@ -125,12 +125,8 @@ def mergePosition(desire,positions,step,isStop=False):
                 positions[pos]['Price'] = (positions[pos]['Value'])/(positions[pos]['Shares'])
                 positions[pos]['Step'] = step
                 # Again, preventing accumulation of position size.
-                cash = -1000000000
-                # Consider modifying StopLoss, StopProfit when merging position?
-            '''
-            # Adding check to prevent accumulation of already open positions.. and to prevent closing by desires.
-            if not isStop:
-                cash = -1000000000 '''
+                if not accumulate:
+                    cash = -1000000000
         else:
             cash += -abs(desire[pos]['Value'])
             longshort = cmp(desire[pos]['Shares'],0)
