@@ -302,6 +302,36 @@ def outputPLstats(keyname, namespace = ''):
     finally:
         namespace_manager.set_namespace(originalNamespace)
 
+def outputPerStockHistoryForChart(keyname):
+    from math import floor,ceil
+    
+    originalNamespace = namespace_manager.get_namespace()
+    try:
+        namespace_manager.set_namespace('')
+        meta = meSchema.metaAlg.get_by_key_name(keyname)
+    finally:
+        namespace_manager.set_namespace(originalNamespace)
+    stopSteps = []
+    history = eval(meta.history)
+    for hist in history:
+        stopSteps.append(hist['step'])
+    stopSteps.sort()
+    trades = eval(meta.CashDelta)
+    returnDict = {'HBC':{},'CME':{},'GOOG':{},'INTC':{}}
+    for stopStep in stopSteps:
+        for key in returnDict:
+            returnDict[key][stopStep] = 0.0
+    for trade in trades:
+        tradeIndex = (trade['step'] - stopSteps[0])/400.0
+        stopStep = stopSteps[int(ceil(tradeIndex))]
+        returnDict[trade['Symbol']][stopStep] += trade['PandL']
+    for stock in returnDict:
+        print stock,':',
+        for step in stopSteps:
+            print returnDict[stock][step],
+        print
+            
+
 def outputHistoryForChart(keyname, namespace = ''):
     originalNamespace = namespace_manager.get_namespace()
     if namespace == '':
