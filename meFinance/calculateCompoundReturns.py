@@ -41,10 +41,14 @@ def fanoutTaskAdd(stopStep, startStep, globalStop, namespace, name, cType):
     elif cType == 'LiveAlg':
         calcUrl = '/calculate/compounds/liveAlgCompounds'
     stepRange = stopStep - startStep
-    for i in range(stopStep, globalStop + 1, 1600):
+    if stepRange == 800:
+        stepBlock = 2800
+    elif stepRange == 1600:
+        stepBlock = 2000
+    for i in range(stopStep, globalStop + 1, stepBlock):
         newStopStep = i
         newStartStep = newStopStep - stepRange
-        newGlobalStop = min(newStopStep + 1600 - 1, globalStop)
+        newGlobalStop = min(newStopStep + stepBlock - 1, globalStop)
         taskAdd(newStopStep, newStartStep, newGlobalStop, namespace, name, 0, '', calcUrl)
 
 def taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, calcUrl, wait = 0.5):
@@ -125,11 +129,15 @@ def doCompoundReturns(stopStep, startStep, globalStop, namespace, name = '', i =
         taskAdd(stopStep, startStep, globalStop, namespace, name, 0, '', '/calculate/compounds/bTestCompounds')
 
 def doLiveAlgCompounds(stopStep, startStep, name, i, liveAlgs):
+    stepBacks = [1,2,3,4,5]
+    stepRange = stopStep - startStep
+    if stepRange == 800:
+        stepBacks.extend([6,7])
     putList = []
     memKeys = []
     for LAlg in liveAlgs:
         technique = LAlg.technique
-        for stepback in [1,2,3,4,5]:
+        for stepback in stepBacks:
             newStop = stopStep - 400*stepback
             newStart = startStep - 400*stepback
             memkey = buildMemKey(newStop, newStart, technique, 'LAR-')
@@ -146,6 +154,11 @@ def doLiveAlgCompounds(stopStep, startStep, name, i, liveAlgs):
         LAlg.R4 = R4
         LAlg.R5 = R5
         LAlg.R6 = R6
+        if stepRange == 800:
+            R7 = R6*(1.0 + getRReturn(stopStep, startStep, LAlg.technique, 6, prevReturns, 'LAR-'))
+            R8 = R7*(1.0 + getRReturn(stopStep, startStep, LAlg.technique, 7, prevReturns, 'LAR-'))
+            LAlg.R7 = R7
+            LAlg.R8 = R8
         putList.append(LAlg)
     db.put(putList)
 

@@ -107,6 +107,8 @@ class liveAlg(db.Model):
     R4            = db.FloatProperty(required=False)
     R5            = db.FloatProperty(required=False)
     R6            = db.FloatProperty(required=False)
+    R7            = db.FloatProperty(required=False)
+    R8            = db.FloatProperty(required=False)
     N             = db.IntegerProperty(required=False)
     numTrades     = db.IntegerProperty(required=True)
     history       = db.TextProperty(required=False)
