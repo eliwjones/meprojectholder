@@ -120,6 +120,7 @@ class liveAlg(db.Model):
 class metaAlg(db.Model):
     stopStep      = db.IntegerProperty(required=True)
     startStep     = db.IntegerProperty(required=True)
+    stepRange     = db.IntegerProperty(required=False)
     lastBuy       = db.IntegerProperty(required=True)
     lastSell      = db.IntegerProperty(required=True)
     percentReturn = db.FloatProperty(required=True)

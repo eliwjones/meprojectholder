@@ -66,15 +66,14 @@ class doBackTestBatch(webapp.RequestHandler):
         namespace = str(self.request.get('namespace'))
         backTestBatch(algBatch, monthBatch, stopStep, namespace)
 
-def addTaskRange(initialStopStep, globalStop, unique, namespace, batchSize=5):
+def addTaskRange(initialStopStep, globalStop, unique, namespace, batchSize=5, stepsBack=1600):
     from google.appengine.api import namespace_manager
     namespace_manager.set_namespace('')
     startAlg = 1
-    #stopAlg = 3540
     stopAlg = int(meSchema.meAlg.all(keys_only=True).order('-__key__').get().name())
     for i in range(initialStopStep, globalStop+1, 400):
         stopStep = i
-        stepRange = [stopStep - 1600]
+        stepRange = [stopStep - stepsBack]  # Default 1600 does 4 week long back test. Using 800 would do 2 week ones.
         name = unique + '-' + str(startAlg) + '-' + str(stopAlg) + '-' + str(stopStep) + '-' + namespace
         mainTaskAdd(name, startAlg, stopAlg, stopStep, batchSize, stepRange, unique, namespace)
 

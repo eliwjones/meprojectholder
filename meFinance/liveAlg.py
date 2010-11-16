@@ -207,7 +207,7 @@ def getBestAlgs(stopStep, liveAlgInfo):
     for algKey in liveAlgInfo:
         # Must get .technique and .stepRange from liveAlgInfo
         #   to decide appropriate action.
-        startStep = stopStep - 1600 #liveAlgInfo[algKey].stepRange   # Changing to hardcode 1600 to force test.
+        startStep = stopStep - liveAlgInfo[algKey].stepRange   # Changing to hardcode 1600 to force test.
         technique = liveAlgInfo[algKey].technique
         bestAlgs[algKey] = getTopAlg(stopStep, startStep, technique)
     return bestAlgs

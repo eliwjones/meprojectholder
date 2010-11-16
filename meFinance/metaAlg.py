@@ -38,7 +38,7 @@ def doRangeOfBatches(globalStop, weeksBack, runLength, namespace, name):
 def doDeferredBatchAdd(startStep, stopStep, FTLlist, Rs, namespace, name, metaMeta):
     deferred.defer(taskAdd, startStep, stopStep, FTLlist, Rs, namespace, name, metaMeta)
 
-def taskAdd(startStep, stopStep, FTLlist, Rs, namespace, name, stckIDorder, metaMeta):
+def taskAdd(startStep, stopStep, FTLlist, Rs, namespace, name, stckIDorder, metaMeta, stepRange = 1600):
     tasklist = []
     namespace_manager.set_namespace(namespace)
     if metaMeta.lower() == 'true':
@@ -48,7 +48,7 @@ def taskAdd(startStep, stopStep, FTLlist, Rs, namespace, name, stckIDorder, meta
         Vs = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, stckIDorder, metaModel)
     else:
         metaModel = meSchema.metaAlg
-        keynames = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, stckIDorder, metaModel)
+        keynames = initializeMetaAlgs(FTLlist, Rs, startStep, stopStep, stckIDorder, metaModel, stepRange)
         
     for keyname in keynames:
         taskname = 'metaAlg-Calculator-' + name + '-' + keyname + '-' + namespace
@@ -150,7 +150,7 @@ def getMetaAlgInfo(metaKeys, metaModel):
 def getBestLiveAlgs(stopStep, metaAlgInfo):
     bestLiveAlgs = {}
     for metaAlgKey in metaAlgInfo:
-        startStep = stopStep - 1600
+        startStep = stopStep - metaAlgInfo[metaAlgKey].stepRange
         technique = metaAlgInfo[metaAlgKey].technique
         bestLiveAlgs[metaAlgKey] = getTopLiveAlg(stopStep, startStep, technique)
     return bestLiveAlgs
@@ -382,7 +382,7 @@ def outputHistoryForChart(keyname, namespace = ''):
     print ''
 
 
-def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, stckIDorder, metaModel = meSchema.metaAlg, Vs = None):
+def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, stckIDorder, metaModel = meSchema.metaAlg, stepRange = 1600, Vs = None):
     Cash = 100000.0
     if Vs is None:
         Vs = ['V' + str(i).rjust(3,'0') for i in range(1,2)]
@@ -390,7 +390,7 @@ def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, stckIDorder, metaMod
     for FTL in FTLtype:
         for R in Rtype:
             for v in Vs:
-                keyname = str(startStep).rjust(7,'0') + '-' + str(stopStep).rjust(7,'0')  + '-' + FTL + '-' + R + '-' + v
+                keyname = str(startStep).rjust(7,'0') + '-' + str(stopStep).rjust(7,'0')  + '-' + FTL + '-' + R + '-' + v + '-' + str(stepRange).rjust(5,'0')
                 keyname = keyname + '-'
                 for stckID in stckIDorder:
                     keyname = keyname + str(stckID)
@@ -400,7 +400,7 @@ def initializeMetaAlgs(FTLtype, Rtype, startStep, stopStep, stckIDorder, metaMod
         split = mAlgKey.split('-')
         technique = split[2] + '-' + split[3]
         metaAlg = metaModel(key_name = mAlgKey,
-                            stopStep = stopStep, startStep = startStep,
+                            stopStep = stopStep, startStep = startStep, stepRange = stepRange,
                             lastBuy = 0, lastSell = 0,
                             percentReturn = 0.0, Positions = repr({}),
                             PosVal = 0.0, PandL = 0.0, CashDelta = repr(deque([])),
