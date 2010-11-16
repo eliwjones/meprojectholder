@@ -62,6 +62,39 @@ class putNewTrade(webapp.RequestHandler):
         db.put(cTrader)
         self.redirect('/CurrentTrader/fillTrades')
 
+class closeTrade(webapp.RequestHandler):
+    def post(self):
+        # If was a Stop, then do not update Sell, Buy Step.
+        try:
+            Step = int(self.request.get('Step'))
+        except:
+            Step = str(self.request.get('Step')).upper()
+            if Step != 'STOP':
+                raise
+        Symbol = str(self.request.get('Symbol')).upper()
+        Price  = float(self.request.get('Price'))
+
+        cTrader = meSchema.currentTrader.get_by_key_name('1')
+        Positions = eval(cTrader.Positions)
+        ClosePosition = Positions[Symbol]
+        Shares = ClosePosition['Shares']
+        Commission = 2*max(10.00,Shares*0.01)
+        PriceDiff = Price - ClosePosition['Price']
+        PandL = (Shares*PriceDiff) - Commission
+        
+        del Positions[Symbol]
+        cTrader.Positions = repr(Positions)
+        cTrader.PandL = cTrader.PandL + PandL
+        if Step != 'STOP':
+            buysell = cmp(Shares,0)
+            if buysell == 1:
+                cTrader.lastBuy = Step
+            elif buysell == -1:
+                cTrader.lastSell = Step
+        db.put(cTrader)
+        self.redirect('/CurrentTrader/fillTrades')
+        
+
 def taskAdd(step,taskname,wait=.5):
     try:
         taskqueue.add(url    = '/CurrentTrader/go', countdown = 0,
@@ -443,9 +476,10 @@ def getMaxMinDevMeans(histRets):
     return maxMinDevMeans
 
 
-application = webapp.WSGIApplication([('/CurrentTrader/go',goCurrentTrader),
-                                      ('/CurrentTrader/fillTrades',updateFilledTrades),
-                                      ('/CurrentTrader/putNewTrade',putNewTrade)],
+application = webapp.WSGIApplication([('/CurrentTrader/go', goCurrentTrader),
+                                      ('/CurrentTrader/fillTrades', updateFilledTrades),
+                                      ('/CurrentTrader/putNewTrade', putNewTrade),
+                                      ('/CurrentTrader/closeTrade', closeTrade)],
                                      debug = True)
 
 def main():
