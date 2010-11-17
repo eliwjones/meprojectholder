@@ -104,7 +104,7 @@ def getCurrentReturn(liveAlgInfo,stopStep, Cash = None):
     return liveAlgInfo
         
 
-def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,3,4], MaxTrade = False):
+def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,3,4], MaxTrade = False, scaleFactor = 0.0):
     originalNameSpace = namespace_manager.get_namespace()
     namespace_manager.set_namespace('')
     if originalNameSpace == '':
@@ -144,7 +144,7 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,
                     be consistent if compared to fixed day.
                 '''
                 stats = convertLiveAlgInfoToStatDict(liveAlgInfo[liveAlgKey])
-                stats = processDesires.doStops(step, stats, alginfo, stopRange)
+                stats = processDesires.doStops(step, stats, alginfo, stopRange, scaleFactor)
                 liveAlgInfo[liveAlgKey].CashDelta = repr(stats['CashDelta'])
                 liveAlgInfo[liveAlgKey].Positions = repr(stats['Positions'])
                 liveAlgInfo[liveAlgKey].PandL     = stats['PandL']

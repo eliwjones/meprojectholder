@@ -159,6 +159,20 @@ indexes:
   - name: startStep
   - name: R6
     direction: desc
+
+- kind: liveAlg
+  properties:
+  - name: stopStep
+  - name: startStep
+  - name: R7
+    direction: desc
+
+- kind: liveAlg
+  properties:
+  - name: stopStep
+  - name: startStep
+  - name: R8
+    direction: desc
     
 - kind: desire
   properties:

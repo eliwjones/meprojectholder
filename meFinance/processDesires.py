@@ -71,7 +71,7 @@ def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_
     bTestReturns = getBackTestReturns([memprefix + algKey],stopStep, {memprefix + algKey: stats}, namespace)
     return bTestReturns
 
-def doStops(step, statDict, alginfo, stopRange):
+def doStops(step, statDict, alginfo, stopRange, scaleFactor = 0.0):
     from random import random
     import CurrentTrader
 
@@ -95,15 +95,9 @@ def doStops(step, statDict, alginfo, stopRange):
                                        CueKey = '0000')
         dictDesire = convertDesireToDict(offsetDesire, -1*longshort, alginfo.TradeSize, alginfo.Cash, -1*shares)
         
-        # Using MaxMinDevMeans for StopLoss and MaxMinMedianMedians for StopProfit.
-        #maxDevStopLoss, minDevStopLoss, maxDevStopProfit, minDevStopProfit = getMaxMinDevMeansV2(stckDeltas)
         # Now only using maxmin deviations for stops.
         maxDevStop, minDevStop = getMaxMinDevMeansV2(stckDeltas)
-        #maxMedianMedian, minMedianMedian = CurrentTrader.getStckMaxMinMedianMedians(stckDeltas)
-        
-        # MaxMinDevMeans for StopLoss :  Gives slightly more leeway to "downside" but follows current quote.
-        # MaxMinMedianMedian for StopProfit : Is fixed but generally more probable of being hit than first StopLoss.
-        #     Obviates need to scale down max or minDev for StopProfit.
+        # Using scaleFactor for metaAlgs. Moves stop 40% closer to 1.0
 
         stopLoss = statDict['Positions'][pos]['StopLoss']
         stopProfit = statDict['Positions'][pos]['StopProfit']
@@ -113,14 +107,16 @@ def doStops(step, statDict, alginfo, stopRange):
             else:
                 stopLoss = max(statDict['Positions'][pos]['StopLoss'], stckQuote*minDevStop)
                 if stopProfit > 1.15*statDict['Positions'][pos]['Price']:
-                    stopProfit = min(statDict['Positions'][pos]['StopProfit'], stckQuote*maxDevStop)
+                    stopPrice = stckQuote*(maxDevStop - ((maxDevStop-1)*scaleFactor))
+                    stopProfit = min(statDict['Positions'][pos]['StopProfit'], stopPrice)
         elif longshort == -1:
             if stckQuote > stopLoss or stckQuote < stopProfit:
                 stopDesires.append(dictDesire)
             else:
                 stopLoss = min(statDict['Positions'][pos]['StopLoss'], stckQuote*maxDevStop)
                 if stopProfit < 0.85*statDict['Positions'][pos]['Price']:
-                    stopProfit = max(statDict['Positions'][pos]['StopProfit'], stckQuote*minDevStop)
+                    stopPrice = stckQuote*(minDevStop + ((1-minDevStop)*scaleFactor))
+                    stopProfit = max(statDict['Positions'][pos]['StopProfit'], stopPrice)
         statDict['Positions'][pos]['StopLoss'] = stopLoss
         statDict['Positions'][pos]['StopProfit'] = stopProfit
     for stop in stopDesires:
