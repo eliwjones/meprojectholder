@@ -84,15 +84,53 @@ class fillRandomQuotes(webapp.RequestHandler):
         ''' Starting at Step 1000001 and iterating over each group of 80,
               Get all stck quotes for range and fill in gaps. '''
         startStep = int(self.request.get('startStep'))
+        if startStep < 1000001:
+            raise Exception('Must be doing random fills above step 1000000!')
         endStep = startStep + 79
-        stckQuotes = meSchema.stck.all().filter('step >=,' startStep).filter('step <=,' endStep).order('step').fetch(50)
-        ''' Should have 16 quotes.  4 for each stckID. '''
-        stckDict = {1:{}, 2:{}, 3:{}, 4:{}}
-        stepSeq = {1:[], 2:[], 3:[], 4:[]}
-        for stck in stckQuotes:
-            stckDict[stck.ID][stck.step] = stck.quote
-            stepSeq[stck.ID].append(stck.step)
+        stckDict,stepSeq = getStckDictStepSeq(startStep,endStep)
         ''' for stckID in stckDict, must fill in gaps between stepSeq values. '''
+        entityList = buildEntityList(stckDict, stepSeq)
+        db.put(entityList)
+
+def getStckDictStepSeq(startStep, endStep, batchSize = 100):
+    stckQuotes = meSchema.stck.all().filter('step >=', startStep).filter('step <=', endStep).order('step').fetch(batchSize)
+    ''' Should have 16 quotes per day.  4 for each stckID. '''
+    if len(stckQuotes) != 16:
+        raise Exception('stckQuotes should be 16! Not ' + str(len(stckQuotes)))
+    stckDict = {1:{}, 2:{}, 3:{}, 4:{}}
+    stepSeq = {1:[], 2:[], 3:[], 4:[]}
+    # randScaleRange = [((x+1)**2)/200.0 for x in range(11)]
+    for stck in stckQuotes:
+        stckDict[stck.ID][stck.step] = stck.quote
+        stepSeq[stck.ID].append(stck.step)
+    return stckDict, stepSeq
+
+def buildEntityList(stckDict, stepSeq):
+    stckEntities = []
+    for stckID in stckDict:
+        for i in range(1,len(stepSeq[stckID])):
+            # do random walk from stepSeq[stckID][i-1] to stepSeq[stckID][i]
+            # use high,low data from [stckDict[stckID][stepSeq[stckID][1]], stckDict[stckID][stepSeq[stckID][2]]].sort()
+            ''' For the sake of speed, just doing straight line. '''
+            startStep = stepSeq[stckID][i-1]
+            stopStep = stepSeq[stckID][i]
+            startQuote = stckDict[stckID][startStep]
+            stopQuote = stckDict[stckID][stopStep]
+            stepQuotes = walkStraightLine(startQuote,stopQuote,startStep,stopStep)
+            for step in stepQuotes:
+                stckEntities.append(meSchema.stck(key_name = str(stckID) + '_' + str(step),
+                                                  ID = stckID, quote = float(stepQuotes[step]),
+                                                  step = step))
+    return stckEntities
+
+def walkStraightLine(startQuote, stopQuote, startStep, stopStep):
+    steps = [step for step in range(startStep+1,stopStep)]
+    stepDeltas = [((stopQuote-startQuote)/(len(steps)+1))*i for i in range(1,len(steps)+1)]
+    quotePath = [startQuote + delta for delta in stepDeltas]
+    stepQuoteDict = {}
+    for i in range(len(quotePath)):
+        stepQuoteDict[steps[i]] = quotePath[i]
+    return stepQuoteDict
 
 def randomWalkBetweenPoints(startQuote, stopQuote, steps, minQuote, maxQuote):
     straightLine = [((stopQuote - startQuote)/len(steps))*i for i in range(1,len(steps)+1)]
@@ -106,14 +144,26 @@ def randomWalkBetweenPoints(startQuote, stopQuote, steps, minQuote, maxQuote):
         pass
     '''
             
-        
+def doFanOut(startStep, numDays):
+    for step in range(startStep, startStep + 80*numDays, 80):
+        taskAdd('RandFiller-' + str(step), step, 'None', 'fill')
+        lastStartStep = step
+    return lastStartStep
 
-def taskAdd(name,startDayIndex,Symbol,wait=.5):
+def taskAdd(name,startDayIndex,Symbol,switch,wait=.5):
+    if switch == 'csv':
+        taskUrl = '/import/CSVQuotes'
+        taskParams = {'startDayIndex' : startDayIndex,
+                      'Symbol'        : Symbol}
+    elif switch == 'fill':
+        taskUrl = '/import/fillRandomQuotes'
+        taskParams = {'startStep' : startDayIndex}
+    else:
+        raise Exception('Must supply switch for "csv" or "fill"')
     try:
-        taskqueue.add(url    = '/import/CSVQuotes', countdown = 0,
+        taskqueue.add(url    = taskUrl, countdown = 0,
                       name   = name,
-                      params = {'startDayIndex' : startDayIndex,
-                                'Symbol'        : Symbol} )
+                      params = taskParams)
     except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
         pass
     except:
@@ -121,7 +171,8 @@ def taskAdd(name,startDayIndex,Symbol,wait=.5):
         sleep(wait)
         taskAdd(name,startDayIndex,Symbol,2*wait)
 
-application = webapp.WSGIApplication([('/import/CSVQuotes',CSVQuotes)],
+application = webapp.WSGIApplication([('/import/CSVQuotes',CSVQuotes),
+                                      ('/import/fillRandomQuotes',fillRandomQuotes)],
                                      debug = True)
 
 def main():
