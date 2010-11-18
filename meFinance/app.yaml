@@ -81,3 +81,7 @@ handlers:
 - url: /calculate/compounds/.*
   script: calculateCompoundReturns.py
   login: admin
+
+- url: /import/.*
+  script: importCsvQuoteData.py
+  login: admin
