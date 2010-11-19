@@ -84,6 +84,7 @@ class fillRandomQuotes(webapp.RequestHandler):
         ''' Starting at Step 1000001 and iterating over each group of 80,
               Get all stck quotes for range and fill in gaps. '''
         startStep = int(self.request.get('startStep'))
+        Symbol = str(self.request.get('Symbol'))
         if startStep < 1000001:
             raise Exception('Must be doing random fills above step 1000000!')
         endStep = startStep + 79
@@ -92,11 +93,11 @@ class fillRandomQuotes(webapp.RequestHandler):
         entityList = buildEntityList(stckDict, stepSeq)
         db.put(entityList)
 
-def getStckDictStepSeq(startStep, endStep, batchSize = 100):
+def getStckDictStepSeq(startStep, endStep, batchSize = 500):
     stckQuotes = meSchema.stck.all().filter('step >=', startStep).filter('step <=', endStep).order('step').fetch(batchSize)
     ''' Should have 16 quotes per day.  4 for each stckID. '''
-    if len(stckQuotes) != 16:
-        raise Exception('stckQuotes should be 16! Not ' + str(len(stckQuotes)))
+    if len(stckQuotes) > 320:
+        raise Exception('stckQuotes should be no greater than 320! Got ' + str(len(stckQuotes)))
     stckDict = {1:{}, 2:{}, 3:{}, 4:{}}
     stepSeq = {1:[], 2:[], 3:[], 4:[]}
     # randScaleRange = [((x+1)**2)/200.0 for x in range(11)]
@@ -144,9 +145,9 @@ def randomWalkBetweenPoints(startQuote, stopQuote, steps, minQuote, maxQuote):
         pass
     '''
             
-def doFanOut(startStep, numDays):
+def doFanOut(startStep, numDays, name):
     for step in range(startStep, startStep + 80*numDays, 80):
-        taskAdd('RandFiller-' + str(step), step, 'None', 'fill')
+        taskAdd('RandFiller-' + str(step) + '-' + name, step, 'None', 'fill')
         lastStartStep = step
     return lastStartStep
 
