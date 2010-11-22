@@ -8,14 +8,6 @@ import meSchema
 import princeFunc
 import liveAlg
 
-def updateAllAlgStats(alphaAlg=1,omegaAlg=10620):
-    # Way too slow to be useful.
-    # Must implement looping method similar to process for desires.
-    # resetAlgstats()
-    for i in range(alphaAlg, omegaAlg+1):
-        key_name = meSchema.buildAlgKey(str(i))
-        updateAlgStat(key_name)
-
 def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_"):
     if namespace == '':
         stckIDs = [1,2,3,4]
@@ -213,79 +205,6 @@ def memGetStcks(stckKeyList):
     for key in stckKeyList:
         meList.append(results[key])
     return meList
-
-'''
-  # Commenting Out.  Candidate for deletion. #
-def bestAlgSearch(startStep,stopStep):
-    allAlgs = meSchema.meAlg.all().fetch(10620)
-    testAlgKeys = []
-    for alg in allAlgs:
-        if alg.TradeSize == 0.25:
-            testAlgKeys.append(alg.key().name())
-    testAlgKeys.sort()
-    # Create check to see if any of the stats have been updated before running
-    memprefix = str(startStep) + "_" + str(stopStep) + "_"
-    memkeys = []
-    for algKey in testAlgKeys:
-        memkeys.append(memprefix + algKey)
-    algStats = memcache.get_multi(memkeys)
-    updated = False
-    if len(algStats) == len(memkeys):
-        for key in algStats:
-            if algStats[key]['PandL'] != 0.0 or len(algStats[key]['Positions']) > 0:
-                updated = True
-                break
-    if not updated:
-        resetAlgstats(memprefix)
-        for algKey in testAlgKeys:
-            updateAlgStat(algKey, startStep, stopStep, memprefix)
-        algStats = memcache.get_multi(memkeys)
-    # Stats updated.. must calculate total PandL and position values.
-    posPandLs = calculatePositionPandLs(testAlgKeys,memprefix,stopStep,algStats)
-    totalValDict = {}
-    for key in algStats:
-        totalVal = algStats[key]['PandL'] + posPandLs[key]
-        trades = len(algStats[key]['CashDelta'])
-        if totalVal > 0.0 and trades > ((stopStep - startStep)*0.002):     # A little more than .002 trades per step.
-            if totalValDict.__contains__(totalVal):
-                totalValDict[totalVal].append(key)
-            else:
-                totalValDict[totalVal] = [key]
-    totalValKeys = totalValDict.keys()
-    totalValKeys.sort()
-    backTestCandidates = []
-    for i in range(1,len(totalValKeys)):  # Sending all keys since will do filtering later.
-        key = totalValKeys[(-1)*i]
-        backTestCandidates.append(totalValDict[key][0].split('_')[-1])
-    # Returning candidate list so can get multiple sets of candidates from
-    # different starting points.
-    return backTestCandidates
-    
-    #backTestKeyList = runBackTests(backTestCandidates)
-    #backTestReturns = getBackTestReturns(backTestKeyList,stopStep)
-    #return backTestReturns
-'''
-'''
-  # Commenting Out.  Candidate for deletion. #
-def calculatePositionPandLs(algKeys,memprefix,stopStep,algStats=None):
-    memkeys = []
-    for algKey in algKeys:
-        memkeys.append(memprefix + algKey)
-    if algStats is None:
-        algStats = memcache.get_multi(memkeys)
-    stopStepQuotes = princeFunc.getStepQuotes(stopStep)
-    algPosValues = {}
-    for memkey in algStats:
-        positions = algStats[memkey]['Positions']
-        positionsValue = 0.0
-        for symbol in positions:
-            currentPrice = stopStepQuotes[symbol]
-            posPrice = positions[symbol]['Price']
-            shares = positions[symbol]['Shares']
-            positionsValue += (currentPrice - posPrice)*shares
-        algPosValues[memkey] = positionsValue
-    return algPosValues
-'''
         
 def getBackTestReturns(memkeylist, stopStep, stats, namespace):
     # If want can pass in stats dict with appropriate data.
@@ -298,12 +217,6 @@ def getBackTestReturns(memkeylist, stopStep, stats, namespace):
         algkeys[key_name] = None       # So I don't have to check if algkey already there.
     algkeys = algkeys.keys()           # Turn dictionary keys into list of keys.
     algs = meSchema.memGet_multi(meSchema.meAlg,algkeys)
-    # Not munging .Cash since want underlying backTests to trade with .25 TradeSize.
-    '''
-    if namespace != '':
-        for algkey in algs:
-            algs[algkey].Cash = algs[algkey].Cash*algs[algkey].TradeSize
-            '''
     cuekeys = {}
     for key in algs:
         key_name = algs[key].BuyCue
@@ -372,36 +285,6 @@ def persistBackTestReturns(backTestReturns):
             putList.append(backTestResult)
     meSchema.batchPut(putList)
 
-
-'''
-  # Commenting Out.  Candidate for deletion. #
-def unpackAlgstats(memprefix = "unpacked_",alphaAlg=1,omegaAlg=10620):
-    statDict = {}
-    memkeylist = []
-    entitykeylist = []
-    for i in range(alphaAlg,omegaAlg+1):
-        key_name = meSchema.buildAlgKey(str(i))
-        memkey = memprefix + key_name
-        memkeylist.append(memkey)
-    statDict = memcache.get_multi(memkeylist)
-    entitykeylist = meSchema.getMissingKeys(memkeylist,statDict)
-    if len(entitykeylist) > 0:
-        print 'getting from datatstore!'
-        for i in range(len(entitykeylist)):
-            entitykeylist[i] = entitykeylist[i].replace(memprefix,'')
-        Entities = meSchema.algStats.get_by_key_name(entitykeylist)
-        for i in range(len(entitykeylist)):
-            key = entitykeylist[i]
-            memkey = memprefix + key
-            statDict[key] = {'Cash'      : Entities[i].Cash,
-                             'CashDelta' : eval(decompress(Entities[i].CashDelta)),
-                             'PandL'     : Entities[i].PandL,
-                             'Positions' : eval(Entities[i].Positions) }
-            memcache.set(memkey,statDict[key])
-    return statDict
-'''
-
-
 def resetAlgstats(memprefix = "unpacked_",algCash=20000.0,alphaAlg=1,omegaAlg=10620):
     memkeylist = []
     cashdelta = {}
@@ -419,84 +302,6 @@ def resetAlgstats(memprefix = "unpacked_",algCash=20000.0,alphaAlg=1,omegaAlg=10
         memcache.set(key,statDict[key])
     return statDict
 
-'''
-  # Commenting Out.  Candidate for deletion. #
-def repackAlgstats(memprefix = "unpacked_", alphaAlg=1, omegaAlg=10620):
-    statDict = {}
-    meDict = {}
-    memkeylist = []
-    for i in range(alphaAlg,omegaAlg+1):
-        key_name = meSchema.buildAlgKey(str(i))
-        memkey = memprefix + key_name
-        memkeylist.append(memkey)
-    statDict = memcache.get_multi(memkeylist)
-
-    for key in statDict:
-        algstat = meSchema.algStats(key_name  = key.replace(memprefix,''),
-                                    Cash      = statDict[key]['Cash'],
-                                    CashDelta = compress(repr(statDict[key]['CashDelta']),9),
-                                    PandL     = statDict[key]['PandL'],
-                                    Positions = repr(statDict[key]['Positions']))
-        meDict[key] = algstat
-    meSchema.memPut_multi(meSchema.algStats, meDict)
-'''
-
-'''
-  # Commenting Out.  Candidate for deletion. #
-  # Must integrate liveAlg.getStepRangeDesires() since that is what is already used.
-def getAlgDesires(algKey,resetCache=False,startStep=None,stopStep=None):
-    buyList = []
-    sellList = []
-    desireDict = {}
-    alginfo = meSchema.memGet(meSchema.meAlg,algKey)
-    buyCue = alginfo.BuyCue
-    sellCue = alginfo.SellCue
-    # Must use algKey to get buyCue and sellCue to then
-    # grab underlying desires.
-    # TODO! : Better add a damned step value and compound index on (CueKey,step) for easy range grab.
-    buyQuery = "Select * from desire Where CueKey = '%s'" % (buyCue)
-    sellQuery = "Select * from desire Where CueKey = '%s'" % (sellCue)
-    
-    buyList = meSchema.cachepy.get(buyQuery)
-    if buyList is None:
-        buyList = memcache.get(buyQuery)
-        if buyList is None:
-            buyList = db.GqlQuery(buyQuery).fetch(4000)
-            memcache.set(buyQuery,buyList)
-        meSchema.cachepy.set(buyQuery,buyList)
-    sellList = meSchema.cachepy.get(sellQuery)
-    if sellList is None:
-        sellList = memcache.get(sellQuery)
-        if sellList is None:
-            sellList = db.GqlQuery(sellQuery).fetch(4000)
-            memcache.set(sellQuery,sellList)
-        meSchema.cachepy.set(sellQuery,sellList)
-
-    if len(buyList) > len(sellList):
-        # If there are more buys than sells, fill dict with buys first
-        # Then overwrite with sells.  Else, do reverse.
-        # If there is a buy and a sell for a given stock on a certain step,
-        # the less frequent action will be given precedence.
-        for buy in buyList:
-            keyname = buy.key().name()
-            keyname = keyname.replace('_' + buyCue + '_', '_' + algKey + '_')
-            desireDict[keyname] = convertDesireToDict(buy, 1, alginfo.TradeSize, alginfo.Cash)
-        for sell in sellList:
-            keyname = sell.key().name()
-            keyname = keyname.replace('_' + sellCue + '_', '_' + algKey + '_')
-            desireDict[keyname] = convertDesireToDict(sell, -1, alginfo.TradeSize, alginfo.Cash)
-    else:
-        for sell in sellList:
-            keyname = sell.key().name()
-            keyname = keyname.replace('_' + sellCue + '_', '_' + algKey + '_')
-            desireDict[keyname] = convertDesireToDict(sell, -1, alginfo.TradeSize, alginfo.Cash)
-        for buy in buyList:
-            keyname = buy.key().name()
-            keyname = keyname.replace('_' + buyCue + '_', '_' + algKey + '_')
-            desireDict[keyname] = convertDesireToDict(buy, 1, alginfo.TradeSize, alginfo.Cash)
-    return desireDict
-'''
-
 def convertDesireToDict(desire, buysell, tradesize, cash, shares = None):
     from math import floor
     meDict = {}
@@ -510,127 +315,3 @@ def convertDesireToDict(desire, buysell, tradesize, cash, shares = None):
                              'Price'  : desire.Quote,
                              'Value'  : desire.Quote*shares}
     return repr(meDict)
-
-'''
- ## Candidate for deletion. ##
-def populatePandL():
-    algstats = meSchema.algStats().all().fetch(5000)
-    for alg in algstats:
-        summer = 0.0
-        cashdelta = eval(decompress(alg.CashDelta))
-        for i in range(len(cashdelta)):
-            if cashdelta[len(cashdelta)-1]['step'] == -1:
-                cashdelta.pop()
-        for trade in cashdelta:
-            summer += trade['PandL']
-        alg.PandL = summer
-        alg.CashDelta = compress(repr(cashdelta),9)
-    meSchema.batchPut(algstats)
-'''
-
-
-'''
- ## Fun code, but sadly not used anymore.
- ## Must delete.. though can always look back at version control
- ## for fond memories.
- 
-def getMaxMinDistance(algList,subSetSize=5):
-    subsets = combinations(algList,subSetSize)
-    MaxMinDistanceSets = {}
-    MaxMinDistance = 0.0
-    MaxMinDistanceSet = []
-    for subset in subsets:
-        subset = list(subset)
-        minDistance = getMinDistance(subset)
-        if minDistance > MaxMinDistance:
-            MaxMinDistanceSets = appendSetByMinKey(MaxMinDistanceSets,minDistance,subset)
-            MaxMinDistance = minDistance
-            MaxMinDistanceSet = subset
-    MaxMaxDistance = 0.0
-    for subset in MaxMinDistanceSets[MaxMinDistance]:  # In case more than one subset had same MaxMinDistance.
-        maxDistance = getMaxDistance(subset)
-        if maxDistance > MaxMaxDistance:
-            MaxMaxDistance = maxDistance
-            MaxMinDistanceSet = subset
-    return MaxMinDistanceSet
-
-def appendSetByMinKey(setDict,minKey,minKeySet):
-    # If minKey is not in the Dict, then it is a new MaxMin,
-    # Reset dict with minKeySet.
-    # If minKey is there, append minKeySet to list.
-    if not setDict.__contains__(minKey):
-        setDict = {}
-        setDict[minKey] = [minKeySet]
-    else:
-        setDict[minKey].append(minKeySet)
-    return setDict
-    
-
-def combinations(algList, r):
-    ##  Returns all possible r-member subsets from the algList.
-    pool = tuple(algList)
-    n = len(pool)
-    if r>n:
-        return
-    indices = range(r)
-    yield tuple(pool[i] for i in indices)
-    while True:
-        for i in reversed(range(r)):
-            if indices[i] != i + n - r:
-                break
-        else:
-            return
-        indices[i] += 1
-        for j in range(i+1,r):
-            indices[j] = indices[j-1] + 1
-        yield tuple(pool[i] for i in indices)
-
-def getMinDistance(algList):
-    minDistance = 1000.0
-    for i in range(len(algList)-1):
-        for j in range(i+1, len(algList)):
-            distance = getAlgDistance(algList[i], algList[j])
-            if distance < minDistance:
-                minDistance = distance
-    return minDistance
-
-def getMaxDistance(algList):
-    maxDistance = 0.0
-    for i in range(len(algList)-1):
-        for j in range(i+1, len(algList)):
-            distance = getAlgDistance(algList[i], algList[j])
-            if distance > maxDistance:
-                maxDistance = distance
-    return maxDistance
-
-def getAlgDistance(alg1Key,alg2Key):
-    from math import sqrt
-    alg1 = meSchema.memGet(meSchema.meAlg,alg1Key)
-    alg2 = meSchema.memGet(meSchema.meAlg,alg2Key)
-    buycue1 = meSchema.memGet(meSchema.tradeCue,alg1.BuyCue)
-    sellcue1 = meSchema.memGet(meSchema.tradeCue,alg1.SellCue)
-    buycue2 = meSchema.memGet(meSchema.tradeCue,alg2.BuyCue)
-    sellcue2 = meSchema.memGet(meSchema.tradeCue,alg2.SellCue)
-
-    # Packing normalized Deltas into A1, A2 vectors.
-    A1 = [normalizeQuoteDelta(buycue1.QuoteDelta), normalizeTimeDelta(buycue1.TimeDelta), normalizeQuoteDelta(sellcue1.QuoteDelta), normalizeTimeDelta(sellcue1.TimeDelta)]
-    A2 = [normalizeQuoteDelta(buycue2.QuoteDelta), normalizeTimeDelta(buycue2.TimeDelta), normalizeQuoteDelta(sellcue2.QuoteDelta), normalizeTimeDelta(sellcue2.TimeDelta)]
-    distance = (A1[0] - A2[0])**2 + (A1[1] - A2[1])**2 + (A1[2] - A2[2])**2 + (A1[3] - A2[3])**2
-    distance = sqrt(distance)
-    return distance
-
-def normalizeTimeDelta(TD):
-    TD = (float(TD)-1.0)/399.0
-    return TD
-    
-def normalizeQuoteDelta(QD):
-    QD = (float(QD) + 0.05)/0.1    # Normalizing for 0.05 instead of 0.07 since 0.07 does not show up in any frequent traders.
-    return QD
-'''
-        
-
-
-
-
-
-    

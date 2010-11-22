@@ -10,35 +10,7 @@ import processDesires
 class doBackTests(webapp.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/plain'
-        self.response.out.write('I do backtests!\n')
-        stopStep = str(self.request.get('stopStep'))
-        # Must split up string representation of list and turn into int list
-        # Just say no to eval().
-        startSteps = str(self.request.get('startSteps'))
-        if startSteps != '':
-            startSteps = startSteps[1:-1].split(',')
-            startSteps = [int(i) for i in startSteps]
-        
-        startAlg = str(self.request.get('startAlg'))
-        stopAlg = str(self.request.get('stopAlg'))
-        unique = str(self.request.get('unique'))
-        namespace = str(self.request.get('namespace'))
-
-        if stopStep == '' or startAlg == '' or stopAlg == '':
-            self.response.out.write('You must provide a "stopStep","startAlg", and "stopAlg" params!')
-        else:
-            stopStep = int(stopStep)
-            startAlg = int(startAlg)
-            stopAlg = int(stopAlg)
-            # alglist = [meSchema.buildAlgKey(i) for i in range(startAlg, stopAlg+1)]
-            if type(startSteps) == type([]):
-                stepRange = [stopStep - i*400 for i in startSteps]
-            else:
-                stepRange = [stopStep - i*400 for i in [4]]    # Changing default to just do 1600 step range.
-            # Create proper taskAdd() function and add with params.
-            name = unique + '-' + str(startAlg) + '-' + str(stopAlg) + '-' + str(stopStep) + '-' + namespace
-            mainTaskAdd(name, startAlg, stopAlg, stopStep, 5, stepRange, unique, namespace)
-            self.response.out.write('Added job!\n')
+        self.response.out.write('I do backtests! Please use mainTaskAdd().\n')
             
     def post(self):
         uniquifier = self.request.get('uniquifier')
@@ -133,7 +105,7 @@ def runBackTests(alglist, stop, batchSize = 5, stepRange=None, uniquifier='', na
     keylist = []
     for startMonth in monthList:
         for algkey in alglist:
-            memprefix = startMonth + "_" + str(stop) + "_"
+            memprefix = startMonth + '_' + str(stop) + '_'
             keylist.append(memprefix + algkey)
     return keylist
 
@@ -150,7 +122,6 @@ def backTestBatch(algBatch, monthBatch, stopStep, namespace):
                 else:
                     backTestReturnDict[key] = batchReturns[key]
     try:
-        # defaultNameSpace = namespace_manager.get_namespace() # Not doing this since I want default alwasy to be ''
         namespace_manager.set_namespace(namespace)
         processDesires.persistBackTestReturns(backTestReturnDict)
     finally:
