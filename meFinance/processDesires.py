@@ -158,45 +158,18 @@ def getMaxMinDevMeans(stckDeltas):
     return maxPosDevMean, minNegDevMean
 
 def getMaxMinDevMeansV2(stckDeltas):
-    from math import sqrt
-    Phi = 2.0/(1.0+sqrt(5))
     # Used to get general max min expected deviations from mean.
-    negDevStopLosses = []
-    negDevStopProfits = []
-    posDevStopLosses = []
-    posDevStopProfits = []
+    negDevStops = []
+    posDevStops = []
     for key in stckDeltas:
         dev,mean = getStandardDeviationMean(stckDeltas[key])
-        negDevStopLosses.append(mean - dev)
-        #negDevStopProfits.append(mean - Phi*dev)
-        posDevStopLosses.append(mean + dev)
-        #posDevStopProfits.append(mean + Phi*dev)
-    '''
-    maxDevMean = 0.0
-    for devMean in posDevMeans:
-        if devMean[0] > maxDevMean:
-            maxDevMean = devMean[0]
-            maxDev = devMean[1]
-    minDevMean = 100.0
-    for devMean in negDevMeans:
-        if devMean[0] < minDevMean:
-            minDevMean = devMean[0]
-            minDev = devMean[1]
-    '''
-    maxDevStop = max(posDevStopLosses)
-    #maxDevStopProfit = max(posDevStopProfits)
-    minDevStop = min(negDevStopLosses)
-    #minDevStopProfit = min(negDevStopProfits)
-
+        negDevStops.append(mean - dev)
+        posDevStops.append(mean + dev)
+    maxDevStop = max(posDevStops)
+    minDevStop = min(negDevStops)
     maxDevStop = max(1 + maxDevStop, 1.001)
-    #maxDevStopProfit = max(1 + maxDevStopProfit, 1.001)
     minDevStop = min(1 + minDevStop, 0.999)
-    #minDevStopProfit = min(1 + minDevStopProfit, 0.999)
-    '''
-    maxDevMean = max(1 + maxDevMean, 1.001)
-    minDevMean = min(1 + minDevMean, 0.999)
-    '''
-    return maxDevStop, minDevStop #, maxDevStopProfit, minDevStopProfit
+    return maxDevStop, minDevStop
 
 def getStandardDeviationMean(stckDeltas):
     from math import sqrt
@@ -213,7 +186,7 @@ def getStandardDeviationMean(stckDeltas):
 
 def calculateDeltas(stckID, step):
     stckKeyList = []
-    # Now creating deltaLists of 1, 2, and 3 day percent changes.
+    # Now creating deltaLists of 1, 2, 3 and 4 day percent changes.
     # Create list of stckKeys starting from current step and going backwards to 1600 steps.
     #   stckKeyList ~ ['1_2300', '1_2220', ..., '1_700'] for stckID = 1 and step = 2300
     for i in range(0,2321,80):
@@ -241,6 +214,8 @@ def memGetStcks(stckKeyList):
         meList.append(results[key])
     return meList
 
+'''
+  # Commenting Out.  Candidate for deletion. #
 def bestAlgSearch(startStep,stopStep):
     allAlgs = meSchema.meAlg.all().fetch(10620)
     testAlgKeys = []
@@ -289,7 +264,9 @@ def bestAlgSearch(startStep,stopStep):
     #backTestKeyList = runBackTests(backTestCandidates)
     #backTestReturns = getBackTestReturns(backTestKeyList,stopStep)
     #return backTestReturns
-            
+'''
+'''
+  # Commenting Out.  Candidate for deletion. #
 def calculatePositionPandLs(algKeys,memprefix,stopStep,algStats=None):
     memkeys = []
     for algKey in algKeys:
@@ -308,6 +285,7 @@ def calculatePositionPandLs(algKeys,memprefix,stopStep,algStats=None):
             positionsValue += (currentPrice - posPrice)*shares
         algPosValues[memkey] = positionsValue
     return algPosValues
+'''
         
 def getBackTestReturns(memkeylist, stopStep, stats, namespace):
     # If want can pass in stats dict with appropriate data.
@@ -395,6 +373,8 @@ def persistBackTestReturns(backTestReturns):
     meSchema.batchPut(putList)
 
 
+'''
+  # Commenting Out.  Candidate for deletion. #
 def unpackAlgstats(memprefix = "unpacked_",alphaAlg=1,omegaAlg=10620):
     statDict = {}
     memkeylist = []
@@ -419,6 +399,7 @@ def unpackAlgstats(memprefix = "unpacked_",alphaAlg=1,omegaAlg=10620):
                              'Positions' : eval(Entities[i].Positions) }
             memcache.set(memkey,statDict[key])
     return statDict
+'''
 
 
 def resetAlgstats(memprefix = "unpacked_",algCash=20000.0,alphaAlg=1,omegaAlg=10620):
@@ -438,7 +419,8 @@ def resetAlgstats(memprefix = "unpacked_",algCash=20000.0,alphaAlg=1,omegaAlg=10
         memcache.set(key,statDict[key])
     return statDict
 
-
+'''
+  # Commenting Out.  Candidate for deletion. #
 def repackAlgstats(memprefix = "unpacked_", alphaAlg=1, omegaAlg=10620):
     statDict = {}
     meDict = {}
@@ -457,8 +439,11 @@ def repackAlgstats(memprefix = "unpacked_", alphaAlg=1, omegaAlg=10620):
                                     Positions = repr(statDict[key]['Positions']))
         meDict[key] = algstat
     meSchema.memPut_multi(meSchema.algStats, meDict)
+'''
 
-
+'''
+  # Commenting Out.  Candidate for deletion. #
+  # Must integrate liveAlg.getStepRangeDesires() since that is what is already used.
 def getAlgDesires(algKey,resetCache=False,startStep=None,stopStep=None):
     buyList = []
     sellList = []
@@ -510,6 +495,7 @@ def getAlgDesires(algKey,resetCache=False,startStep=None,stopStep=None):
             keyname = keyname.replace('_' + buyCue + '_', '_' + algKey + '_')
             desireDict[keyname] = convertDesireToDict(buy, 1, alginfo.TradeSize, alginfo.Cash)
     return desireDict
+'''
 
 def convertDesireToDict(desire, buysell, tradesize, cash, shares = None):
     from math import floor
@@ -525,6 +511,8 @@ def convertDesireToDict(desire, buysell, tradesize, cash, shares = None):
                              'Value'  : desire.Quote*shares}
     return repr(meDict)
 
+'''
+ ## Candidate for deletion. ##
 def populatePandL():
     algstats = meSchema.algStats().all().fetch(5000)
     for alg in algstats:
@@ -538,7 +526,14 @@ def populatePandL():
         alg.PandL = summer
         alg.CashDelta = compress(repr(cashdelta),9)
     meSchema.batchPut(algstats)
+'''
 
+
+'''
+ ## Fun code, but sadly not used anymore.
+ ## Must delete.. though can always look back at version control
+ ## for fond memories.
+ 
 def getMaxMinDistance(algList,subSetSize=5):
     subsets = combinations(algList,subSetSize)
     MaxMinDistanceSets = {}
@@ -572,9 +567,7 @@ def appendSetByMinKey(setDict,minKey,minKeySet):
     
 
 def combinations(algList, r):
-    '''
-        Returns all possible r-member subsets from the algList.
-    '''
+    ##  Returns all possible r-member subsets from the algList.
     pool = tuple(algList)
     n = len(pool)
     if r>n:
@@ -633,6 +626,7 @@ def normalizeTimeDelta(TD):
 def normalizeQuoteDelta(QD):
     QD = (float(QD) + 0.05)/0.1    # Normalizing for 0.05 instead of 0.07 since 0.07 does not show up in any frequent traders.
     return QD
+'''
         
 
 
