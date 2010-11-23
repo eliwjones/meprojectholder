@@ -129,12 +129,15 @@ def doCompoundReturns(stopStep, startStep, globalStop, namespace, name = '', i =
         taskAdd(stopStep, startStep, globalStop, namespace, name, 0, '', '/calculate/compounds/bTestCompounds')
 
 def doLiveAlgCompounds(stopStep, startStep, name, i, liveAlgs):
-    stepBacks = [1,2,3,4,5]
+    putList = []
+    memKeys = []
+    maxR = getMaxRnum(meSchema.liveAlg)
+    stepBacks = [week for week in range(1,maxR)]
+    ''' Commenting this out since generalizing entire function.
     stepRange = stopStep - startStep
     if stepRange == 800:
         stepBacks.extend([6,7])
-    putList = []
-    memKeys = []
+    '''
     for LAlg in liveAlgs:
         technique = LAlg.technique
         for stepback in stepBacks:
@@ -144,6 +147,11 @@ def doLiveAlgCompounds(stopStep, startStep, name, i, liveAlgs):
             memKeys.append(memkey)
     prevReturns = memGetPercentReturns(memKeys, 'LAR-')
     for LAlg in liveAlgs:
+        Rdict = {1: (1.0 + LAlg.percentReturn)}
+        for Rnum in range(2, maxR + 1):
+            Rdict[Rnum] = Rdict[Rnum-1]*(1.0 + getRReturn(stopStep, startStep, LAlg.technique, Rnum-1, prevReturns, 'LAR-'))
+            setattr(LAlg, 'R' + str(Rnum), Rdict[Rnum])
+        '''
         R2 = (1.0 + LAlg.percentReturn)*(1.0 + getRReturn(stopStep, startStep, LAlg.technique, 1, prevReturns, 'LAR-'))
         R3 = R2*(1.0 + getRReturn(stopStep, startStep, LAlg.technique, 2, prevReturns, 'LAR-'))
         R4 = R3*(1.0 + getRReturn(stopStep, startStep, LAlg.technique, 3, prevReturns, 'LAR-'))
@@ -159,31 +167,51 @@ def doLiveAlgCompounds(stopStep, startStep, name, i, liveAlgs):
             R8 = R7*(1.0 + getRReturn(stopStep, startStep, LAlg.technique, 7, prevReturns, 'LAR-'))
             LAlg.R7 = R7
             LAlg.R8 = R8
+        '''
         putList.append(LAlg)
     db.put(putList)
 
 def doCompounds(stopStep, startStep, name, i, backTests):
     putList = []
     memKeys = []
+    maxR = getMaxRnum(meSchema.backTestResult)
+    stepBacks = [week for week in range(1,maxR)]
     for bTest in backTests:
         # backTestResult key has form: algKey _ startStep _ stopStep
         algKey = bTest.algKey
-        for stepback in [1,2,3,4]:
+        for stepback in stepBacks:
             memkey = buildMemKey(stopStep - 400*stepback, startStep - 400*stepback, algKey, 'BTR-')
             memKeys.append(memkey)
     # Function returns dict of percentReturn values with 'BTR-' key.
     prevReturns = memGetPercentReturns(memKeys, 'BTR-')
     for bTest in backTests:
-        R2 = (1.0 + bTest.percentReturn)*(1.0 + getRReturn(stopStep, startStep, bTest.algKey, 1, prevReturns, 'BTR-'))
+        Rdict = {1: (1.0 + bTest.percentReturn)}
+        for Rnum in range(2, maxR + 1):
+            Rdict[Rnum] = Rdict[Rnum-1]*(1.0 + getRReturn(stopStep, startStep, bTest.algKey, Rnum-1, prevReturns, 'BTR-'))
+            setattr(bTest, 'R' + str(Rnum), Rdict[Rnum])
+        ''' Manually setting Rdict[1] so can do all calculations in loop.
+        Rdict[2] = (1.0 + bTest.percentReturn)*(1.0 + getRReturn(stopStep, startStep, bTest.algKey, 1, prevReturns, 'BTR-'))
+        bTest.R2 = Rdict[2]
+        '''
+        '''
         R3 = R2*(1.0 + getRReturn(stopStep, startStep, bTest.algKey, 2, prevReturns, 'BTR-'))
         R4 = R3*(1.0 + getRReturn(stopStep, startStep, bTest.algKey, 3, prevReturns, 'BTR-'))
         R5 = R4*(1.0 + getRReturn(stopStep, startStep, bTest.algKey, 4, prevReturns, 'BTR-'))
-        bTest.R2 = R2
         bTest.R3 = R3
         bTest.R4 = R4
         bTest.R5 = R5
+        '''
         putList.append(bTest)
     db.put(putList)
+
+def getMaxRnum(model):
+    i = 1
+    while True:
+        if hasattr(model, 'R' + str(i+1)):
+            i += 1
+        else:
+            break
+    return i
 
 def getRReturn(stopStep, startStep, algKey, R, prevReturns, prefix):
     memkey = buildMemKey(stopStep - R*400, startStep - R*400, algKey, prefix)
