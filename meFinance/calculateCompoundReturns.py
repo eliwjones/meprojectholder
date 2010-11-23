@@ -6,7 +6,7 @@ from google.appengine.ext import db
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 
-class calculateBTestCompounds(webapp.RequestHandler):
+class calculateCompounds(webapp.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/plain'
         self.response.out.write('I just calculate compound returns.\n')
@@ -18,28 +18,11 @@ class calculateBTestCompounds(webapp.RequestHandler):
         namespace = str(self.request.get('namespace'))
         i = int(self.request.get('i'))
         cursor = str(self.request.get('cursor'))
-        doCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, cursor)
+        model = str(self.request.get('model'))
+        doCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, cursor, model)
 
-class calculateLiveAlgCompounds(webapp.RequestHandler):
-    def get(self):
-        self.response.headers['Content-Type'] = 'text/plain'
-        self.response.out.write('I just calculate liveAlg compound returns.\n')
-    def post(self):
-        stopStep = int(self.request.get('stopStep'))
-        startStep = int(self.request.get('startStep'))
-        globalStop = int(self.request.get('globalStop'))
-        name = str(self.request.get('name'))
-        namespace = str(self.request.get('namespace'))
-        i = int(self.request.get('i'))
-        cursor = str(self.request.get('cursor'))
-        doLiveALgCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, cursor)
-
-def fanoutTaskAdd(stopStep, startStep, globalStop, namespace, name, cType):
-    # partition range of steps into batches to add in parallel.
-    if cType == 'BackTest':
-        calcUrl = '/calculate/compounds/bTestCompounds'
-    elif cType == 'LiveAlg':
-        calcUrl = '/calculate/compounds/liveAlgCompounds'
+def fanoutTaskAdd(stopStep, startStep, globalStop, namespace, name, model):
+    ''' Partition range of steps into batches to add in parallel. '''
     stepRange = stopStep - startStep
     if stepRange == 800:
         stepBlock = 2800
@@ -49,125 +32,93 @@ def fanoutTaskAdd(stopStep, startStep, globalStop, namespace, name, cType):
         newStopStep = i
         newStartStep = newStopStep - stepRange
         newGlobalStop = min(newStopStep + stepBlock - 1, globalStop)
-        taskAdd(newStopStep, newStartStep, newGlobalStop, namespace, name, 0, '', calcUrl)
+        taskAdd(newStopStep, newStartStep, newGlobalStop, namespace, name, 0, '', model)
 
-def taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, calcUrl, wait = 0.5):
+def taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, model, wait = 0.5):
     from google.appengine.api import namespace_manager
     namespace_manager.set_namespace(namespace)
-    urlSplit = calcUrl.split('/')
-    prefix = urlSplit[-1]
     try:
-        taskqueue.add(url = calcUrl, countdown = 0,
-                      name = prefix + '-' + str(stopStep) + '-' + str(startStep) + '-' + str(i) + '-' + name + '-' + namespace,
+        taskqueue.add(url = '/calculate/compounds/calculateCompounds', countdown = 0,
+                      name = model + '-' + str(stopStep) + '-' + str(startStep) + '-' + str(i) + '-' + name + '-' + namespace,
                       params = {'stopStep'  : stopStep,
                                 'startStep' : startStep,
                                 'globalStop': globalStop,
                                 'name'      : name,
                                 'namespace' : namespace,
                                 'i'         : i,
-                                'cursor'    : cursor } )
+                                'cursor'    : cursor,
+                                'model'     : model} )
     except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
         pass
     except:
         from time import sleep
         sleep(wait)
-        taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, calcUrl, 2*wait)
+        taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, model, 2*wait)
     namespace_manager.set_namespace('')
 
-def doLiveALgCompoundReturns(stopStep, startStep, globalStop, namespace, name = '', i = 0, cursor = ''):
+def doCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, cursor, model):
     from time import time
     deadline = time() + 20.00
+    entityModel = getattr(meSchema, model)
+    if entityModel == meSchema.backTestResult:
+        prefix = 'BTR-'
+    elif entityModel == meSchema.liveAlg:
+        prefix = 'LAR-'
+    else:
+        raise Exception('Model must be backTestResult or liveAlg!')
     count = 100
     while count == 100:
-        query = meSchema.liveAlg.all().filter('stopStep =', stopStep).filter('startStep =', startStep).order('percentReturn')
+        query = entityModel.all().filter('stopStep =', stopStep).filter('startStep =', startStep).order('percentReturn')
         if cursor != '':
             query.with_cursor(cursor)
         if deadline > time():
             i += 1
-            liveAlgs = query.fetch(100)
-            lReturns = {}
-            for LAlg in liveAlgs:
-                memkey = "LAR-" + LAlg.key().name()
-                lReturns[memkey] = LAlg.percentReturn
-            memcache.set_multi(lReturns)
-            count = len(liveAlgs)
-            doLiveAlgCompounds(stopStep, startStep, liveAlgs)
+            entities = query.fetch(100)
+            count = len(entities)
+            memEntities = {}
+            for entity in entities:
+                memkey = prefix + entity.key().name()
+                memEntities[memkey] = entity.percentReturn
+            memcache.set_multi(memEntities)
+            doCompounds(stopStep, startStep, entities)
             cursor = query.cursor()
         else:
-            taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, '/calculate/compounds/liveAlgCompounds')
+            taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, model)
             return
     if stopStep <= globalStop - 400:
         stopStep += 400
         startStep += 400
-        taskAdd(stopStep, startStep, globalStop, namespace, name, 0, '', '/calculate/compounds/liveAlgCompounds')
+        taskAdd(stopStep, startStep, globalStop, namespace, name, 0, '', model)
 
-def doCompoundReturns(stopStep, startStep, globalStop, namespace, name = '', i = 0, cursor = ''):
-    from time import time
-    deadline = time() + 20.00
-    count = 100
-    while count == 100:
-        query = meSchema.backTestResult.all().filter('stopStep =', stopStep).filter('startStep =', startStep).order('percentReturn')
-        if cursor != '':
-            query.with_cursor(cursor)
-        if deadline > time():
-            i += 1
-            backTests = query.fetch(100)
-            bReturns = {}
-            for bTest in backTests:
-                memkey = "BTR-" + bTest.key().name()
-                bReturns[memkey] = bTest.percentReturn
-            memcache.set_multi(bReturns)
-            count = len(backTests)
-            doCompounds(stopStep, startStep, backTests)
-            cursor = query.cursor()
-        else:
-            taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, '/calculate/compounds/bTestCompounds')
-            return
-    if stopStep <= globalStop - 400:
-        stopStep += 400
-        startStep += 400
-        taskAdd(stopStep, startStep, globalStop, namespace, name, 0, '', '/calculate/compounds/bTestCompounds')
-
-def doLiveAlgCompounds(stopStep, startStep, liveAlgs):
+def doCompounds(stopStep, startStep, entities):
     putList = []
     memKeys = []
-    maxR = getMaxRnum(meSchema.liveAlg)
+    model = type(entities[0])
+    if model == meSchema.backTestResult:
+        idProp = 'algKey'
+        prefix = 'BTR-'
+    elif model == meSchema.liveAlg:
+        idProp = 'technique'
+        prefix = 'LAR-'
+    else:
+        raise Exception('Got unexpected Model type!')
+    maxR = getMaxRnum(model)
     stepBacks = [week for week in range(1,maxR)]
-    for LAlg in liveAlgs:
-        technique = LAlg.technique
+    for entity in entities:
+        identifier = getattr(entity, idProp)
         for stepback in stepBacks:
             newStop = stopStep - 400*stepback
             newStart = startStep - 400*stepback
-            memkey = buildMemKey(newStop, newStart, technique, 'LAR-')
+            memkey = buildMemKey(newStop, newStart, identifier, prefix)
             memKeys.append(memkey)
-    prevReturns = memGetPercentReturns(memKeys, 'LAR-')
-    for LAlg in liveAlgs:
-        Rdict = {1: (1.0 + LAlg.percentReturn)}
-        ''' Sets R2, R3, ... property values. '''
+    prevReturns = memGetPercentReturns(memKeys, prefix)
+    for entity in entities:
+        Rdict = {1: (1.0 + entity.percentReturn)}
         for Rnum in range(2, maxR + 1):
-            Rdict[Rnum] = Rdict[Rnum-1]*(1.0 + getRReturn(stopStep, startStep, LAlg.technique, Rnum-1, prevReturns, 'LAR-'))
-            setattr(LAlg, 'R' + str(Rnum), Rdict[Rnum])
-        putList.append(LAlg)
-    db.put(putList)
-
-def doCompounds(stopStep, startStep, backTests):
-    putList = []
-    memKeys = []
-    maxR = getMaxRnum(meSchema.backTestResult)
-    stepBacks = [week for week in range(1,maxR)]
-    for bTest in backTests:
-        algKey = bTest.algKey
-        for stepback in stepBacks:
-            memkey = buildMemKey(stopStep - 400*stepback, startStep - 400*stepback, algKey, 'BTR-')
-            memKeys.append(memkey)
-    prevReturns = memGetPercentReturns(memKeys, 'BTR-')
-    for bTest in backTests:
-        Rdict = {1: (1.0 + bTest.percentReturn)}
-        ''' Sets R2, R3, ... property values. '''
-        for Rnum in range(2, maxR + 1):
-            Rdict[Rnum] = Rdict[Rnum-1]*(1.0 + getRReturn(stopStep, startStep, bTest.algKey, Rnum-1, prevReturns, 'BTR-'))
-            setattr(bTest, 'R' + str(Rnum), Rdict[Rnum])
-        putList.append(bTest)
+            identifier = getattr(entity,idProp)
+            Rdict[Rnum] = Rdict[Rnum-1]*(1.0 + getRReturn(stopStep, startStep, identifier, Rnum-1, prevReturns, prefix))
+            setattr(entity, 'R' + str(Rnum), Rdict[Rnum])
+        putList.append(entity)
     db.put(putList)
 
 def getMaxRnum(model):
@@ -211,8 +162,7 @@ def memGetPercentReturns(memkeylist, prefix):
         memcache.set_multi(newMemEntities)
     return memEntities
 
-application = webapp.WSGIApplication([('/calculate/compounds/bTestCompounds', calculateBTestCompounds),
-                                      ('/calculate/compounds/liveAlgCompounds', calculateLiveAlgCompounds)],
+application = webapp.WSGIApplication([('/calculate/compounds/calculateCompounds', calculateCompounds)],
                                      debug = True)
 
 def main():
