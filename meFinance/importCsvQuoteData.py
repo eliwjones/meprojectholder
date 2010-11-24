@@ -25,7 +25,7 @@ from google.appengine.api import memcache
 from datetime import datetime, date
 import meSchema
 import csv
-from random import random
+from random import random, choice, sample
 
 
 class CSVQuotes(webapp.RequestHandler):
@@ -49,15 +49,13 @@ class CSVQuotes(webapp.RequestHandler):
             dailyCloseStep  = 1000000 + N*80 + 80
             '''Must draw random steps for High and Low.'''
             daySteps = [step for step in range(dailyOpenStep+1,dailyCloseStep)]
-            randIndex = int(round(random()*(len(daySteps)-1)))
-            dailyHighStep = daySteps[randIndex]
-            del daySteps[randIndex]
-            randIndex = int(round(random()*(len(daySteps)-1)))
-            dailyLowStep = daySteps[randIndex]
+            highLow = sample(daySteps, 2)
+            dailyHighStep = highLow[0]
+            dailyLowStep = highLow[1]
             ''' Set Quote Values '''
-            OpenQuote = dailyQuotes[N][1]
-            HighQuote = dailyQuotes[N][2]
-            LowQuote = dailyQuotes[N][3]
+            OpenQuote  = dailyQuotes[N][1]
+            HighQuote  = dailyQuotes[N][2]
+            LowQuote   = dailyQuotes[N][3]
             CloseQuote = dailyQuotes[N][4]
             ''' Create stck Entities for stckID Quotes'''
             openStck = meSchema.stck(key_name=str(stckID) + '_' + str(dailyOpenStep),
@@ -69,11 +67,7 @@ class CSVQuotes(webapp.RequestHandler):
             closeStck = meSchema.stck(key_name=str(stckID) + '_' + str(dailyCloseStep),
                                      ID = stckID, quote = float(CloseQuote), step = dailyCloseStep)
             putList.extend([openStck,highStck,lowStck,closeStck])
-            if len(putList) > 399:
-                db.put(putList)
-                putList = []
-        if len(putList) > 0:
-            db.put(putList)
+        meSchema.batchPut(putList)
 
 class fillRandomQuotes(webapp.RequestHandler):
     def get(self):
@@ -84,18 +78,17 @@ class fillRandomQuotes(webapp.RequestHandler):
         ''' Starting at Step 1000001 and iterating over each group of 80,
               Get all stck quotes for range and fill in gaps. '''
         startStep = int(self.request.get('startStep'))
-        Symbol = str(self.request.get('Symbol'))
         if startStep < 1000001:
             raise Exception('Must be doing random fills above step 1000000!')
         endStep = startStep + 79
         stckDict,stepSeq = getStckDictStepSeq(startStep,endStep)
         ''' for stckID in stckDict, must fill in gaps between stepSeq values. '''
         entityList = buildEntityList(stckDict, stepSeq)
-        db.put(entityList)
+        meSchema.batchPut(entityList)
 
 def getStckDictStepSeq(startStep, endStep, batchSize = 500):
     stckQuotes = meSchema.stck.all().filter('step >=', startStep).filter('step <=', endStep).order('step').fetch(batchSize)
-    ''' Should have 16 quotes per day.  4 for each stckID. '''
+    ''' Should have no more than 320 quotes per day.  80 for each stckID. '''
     if len(stckQuotes) > 320:
         raise Exception('stckQuotes should be no greater than 320! Got ' + str(len(stckQuotes)))
     stckDict = {1:{}, 2:{}, 3:{}, 4:{}}
