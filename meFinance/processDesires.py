@@ -15,14 +15,13 @@ def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_
     else:
         stckIDs = [meSchema.getStckID(namespace)]
         accumulate = True
-    lastStep = stopStep
+    ''' Section to be converted to function for handling liveAlg.processDesires() as well. '''
     alginfo = meSchema.memGet(meSchema.meAlg,algKey)
     desires = liveAlg.getStepRangeAlgDesires(algKey, alginfo, startStep, stopStep)
     stats = resetAlgstats(memprefix, alginfo.Cash, int(algKey), int(algKey))[memprefix + algKey]
     buydelta = meSchema.memGet(meSchema.tradeCue,alginfo.BuyCue).TimeDelta
     selldelta = meSchema.memGet(meSchema.tradeCue,alginfo.SellCue).TimeDelta
-    lastTradeStep = {memprefix + '_' + algKey + '_-1': -10000,
-                     memprefix + '_' + algKey + '_1' : -10000}
+    
     orderDesires = desires.keys()
     orderDesires.sort()
     for step in range(int(startStep), int(stopStep)+1):
@@ -44,11 +43,16 @@ def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_
                 cash = tradeCash + eval(repr(stats['Cash']))
                 if buysell == -1:
                     timedelta = selldelta
+                    lastTradeStep = stats['lastSell']
                 elif buysell == 1:
                     timedelta = buydelta
+                    lastTradeStep = stats['lastBuy']
                 
-                if cash > 0 and lastTradeStep[memprefix + '_' + algKey + '_' + str(buysell)] <= desireStep - timedelta:
-                    lastTradeStep[memprefix + '_' + algKey + '_' + str(buysell)] = desireStep
+                if cash > 0 and lastTradeStep <= desireStep - timedelta:
+                    if buysell == -1:
+                        stats['lastSell'] = desireStep
+                    elif buysell == 1:
+                        stats['lastBuy'] = desireStep
                     stats['CashDelta'].appendleft({'Symbol'  : Symbol,
                                                    'buysell' : buysell,
                                                    'value'   : tradeCash,
@@ -59,6 +63,7 @@ def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_
                     stats['Cash'] = cash
                     stats['PandL'] += PandL
                     stats['Positions'] = position
+    ''' End Section to be converted to function for handling liveAlg.processStepRangeDesires(). '''
 
     bTestReturns = getBackTestReturns([memprefix + algKey],stopStep, {memprefix + algKey: stats}, namespace)
     return bTestReturns
@@ -298,7 +303,9 @@ def resetAlgstats(memprefix = "unpacked_",algCash=20000.0,alphaAlg=1,omegaAlg=10
         statDict[key] = { 'Cash'      : algCash,
                           'CashDelta' : cashdelta[key],
                           'PandL'     : 0.0,
-                          'Positions' : {} }
+                          'Positions' : {},
+                          'lastBuy'   : -400,
+                          'lastSell'  : -400}
         memcache.set(key,statDict[key])
     return statDict
 

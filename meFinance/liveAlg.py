@@ -115,6 +115,7 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,
     
     for liveAlgKey in bestAlgs:
         algKey = bestAlgs[liveAlgKey]
+        ''' Being Section that will use processDesires.Func(). '''
         alginfo = meSchema.memGet(meSchema.meAlg,algKey)
         if MaxTrade:
             alginfo.Cash = alginfo.Cash + liveAlgInfo[liveAlgKey].PandL
@@ -128,21 +129,6 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,
         for step in range(start, stop+1):
             stopRange = 80
             if (step - start - 44)%stopRange==0:
-                '''
-                    Makes sure to doStops() once a day during midday.
-                    At the moment, this only works for algorithms done
-                    in batches that have a range of start, stop steps.
-
-                    No use for processing a single step since step-start
-                    will always = 0.
-
-                    Possibly consider something like:
-                      step - (min(start,ZeroDayWed) - 44) % stopRange
-
-                    Thus, if start date happened before ZeroDayWed, then
-                    do calculation as before.  Otherwise, steps should
-                    be consistent if compared to fixed day.
-                '''
                 stats = convertLiveAlgInfoToStatDict(liveAlgInfo[liveAlgKey])
                 stats = processDesires.doStops(step, stats, alginfo, stopRange, scaleFactor)
                 liveAlgInfo[liveAlgKey].CashDelta = repr(stats['CashDelta'])
@@ -180,6 +166,8 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,
                         liveAlgInfo[liveAlgKey].Cash      = cash
                         liveAlgInfo[liveAlgKey].PandL    += PandL
                         liveAlgInfo[liveAlgKey].Positions = repr(position)
+        ''' End Section that will use processDesires.Func(). '''
+        # Must add convertStatDictToLiveAlgInfo() here.
     namespace_manager.set_namespace(originalNameSpace)
     return liveAlgInfo
 
@@ -327,9 +315,3 @@ def initializeLiveAlgs(initialStopStep, stepRange, Cash, FTLtype = ['FTLe','dnFT
                                    history = repr(deque([])), technique = technique )
         liveAlgs.append(liveAlg)
     db.put(liveAlgs)
-
-
-
-    
-
-    

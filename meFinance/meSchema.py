@@ -75,8 +75,10 @@ class algStats(db.Model):                                       # key_name = meA
 
 class backTestResult(db.Model):                                # Model to use for sifting through Back Test Results.
     algKey        = db.StringProperty(required=True)            # Used to create intersecting sets.
-    startStep     = db.IntegerProperty(required=True)
     stopStep      = db.IntegerProperty(required=True)
+    startStep     = db.IntegerProperty(required=True)
+    lastBuy       = db.IntegerProperty(required=True)
+    lastSell      = db.IntegerProperty(required=True)
     percentReturn = db.FloatProperty(required=True)
     numTrades     = db.IntegerProperty(required=True)
     PandL         = db.FloatProperty(required=True)
