@@ -15,29 +15,46 @@ def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_
     else:
         stckIDs = [meSchema.getStckID(namespace)]
         accumulate = True
-    ''' Section to be converted to function for handling liveAlg.processDesires() as well. '''
-    alginfo = meSchema.memGet(meSchema.meAlg,algKey)
-    desires = liveAlg.getStepRangeAlgDesires(algKey, alginfo, startStep, stopStep)
-    stats = resetAlgstats(memprefix, alginfo.Cash, int(algKey), int(algKey))[memprefix + algKey]
-    buydelta = meSchema.memGet(meSchema.tradeCue,alginfo.BuyCue).TimeDelta
-    selldelta = meSchema.memGet(meSchema.tradeCue,alginfo.SellCue).TimeDelta
+
+    alginfo = meSchema.memGet(meSchema.meAlg, algKey)
+    stats = resetAlgstats(memprefix, alginfo.Cash, int(algKey), int(algKey))[memprefix+algKey]
     
+    stats = doAlgSteps(algKey, int(startStep), int(stopStep), stats, stckIDs)
+    
+    bTestReturns = getBackTestReturns([memprefix + algKey],stopStep, {memprefix + algKey: stats}, namespace)
+    return bTestReturns
+
+''' Merge of updateAlgStat() and processStepRangeDesires() '''
+''' Must feed in statDict and updated version will be returned. '''
+''' Chicken-Egg problem with alginfo and stats dict for backTestResult.
+      cash value used to init stats comes from alginfo.'''
+def doAlgSteps(algKey, startStep, stopStep, stats, stckIDs, MaxTrade = False):
+    if len(stckIDs) == 1:
+        accumulate = True
+    else:
+        accumulate = False
+    alginfo = meSchema.memGet(meSchema.meAlg, algKey)
+ 
+    if MaxTrade:
+        alginfo.Cash = alginfo.Cash + stats['PandL']
+        alginfo.TradeSize = (0.94/len(stckIDs))
+    desires = liveAlg.getStepRangeAlgDesires(algKey, alginfo, startStep, stopStep)
+    buydelta = meSchema.memGet(meSchema.tradeCue, alginfo.BuyCue).TimeDelta
+    selldelta = meSchema.memGet(meSchema.tradeCue, alginfo.BuyCue).TimeDelta
+
     orderDesires = desires.keys()
     orderDesires.sort()
-    for step in range(int(startStep), int(stopStep)+1):
+
+    for step in range(startStep, stopStep + 1):
         stopRange = 80
-        # for now, just running stop every 80 steps
-        # Shift back step - start by 44 to get midday stop.
-        if (step - int(startStep) - 44)%stopRange == 0:
+        if (step - startStep - 44)%stopRange == 0:
             stats = doStops(step, eval(repr(stats)), alginfo, stopRange)
-        potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in stckIDs]
-        potentialDesires.sort()
+        potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in stckIDs]  # must feed stckIDs into func?
         for key in potentialDesires:
             if key in orderDesires:
                 currentDesire = eval(desires[key])
-                desireStep = int(key.split('_')[0])
-                for des in currentDesire:
-                    buysell = cmp(currentDesire[des]['Shares'],0)
+                for des in currentDesire:            # Eventually re-do desires[key] to be just dict with 'Symbol' 'Shares' keys.
+                    buysell = cmp(currentDesire[des]['Shares'], 0)
                     Symbol = des
                 tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), eval(repr(stats['Positions'])), step, accumulate)
                 cash = tradeCash + eval(repr(stats['Cash']))
@@ -47,26 +64,24 @@ def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_
                 elif buysell == 1:
                     timedelta = buydelta
                     lastTradeStep = stats['lastBuy']
-                
-                if cash > 0 and lastTradeStep <= desireStep - timedelta:
+
+                if cash > 0 and lastTradeStep <= step - timedelta:
                     if buysell == -1:
-                        stats['lastSell'] = desireStep
+                        stats['lastSell'] = step
                     elif buysell == 1:
-                        stats['lastBuy'] = desireStep
-                    stats['CashDelta'].appendleft({'Symbol'  : Symbol,
+                        stats['lastBuy'] = step
+                    stats['CashDelta'].appendleft({'Symbol' : Symbol,
                                                    'buysell' : buysell,
                                                    'value'   : tradeCash,
                                                    'PandL'   : PandL,
-                                                   'step'    : desireStep})
+                                                   'step'    : step})
+
                     if len(stats['CashDelta']) > 800:
                         stats['CashDelta'].pop()
                     stats['Cash'] = cash
                     stats['PandL'] += PandL
                     stats['Positions'] = position
-    ''' End Section to be converted to function for handling liveAlg.processStepRangeDesires(). '''
-
-    bTestReturns = getBackTestReturns([memprefix + algKey],stopStep, {memprefix + algKey: stats}, namespace)
-    return bTestReturns
+    return stats
 
 def doStops(step, statDict, alginfo, stopRange, scaleFactor = 0.0):
     from random import random
