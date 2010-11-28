@@ -73,8 +73,7 @@ class algStats(db.Model):                                       # key_name = meA
     PandL     = db.FloatProperty(required=False)                # total sum of all PandL from trades.
     Positions = db.BlobProperty(required=False)                 # Serialized dict() of stock positions.
 
-class backTestResult(db.Model):                                # Model to use for sifting through Back Test Results.
-    algKey        = db.StringProperty(required=True)            # Used to create intersecting sets.
+class baseAlgClass(db.Model):
     stopStep      = db.IntegerProperty(required=True)
     startStep     = db.IntegerProperty(required=True)
     lastBuy       = db.IntegerProperty(required=True)
@@ -89,30 +88,18 @@ class backTestResult(db.Model):                                # Model to use fo
     R3            = db.FloatProperty(required=False)
     R4            = db.FloatProperty(required=False)
     R5            = db.FloatProperty(required=False)
-    N             = db.IntegerProperty(required=False)         # Maximum number of weeks back this algorithm appears with percentReturn > 0
-                                                               # Only technically needed for top 20 worst, best for each stopStep.
+    N             = db.IntegerProperty(required=False)
+    
 
-class liveAlg(db.Model):
-    stopStep      = db.IntegerProperty(required=True)
-    startStep     = db.IntegerProperty(required=False)
+class backTestResult(baseAlgClass):                             # Model to use for sifting through Back Test Results.
+    algKey        = db.StringProperty(required=True)
+
+class liveAlg(baseAlgClass):
     stepRange     = db.IntegerProperty(required=False)       # Used to indicate what backTestResult range alg is pulled from.
-    lastBuy       = db.IntegerProperty(required=True)        # backTestResult.startStep = currentStep - liveAlg.stepRange
-    lastSell      = db.IntegerProperty(required=True)        # backTestResult.stopStep = currentStep
-    percentReturn = db.FloatProperty(required=True)
-    Positions     = db.TextProperty(required=True)
-    PosVal        = db.FloatProperty(required=True)
-    PandL         = db.FloatProperty(required=True)
-    CashDelta     = db.TextProperty(required=True)
     Cash          = db.FloatProperty(required=True)
-    R2            = db.FloatProperty(required=False)
-    R3            = db.FloatProperty(required=False)
-    R4            = db.FloatProperty(required=False)
-    R5            = db.FloatProperty(required=False)
     R6            = db.FloatProperty(required=False)
     R7            = db.FloatProperty(required=False)
     R8            = db.FloatProperty(required=False)
-    N             = db.IntegerProperty(required=False)
-    numTrades     = db.IntegerProperty(required=True)
     history       = db.TextProperty(required=False)
     technique     = db.StringProperty(required=False)       # FTL method: Follow The Leader, Follow The Loser,
                                                             # Do Not Follow The Leader, Do Not Follow The Loser
@@ -121,19 +108,9 @@ class liveAlg(db.Model):
   metaAlg will be a few entities. FTLe-R3 and dnFTLe-R3
   key_name = startstep + '-' + stopstep
 '''
-class metaAlg(db.Model):
-    stopStep      = db.IntegerProperty(required=True)
-    startStep     = db.IntegerProperty(required=True)
+class metaAlg(baseAlgClass):
     stepRange     = db.IntegerProperty(required=False)
-    lastBuy       = db.IntegerProperty(required=True)
-    lastSell      = db.IntegerProperty(required=True)
-    percentReturn = db.FloatProperty(required=True)
-    Positions     = db.TextProperty(required=True)
-    PosVal        = db.FloatProperty(required=True)
-    PandL         = db.FloatProperty(required=True)
-    CashDelta     = db.TextProperty(required=True)
     Cash          = db.FloatProperty(required=True)
-    numTrades     = db.IntegerProperty(required=True)
     history       = db.TextProperty(required=True)
     technique     = db.StringProperty(required=True)       # FTL method: Follow The Leader, Follow The Loser,
     StockIDOrder  = db.TextProperty(required=False)        # default is [1,2,3,4] for [HBC,CME,GOOG,INTC]
@@ -154,18 +131,8 @@ class metaAlgStat(db.Model):
    Keeps track of performance of process for choosing
    which metAlg Technique to use.
 '''
-class metaMetaAlg(db.Model):
-    stopStep      = db.IntegerProperty(required=True)
-    startStep     = db.IntegerProperty(required=True)
-    lastBuy       = db.IntegerProperty(required=True)
-    lastSell      = db.IntegerProperty(required=True)
-    percentReturn = db.FloatProperty(required=True)
-    Positions     = db.TextProperty(required=True)
-    PosVal        = db.FloatProperty(required=True)
-    PandL         = db.FloatProperty(required=True)
-    CashDelta     = db.TextProperty(required=True)
+class metaMetaAlg(baseAlgClass):
     Cash          = db.FloatProperty(required=True)
-    numTrades     = db.IntegerProperty(required=True)
     history       = db.TextProperty(required=True)
     technique     = db.StringProperty(required=True)
 
@@ -205,9 +172,6 @@ class currentTrader(db.Model):
     PandL          = db.FloatProperty(required=True)
     percentReturn  = db.FloatProperty(required=True)
     HistoricalRets = db.TextProperty(required=True)        # repr(Dict(Collection)) of last 5 weeks of 1,2,3,4 day returns. From doStops() step.
-    # MeanStdDevs    = db.TextProperty(required=True)        # repr(Dict(Collection)) of Mean, Standard Deviation for 1,2,3,4 day returns.
-    ## Not sure why either of these needed.. will have to re-get and re-calculate at each step.
-    # StockQuotes    = db.TextProperty(required=True)        # repr(Dict(Collection)) of quotes for [step,step-1,step-80,step-160,step-240,step-320,step-400]
     TradeDesires   = db.TextProperty(required=True)        # repr(Collection) of emailed desires for each step.
     TradeFills     = db.TextProperty(required=True)        # repr(Collection) of actually filled trades.
     LiveAlgTechne  = db.StringProperty(required=True)    # Informational.. lets me know which LiveAlg technique is in use.
