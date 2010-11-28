@@ -16,11 +16,9 @@ import meSchema
 import processDesires
 import princeFunc
 from collections import deque
-from pickle import dumps
 from google.appengine.api import memcache
 from google.appengine.ext import db
 from google.appengine.ext import deferred
-from google.appengine.api.labs import taskqueue
 from google.appengine.api import namespace_manager
 
 def doAllLiveAlgs(initialStopStep, stepRange, globalStop, namespace, name):
@@ -204,6 +202,7 @@ def buildStopStepList(start,stop):
         BackTestStop += 400
     return stopStepList
 
+''' Must move to future-created meTools. '''
 def getStepRangeAlgDesires(algKey, alginfo, startStep,stopStep):
     buyList = []
     sellList = []

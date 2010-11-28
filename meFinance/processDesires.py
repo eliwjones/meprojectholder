@@ -1,9 +1,4 @@
-from google.appengine.ext import db
-from google.appengine.api import memcache
-from zlib import compress,decompress
 from collections import deque
-from google.appengine.ext import deferred
-from google.appengine.api.labs import taskqueue
 import meSchema
 import princeFunc
 import liveAlg
@@ -108,7 +103,7 @@ def doStops(step, statDict, alginfo, stopRange, scaleFactor = 0.0):
         dictDesire = convertDesireToDict(offsetDesire, -1*longshort, alginfo.TradeSize, alginfo.Cash, -1*shares)
         
         # Now only using maxmin deviations for stops.
-        maxDevStop, minDevStop = getMaxMinDevMeansV2(stckDeltas)
+        maxDevStop, minDevStop = getMaxMinDevMeans(stckDeltas)
         # Using scaleFactor for metaAlgs. Moves stop 40% closer to 1.0
 
         stopLoss = statDict['Positions'][pos]['StopLoss']
@@ -149,27 +144,6 @@ def doStops(step, statDict, alginfo, stopRange, scaleFactor = 0.0):
     return statDict
 
 def getMaxMinDevMeans(stckDeltas):
-    negDeltas = {}
-    posDeltas = {}
-    negDevMeans = []
-    posDevMeans = []
-    for key in stckDeltas:
-        negDeltas[key] = []
-        posDeltas[key] = []
-        for i in range(len(stckDeltas[key])):
-            if stckDeltas[key][i] > 0.0:
-                posDeltas[key].append(stckDeltas[key][i])
-            elif stckDeltas[key][i] < 0.0:
-                negDeltas[key].append(stckDeltas[key][i])
-        negDev, negMean = getStandardDeviationMean(negDeltas[key])
-        posDev, posMean = getStandardDeviationMean(posDeltas[key])
-        negDevMeans.append(negMean - negDev)
-        posDevMeans.append(posMean + posDev)
-    maxPosDevMean = 1 + max(posDevMeans)
-    minNegDevMean = 1 + min(negDevMeans)
-    return maxPosDevMean, minNegDevMean
-
-def getMaxMinDevMeansV2(stckDeltas):
     # Used to get general max min expected deviations from mean.
     negDevStops = []
     posDevStops = []
@@ -219,6 +193,8 @@ def calculateDeltas(stckID, step):
         deltaList[k].sort()
     return deltaList
 
+
+''' This is silly and should be in meSchema (or the soon to be created meTools.) '''
 def memGetStcks(stckKeyList):
     meList = []
     results = meSchema.memGet_multi(meSchema.stck, stckKeyList)
@@ -227,10 +203,6 @@ def memGetStcks(stckKeyList):
     return meList
         
 def getBackTestReturns(memkeylist, stopStep, stats, namespace):
-    # If want can pass in stats dict with appropriate data.
-    if stats is None:
-        stats = memcache.get_multi(memkeylist)
-
     algkeys = {}
     for key in stats:
         key_name = key.split('_')[-1]  # Pull algkey from end of memkey
@@ -321,7 +293,9 @@ def resetAlgstats(memprefix = "unpacked_",algCash=20000.0,alphaAlg=1,omegaAlg=10
                           'Positions' : {},
                           'lastBuy'   : -400,
                           'lastSell'  : -400}
-        memcache.set(key,statDict[key])
+        ''' Not using memcache anymore anyhow, eventually this entire resetAlgstats()
+              will be deprecated. '''
+        # memcache.set(key,statDict[key])
     return statDict
 
 def convertDesireToDict(desire, buysell, tradesize, cash, shares = None):
