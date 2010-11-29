@@ -1,11 +1,5 @@
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
-from google.appengine.ext import deferred
-from google.appengine.api.labs import taskqueue
-import meSchema
-import processDesires
-# Sample url to call code.
-#    /backtest/doBackTests?stopStep=15955&startAlg=1&stopAlg=3540&unique=b2b2
 
 class doBackTests(webapp.RequestHandler):
     def get(self):
@@ -13,12 +7,13 @@ class doBackTests(webapp.RequestHandler):
         self.response.out.write('I do backtests! Please use mainTaskAdd().\n')
             
     def post(self):
+        import meTools
         uniquifier = self.request.get('uniquifier')
         namespace = str(self.request.get('namespace'))
         
         startAlg = int(self.request.get('startAlg'))
         stopAlg = int(self.request.get('stopAlg'))
-        alglist = [meSchema.buildAlgKey(i) for i in range(startAlg, stopAlg+1)]
+        alglist = [meTools.buildAlgKey(i) for i in range(startAlg, stopAlg+1)]
         
         stopStep = int(self.request.get('stopStep'))
         batchSize = int(self.request.get('batchSize'))
@@ -39,6 +34,7 @@ class doBackTestBatch(webapp.RequestHandler):
         backTestBatch(algBatch, monthBatch, stopStep, namespace)
 
 def addTaskRange(initialStopStep, globalStop, unique, namespace, batchSize=5, stepsBack=1600):
+    import meSchema
     from google.appengine.api import namespace_manager
     namespace_manager.set_namespace('')
     startAlg = 1
@@ -50,6 +46,7 @@ def addTaskRange(initialStopStep, globalStop, unique, namespace, batchSize=5, st
         mainTaskAdd(name, startAlg, stopAlg, stopStep, batchSize, stepRange, unique, namespace)
 
 def mainTaskAdd(name,startAlg, stopAlg, stopStep, batchSize, stepRange, uniquifier, namespace, delay = 0, wait = .5):
+    from google.appengine.api.labs import taskqueue
     try:
         taskqueue.add(url = '/backtest/doBackTests', countdown = delay,
                       name = name,
@@ -69,6 +66,7 @@ def mainTaskAdd(name,startAlg, stopAlg, stopStep, batchSize, stepRange, uniquifi
         
 
 def batchTaskAdd(name, algBatch, monthBatch, stopStep, namespace, delay=0,wait=.5):
+    from google.appengine.api.labs import taskqueue
     try:
         taskqueue.add(url = '/backtest/doBackTestBatch', countdown = delay,
                       name = name,
@@ -110,6 +108,7 @@ def runBackTests(alglist, stop, batchSize = 5, stepRange=None, uniquifier='', na
     return keylist
 
 def backTestBatch(algBatch, monthBatch, stopStep, namespace):
+    import processDesires
     from google.appengine.api import namespace_manager
     backTestReturnDict = {}
     for alg in algBatch:

@@ -1,5 +1,6 @@
 from collections import deque
 import meSchema
+import meTools
 import princeFunc
 import liveAlg
 
@@ -8,10 +9,10 @@ def updateAlgStat(algKey, startStep, stopStep, namespace, memprefix = "unpacked_
         stckIDs = [1,2,3,4]
         accumulate = False
     else:
-        stckIDs = [meSchema.getStckID(namespace)]
+        stckIDs = [meTools.getStckID(namespace)]
         accumulate = True
 
-    alginfo = meSchema.memGet(meSchema.meAlg, algKey)
+    alginfo = meTools.memGet(meSchema.meAlg, algKey)
     stats = resetAlgstats(memprefix, alginfo.Cash, int(algKey), int(algKey))[memprefix+algKey]
     
     stats = doAlgSteps(algKey, int(startStep), int(stopStep), stats, stckIDs)
@@ -28,14 +29,14 @@ def doAlgSteps(algKey, startStep, stopStep, stats, stckIDs, MaxTrade = False):
         accumulate = True
     else:
         accumulate = False
-    alginfo = meSchema.memGet(meSchema.meAlg, algKey)
+    alginfo = meTools.memGet(meSchema.meAlg, algKey)
  
     if MaxTrade:
         alginfo.Cash = alginfo.Cash + stats['PandL']
         alginfo.TradeSize = (0.94/len(stckIDs))
     desires = liveAlg.getStepRangeAlgDesires(algKey, alginfo, startStep, stopStep)
-    buydelta = meSchema.memGet(meSchema.tradeCue, alginfo.BuyCue).TimeDelta
-    selldelta = meSchema.memGet(meSchema.tradeCue, alginfo.BuyCue).TimeDelta
+    buydelta = meTools.memGet(meSchema.tradeCue, alginfo.BuyCue).TimeDelta
+    selldelta = meTools.memGet(meSchema.tradeCue, alginfo.BuyCue).TimeDelta
 
     orderDesires = desires.keys()
     orderDesires.sort()
@@ -44,7 +45,7 @@ def doAlgSteps(algKey, startStep, stopStep, stats, stckIDs, MaxTrade = False):
         stopRange = 80
         if (step - startStep - 44)%stopRange == 0:
             stats = doStops(step, eval(repr(stats)), alginfo, stopRange)
-        potentialDesires = [meSchema.buildDesireKey(step, algKey, stckID) for stckID in stckIDs]  # must feed stckIDs into func?
+        potentialDesires = [meTools.buildDesireKey(step, algKey, stckID) for stckID in stckIDs]  # must feed stckIDs into func?
         for key in potentialDesires:
             if key in orderDesires:
                 currentDesire = eval(desires[key])
@@ -90,9 +91,9 @@ def doStops(step, statDict, alginfo, stopRange, scaleFactor = 0.0):
         if stock is None:
             return statDict
         else:
-            stckQuotes[meSchema.getStckSymbol(stock.ID)] = stock.quote
+            stckQuotes[meTools.getStckSymbol(stock.ID)] = stock.quote
     for pos in statDict['Positions']:
-        stckID = meSchema.getStckID(pos)
+        stckID = meTools.getStckID(pos)
         stckDeltas = calculateDeltas(stckID,step)
         shares = statDict['Positions'][pos]['Shares']
         longshort = cmp(shares,0)                                  # -1 for short, +1 for long
@@ -197,7 +198,7 @@ def calculateDeltas(stckID, step):
 ''' This is silly and should be in meSchema (or the soon to be created meTools.) '''
 def memGetStcks(stckKeyList):
     meList = []
-    results = meSchema.memGet_multi(meSchema.stck, stckKeyList)
+    results = meTools.memGet_multi(meSchema.stck, stckKeyList)
     for key in stckKeyList:
         meList.append(results[key])
     return meList
@@ -208,7 +209,7 @@ def getBackTestReturns(memkeylist, stopStep, stats, namespace):
         key_name = key.split('_')[-1]  # Pull algkey from end of memkey
         algkeys[key_name] = None       # So I don't have to check if algkey already there.
     algkeys = algkeys.keys()           # Turn dictionary keys into list of keys.
-    algs = meSchema.memGet_multi(meSchema.meAlg,algkeys)
+    algs = meTools.memGet_multi(meSchema.meAlg,algkeys)
     cuekeys = {}
     for key in algs:
         key_name = algs[key].BuyCue
@@ -216,7 +217,7 @@ def getBackTestReturns(memkeylist, stopStep, stats, namespace):
         key_name = algs[key].SellCue
         cuekeys[key_name] = None
     cuekeys = cuekeys.keys()
-    tradecues = meSchema.memGet_multi(meSchema.tradeCue,cuekeys)
+    tradecues = meTools.memGet_multi(meSchema.tradeCue,cuekeys)
     stopStepQuotes = princeFunc.getStepQuotes(stopStep)
     backTestReturns = {}
     # Pre-populate dict to avoid doing __contains__ on every key.
@@ -275,14 +276,14 @@ def persistBackTestReturns(backTestReturns):
                                                      CashDelta     = currentResult['CashDelta'],
                                                      Positions     = currentResult['Positions'])
             putList.append(backTestResult)
-    meSchema.batchPut(putList)
+    meTools.batchPut(putList)
 
 def resetAlgstats(memprefix = "unpacked_",algCash=20000.0,alphaAlg=1,omegaAlg=10620):
     memkeylist = []
     cashdelta = {}
     statDict = {}
     for i in range(alphaAlg,omegaAlg+1):
-        key_name = meSchema.buildAlgKey(str(i))
+        key_name = meTools.buildAlgKey(str(i))
         memkey = memprefix + key_name
         memkeylist.append(memkey)
     for key in memkeylist:

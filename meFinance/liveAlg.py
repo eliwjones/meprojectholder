@@ -13,6 +13,7 @@
 # Then process desires for liveAlg[stepRange] using its previous trade info and bestAlg[stepRange] desires.
 
 import meSchema
+import meTools
 import processDesires
 import princeFunc
 from collections import deque
@@ -28,7 +29,7 @@ def doAllLiveAlgs(initialStopStep, stepRange, globalStop, namespace, name):
 
 def calculateWeeklyLiveAlgs(stopStep, stepRange, namespace, name = ''):
     namespace_manager.set_namespace('')
-    alginfo = meSchema.memGet(meSchema.meAlg, meSchema.buildAlgKey(1))
+    alginfo = meTools.memGet(meSchema.meAlg, meTools.buildAlgKey(1))
     namespace_manager.set_namespace(namespace)
     Cash = alginfo.Cash
     initializeLiveAlgs(stopStep,stepRange, Cash)
@@ -78,7 +79,7 @@ def processLiveAlgStepRange(start, stop, stepRange, algKeyFilter, namespace):
 def getCurrentReturn(liveAlgInfo,stopStep, Cash = None):
     originalNameSpace = namespace_manager.get_namespace()
     namespace_manager.set_namespace('')
-    alginfo = meSchema.memGet(meSchema.meAlg, meSchema.buildAlgKey(1))
+    alginfo = meTools.memGet(meSchema.meAlg, meTools.buildAlgKey(1))
     namespace_manager.set_namespace(originalNameSpace)
     if Cash is not None:
         startCash = Cash
@@ -109,7 +110,7 @@ def processStepRangeDesires(start,stop,bestAlgs,liveAlgInfo, stckIDorder = [1,2,
         accumulate = False
     else:
         accumulate = True
-        stckIDorder = [meSchema.getStckID(originalNameSpace)]
+        stckIDorder = [meTools.getStckID(originalNameSpace)]
     
     for liveAlgKey in bestAlgs:
         algKey = bestAlgs[liveAlgKey]
@@ -187,7 +188,7 @@ def getTopAlg(stopStep, startStep, technique):
 def getOppositeAlg(meAlgKey):
     originalNameSpace = namespace_manager.get_namespace()
     namespace_manager.set_namespace('')
-    meAlg = meSchema.memGet(meSchema.meAlg, meAlgKey)
+    meAlg = meTools.memGet(meSchema.meAlg, meAlgKey)
     query = meSchema.meAlg.all(keys_only = True).filter("BuyCue =", meAlg.SellCue).filter("SellCue =", meAlg.BuyCue)
     oppositeAlg = query.get()
     oppositeAlgKey = oppositeAlg.name()
@@ -209,28 +210,28 @@ def getStepRangeAlgDesires(algKey, alginfo, startStep,stopStep):
     desireDict = {}
     buyCue = alginfo.BuyCue
     sellCue = alginfo.SellCue
-    buyStartKey = meSchema.buildDesireKey(startStep,buyCue,0)
-    buyStopKey = meSchema.buildDesireKey(stopStep,buyCue,99)
+    buyStartKey = meTools.buildDesireKey(startStep,buyCue,0)
+    buyStopKey = meTools.buildDesireKey(stopStep,buyCue,99)
     buyQuery  = "Select * From desire Where CueKey = '%s' " % (buyCue)
     buyQuery += " AND __key__ >= Key('desire','%s') AND __key__ <= Key('desire','%s')" % (buyStartKey,buyStopKey)
-    sellStartKey = meSchema.buildDesireKey(startStep,sellCue,0)
-    sellStopKey = meSchema.buildDesireKey(stopStep,sellCue,99)
+    sellStartKey = meTools.buildDesireKey(startStep,sellCue,0)
+    sellStopKey = meTools.buildDesireKey(stopStep,sellCue,99)
     sellQuery  = "Select * From desire Where CueKey = '%s' " % (sellCue)
     sellQuery += " AND __key__ >= Key('desire','%s') AND __key__ <= Key('desire','%s')" % (sellStartKey,sellStopKey)
-    buyList = meSchema.cachepy.get(buyQuery)
+    buyList = meTools.cachepy.get(buyQuery)
     if buyList is None:
         buyList = memcache.get(buyQuery)
         if buyList is None:
             buyList = db.GqlQuery(buyQuery).fetch(4000)
             memcache.set(buyQuery,buyList)
-        meSchema.cachepy.set(buyQuery,buyList)
-    sellList = meSchema.cachepy.get(sellQuery)
+        meTools.cachepy.set(buyQuery,buyList)
+    sellList = meTools.cachepy.get(sellQuery)
     if sellList is None:
         sellList = memcache.get(sellQuery)
         if sellList is None:
             sellList = db.GqlQuery(sellQuery).fetch(4000)
             memcache.set(sellQuery,sellList)
-        meSchema.cachepy.set(sellQuery,sellList)
+        meTools.cachepy.set(sellQuery,sellList)
 
     if len(buyList) > len(sellList):
         # If there are more buys than sells, fill dict with buys first
