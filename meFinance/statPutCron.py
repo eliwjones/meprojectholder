@@ -2,10 +2,10 @@ from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.api.labs import taskqueue
 from google.appengine.ext import db
-from google.appengine.datastore import entity_pb
 from google.appengine.api import memcache
 from datetime import datetime, date
 import meSchema
+import meTools
 import CurrentTrader
 
 
@@ -58,9 +58,9 @@ def getPositions(email):
 def putEm(step):
     positions = getPositions('eli.jones@gmail.com')
     meDatetime = datetime.now()
-    meList = []
+    entityDict = {}
     symbols = ['GOOG','HBC','INTC','CME']
-    stckIDs = meSchema.getStckIDs(symbols)
+    stckIDs = meTools.getStckIDs(symbols)
     for pos in positions:
         symbol = pos.ticker_id.split(':')[1]
         quote = float(str(pos.position_data.market_value).replace(' USD',''))
@@ -70,22 +70,15 @@ def putEm(step):
                                    ID    = stckID,
                                    step  = step,
                                    quote = quote)
-            meList.append(meStck)
-        
-
-    memcacheDict = {}
-    for stock in meList:
-        memKey = "stck" + stock.key().name()
-        memcacheDict[memKey] = db.model_to_protobuf(stock).Encode()
-    memcache.set_multi(memcacheDict)
+            entityDict[meStck.key().name()] = meStck
         
     meStepDate = meSchema.stepDate(key_name = str(step),step = step, date = meDatetime)
-    meList.append(meStepDate)
+    entityDict[meStepDate.key().name()] = meStepDate
 
     wait = .1
     while True:
         try:
-            db.put(meList)
+            meTools.memPut_multi(entityDict)
             break
         except db.Timeout:
             from time import sleep
@@ -99,7 +92,7 @@ class meGDATA(object):
         self.client = FinanceService(source='meFinance')
         myToken = memcache.get('meFinance-Token')
         if myToken is None:
-            creds = meSchema.getCredentials(email)
+            creds = meTools.getCredentials(email)
             password = creds.password
             self.client.ClientLogin(email,password)
             myToken = self.client.GetClientLoginToken()

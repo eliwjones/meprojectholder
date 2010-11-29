@@ -2,7 +2,6 @@ from google.appengine.ext import db
 from google.appengine.api import memcache
 import cachepy
 
-
 def batchPut(entities, cache=False, memkey=None, time=0):
     batch = []
     for entity in entities:
@@ -109,13 +108,13 @@ def memGet_multi(model,keylist):
         EntityDict[newkey] = memEntities[key]
     return EntityDict
 
-def memPut_multi(model, entities, priority=0):                     # Must add in code to handle protobuff for memcache set_multi? (or drop protobuff technique?)
+def memPut_multi(entities, priority=0):                     # Must add in code to handle protobuff for memcache set_multi? (or drop protobuff technique?)
     putlist = []
     cachedict = {}
     for key in entities:
         if entities[key] is not None:
             putlist.append(entities[key])
-        memkey = model.kind() + key
+        memkey = entities[key].kind() + key
         cachedict[memkey] = entities[key]
         if len(putlist) > 100:
             db.put(putlist)
@@ -177,12 +176,14 @@ def decompCashDelta(keyname):
     return result
 
 def getStckID(stock):
-    result = memGet(stckID,stock)
+    import meSchema
+    result = memGet(meSchema.stckID,stock)
     result = result.ID
     return result
 
 def getStckIDs(stockList):
-    results = memGet_multi(stckID, stockList)
+    import meSchema
+    results = memGet_multi(meSchema.stckID, stockList)
     stckIDdict = {}
     for res in results:
         stckIDdict[res] = results[res].ID
@@ -216,19 +217,21 @@ def getStck(ID,step):
     return meStocks
 
 def putCredentials(email,password):
+    import meSchema
     from base64 import b64encode
     key_name = email
     email = b64encode(email)
     password = b64encode(password)
-    creds = GDATACredentials(key_name=key_name,email=email,password=password)
+    creds = meSchema.GDATACredentials(key_name=key_name,email=email,password=password)
     db.put(creds)
 
 def getCredentials(email):
+    import meSchema
     from base64 import b64decode
-    creds = memGet(GDATACredentials,email)
+    creds = memGet(meSchema.GDATACredentials,email)
     email    = b64decode(creds.email)
     password = b64decode(creds.password)
-    result = GDATACredentials(email=email,password=password)
+    result = meSchema.GDATACredentials(email=email,password=password)
     return result
 
 def wipeOutCreds():
