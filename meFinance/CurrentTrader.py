@@ -409,7 +409,7 @@ def getMedianMedians(histRets):
 def getStckMaxMinMedianMedians(histStckRets):
     '''
     This will be used for StopProfit setting
-    while processDesires.getMaxMinDevMeansV2() is for StopLoss setting.
+    while processDesires.getMaxMinDevMeans() is for StopLoss setting.
     '''
     maxMedianMedian = -1
     minMedianMedian = 1
@@ -471,7 +471,7 @@ def getMaxMinDevMeans(histRets):
     import processDesires
     maxMinDevMeans = {}
     for stck in histRets:
-        maxDevStop, minDevStop = processDesires.getMaxMinDevMeansV2(histRets[stck])
+        maxDevStop, minDevStop = processDesires.getMaxMinDevMeans(histRets[stck])
         maxMinDevMeans[stck] = {'maxDevStop' : maxDevStop, 'minDevStop' : minDevStop}
     return maxMinDevMeans
 

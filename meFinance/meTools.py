@@ -32,23 +32,8 @@ def memPutGet(model,keyname,time=0):
         memcache.set(memkey,None)
     return result
 
-def memcacheGetMulti(keys):
-    results = memcache.get_multi(keys)
-    return results
-
-def memcacheSet(keyname,value):
-    memcache.set(keyname,value)
-
-def dbGet(model,keyname):
-    result = model.get_by_key_name(keyname)
-    return result
-
-def dbPut(model):
-    db.put(model)
-
 def memGet(model,keyname,priority=1,time=0):
     memkey = model.kind() + keyname
-
     multiget = cachepy.get_multi([memkey],priority=priority)
     if memkey in multiget:
         result = multiget[memkey]
@@ -108,7 +93,7 @@ def memGet_multi(model,keylist):
         EntityDict[newkey] = memEntities[key]
     return EntityDict
 
-def memPut_multi(entities, priority=0):                     # Must add in code to handle protobuff for memcache set_multi? (or drop protobuff technique?)
+def memPut_multi(entities, priority=0):
     putlist = []
     cachedict = {}
     for key in entities:
@@ -167,7 +152,7 @@ def decompCashDelta(keyname):
             cashdelta = algStats.get_by_key_name(keyname)
             if cashdelta is not None:
                 from zlib import decompress
-                from collections import deque  # Needed so eval() understands what CashDelta is.
+                from collections import deque
                 result = eval(decompress(cashdelta.CashDelta))
             else:
                 result = None
@@ -252,30 +237,3 @@ def buildAlgKey(id):
 def buildTradeCueKey(id):
     keyname = str(id).rjust(4,'0')
     return keyname
-
-def convertAlgKeys():
-    import meSchema
-    result = db.GqlQuery("Select * from meAlg").fetch(10000)
-
-    deleteMe = []
-    putMe    = []
-
-    for alg in result:
-        key = alg.key().name().rjust(6,'0')
-        newAlg = meAlg(key_name  = key,
-                       TradeSize = alg.TradeSize,
-                       BuyDelta  = alg.BuyDelta,
-                       SellDelta = alg.SellDelta,
-                       TimeDelta = alg.TimeDelta,
-                       Cash      = alg.Cash)
-        deleteMe.append(alg)
-        putMe.append(newAlg)
-        if len(deleteMe) > 100:
-            db.delete(deleteMe)
-            db.put(putMe)
-            deleteMe = []
-            putMe = []
-
-    if len(deleteMe) + len(putMe) > 0:
-        db.delete(deleteMe)
-        db.put(putMe)
