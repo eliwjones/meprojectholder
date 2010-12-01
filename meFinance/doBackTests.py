@@ -41,7 +41,7 @@ def addTaskRange(initialStopStep, globalStop, unique, namespace, batchSize=5, st
     stopAlg = int(meSchema.meAlg.all(keys_only=True).order('-__key__').get().name())
     for i in range(initialStopStep, globalStop+1, 400):
         stopStep = i
-        stepRange = [stopStep - stepsBack]  # Default 1600 does 4 week long back test. Using 800 would do 2 week ones.
+        stepRange = [stopStep - stepsBack]
         name = unique + '-' + str(startAlg) + '-' + str(stopAlg) + '-' + str(stopStep) + '-' + namespace
         mainTaskAdd(name, startAlg, stopAlg, stopStep, batchSize, stepRange, unique, namespace)
 

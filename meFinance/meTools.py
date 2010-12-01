@@ -2,36 +2,6 @@ from google.appengine.ext import db
 from google.appengine.api import memcache
 import cachepy
 
-def batchPut(entities, cache=False, memkey=None, time=0):
-    batch = []
-    for entity in entities:
-        batch.append(entity)
-        if len(batch) > 112:
-            db.put(batch)
-            batch=[]
-    if len(batch) > 0:
-        db.put(batch)
-    if cache:
-        memcache.set(memkey,entities,time)
-
-def memGqlQuery(query, n, time=0):
-    memkey = query + "_" + str(n)
-    result = memcache.get(memkey)
-    if result is None:
-        import meSchema
-        result = db.GqlQuery(query).fetch(n)
-        memcache.set(memkey, result, time)
-    return result
-
-def memPutGet(model,keyname,time=0):
-    memkey = model.kind() + keyname
-    result = model.get_by_key_name(keyname)
-    if result:
-        memcache.set(memkey,db.model_to_protobuf(result).Encode(),time)
-    else:
-        memcache.set(memkey,None)
-    return result
-
 def memGet(model,keyname,priority=1,time=0):
     memkey = model.kind() + keyname
     multiget = cachepy.get_multi([memkey],priority=priority)
@@ -64,6 +34,8 @@ def memGet_multi(model,keylist):
         cachepykeylist.append(memkey)
     cachepyEntities = cachepy.get_multi(cachepykeylist)
     memkeylist = getMissingKeys(cachepykeylist,cachepyEntities)
+    ''' For keys not found in Cachepy, check Memcache. '''
+    ''' Add found entities to Cachepy. '''
     if len(memkeylist)>0:
         memEntities = memcache.get_multi(memkeylist)
         for key in memEntities:
@@ -72,6 +44,8 @@ def memGet_multi(model,keylist):
                 memEntities[key] = db.model_from_protobuf(entity_pb.EntityProto(memEntities[key]))
             cachepy.set(key,memEntities[key])
         entitykeylist = getMissingKeys(memkeylist,memEntities)
+    ''' For keys not found in Memcache, check Datastore. '''
+    ''' Add found keys to Memcache and Cachepy. '''
     if len(entitykeylist) > 0:
         for i in range(len(entitykeylist)):
             entitykeylist[i] = entitykeylist[i].replace(model.kind(),'')
@@ -85,6 +59,7 @@ def memGet_multi(model,keylist):
                 memcache.set(memkey,None)
             else:
                 memcache.set(memkey,db.model_to_protobuf(EntityDict[key]).Encode())
+    ''' Merge entities into EntityDict. '''
     for key in cachepyEntities:
         newkey = key.replace(model.kind(),'')
         EntityDict[newkey] = cachepyEntities[key]
@@ -101,17 +76,49 @@ def memPut_multi(entities, priority=0):
             putlist.append(entities[key])
         memkey = entities[key].kind() + key
         cachedict[memkey] = entities[key]
-        if len(putlist) > 100:
-            db.put(putlist)
-            putlist = []
-    if len(putlist) > 0:
-        db.put(putlist)
+    batchPut(putlist)
     for key in cachedict:
         cachepy.set(key,cachedict[key], priority=priority)
     for key in cachedict:
         if cachedict[key] is not None:
             cachedict[key] = db.model_to_protobuf(cachedict[key]).Encode()
     memcache.set_multi(cachedict)
+
+def batchPut(entities, batchSize = 100):
+    batch = []
+    for entity in entities:
+        batch.append(entity)
+        if len(batch) == batchSize:
+            db.put(batch)
+            batch=[]
+    if len(batch) > 0:
+        db.put(batch)
+
+''' Adding a few extra batch put functions for comparison. '''
+''' All functions depend on unique key_names for entities. '''
+
+def batchPutV2(entities, batchSize = 100):
+    length = len(entities)
+    for startIndex in range(0, length, batchSize):
+        endIndex = min(startIndex + batchSize, length)
+        db.put(entities[startIndex : endIndex])
+
+def batchPutV3(entities, batchSize = 100):
+    count = len(entities)
+    while count > 0:
+        batchSize = min(count, batchSize)
+        db.put(entities[ : batchSize])
+        entities = entities[batchSize : ]
+        count = len(entities)
+
+def memGqlQuery(query, n, time=0):
+    memkey = query + "_" + str(n)
+    result = memcache.get(memkey)
+    if result is None:
+        import meSchema
+        result = db.GqlQuery(query).fetch(n)
+        memcache.set(memkey, result, time)
+    return result
 
 def getMissingKeys(keylist,dictionary):
     ''' Modifying to simply use set difference. '''
@@ -190,17 +197,6 @@ def getStckSymbol(stckID):
         cachepy.set(memkey,result,priority=1)
     return result
 
-def getStockRange(symbol,date1,date2):
-    import meSchema
-    queryStr = "Select * From stock%s Where date >= :1 AND date <= :2 Order By date" % symbol
-    meStocks = db.GqlQuery(queryStr,date1,date2).fetch(200)
-    return meStocks
-
-def getStck(ID,step):
-    import meSchema
-    meStocks = db.GqlQuery("Select * from stck Where ID = :1 AND step >= :2 AND step < :3 Order By step", ID,step,step+78).fetch(200)
-    return meStocks
-
 def putCredentials(email,password):
     import meSchema
     from base64 import b64encode
@@ -237,3 +233,18 @@ def buildAlgKey(id):
 def buildTradeCueKey(id):
     keyname = str(id).rjust(4,'0')
     return keyname
+
+
+''' Older functions that aren't really used,
+      but are still referenced by old converter. '''
+
+def getStockRange(symbol,date1,date2):
+    import meSchema
+    queryStr = "Select * From stock%s Where date >= :1 AND date <= :2 Order By date" % symbol
+    meStocks = db.GqlQuery(queryStr,date1,date2).fetch(200)
+    return meStocks
+
+def getStck(ID,step):
+    import meSchema
+    meStocks = db.GqlQuery("Select * from stck Where ID = :1 AND step >= :2 AND step < :3 Order By step", ID,step,step+78).fetch(200)
+    return meStocks
