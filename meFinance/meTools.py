@@ -68,6 +68,38 @@ def memGet_multi(model,keylist):
         EntityDict[newkey] = memEntities[key]
     return EntityDict
 
+''' memGet_multi with decorators. '''
+''' Doing without Protobuf since evidence suggests it is now slower than memcache pickle. '''
+''' Accepts memcache or cachepy as Decorator argument. '''
+''' Seems a little dense for my tastes. '''
+
+def checkCache(cacheType):
+    def wrap(F):
+        def wrapper(model,keylist):
+            Entities = {}
+            memkeylist = [ model.kind() + key for key in keylist ]
+            memEntities = cacheType.get_multi(memkeylist)
+            missingkeys = [ key.replace(model.kind(),'') for key in getMissingKeys(memkeylist, memEntities) ]
+            if len(missingkeys) > 0:
+                Entities = F(model, missingkeys)
+                cacheDict = dict((model.kind() + missingkeys[i], Entities[missingkeys[i]])
+                                         for i in range(len(missingkeys)))
+                cacheType.set_multi(cacheDict)
+            memEntities = dict(((key.replace(model.kind(),''), memEntities[key]) for key in memEntities))
+            Entities.update(memEntities)
+            return Entities
+        return wrapper
+    return wrap
+
+@checkCache(cachepy)
+@checkCache(memcache)
+def memGet_multiV2(model, keylist):
+    Entities = model.get_by_key_name(keylist)
+    Entities = dict((keylist[i], Entities[i]) for i in range(len(keylist)))
+    return Entities
+
+''' memGet_multi with decorators END. '''
+
 def memPut_multi(entities, priority=0):
     putlist = []
     cachedict = {}
@@ -168,14 +200,14 @@ def decompCashDelta(keyname):
     return result
 
 def getStckID(stock):
-    import meSchema
-    result = memGet(meSchema.stckID,stock)
+    from meSchema import stckID
+    result = memGet(stckID,stock)
     result = result.ID
     return result
 
 def getStckIDs(stockList):
-    import meSchema
-    results = memGet_multi(meSchema.stckID, stockList)
+    from meSchema import stckID
+    results = memGet_multi(stckID, stockList)
     stckIDdict = {}
     for res in results:
         stckIDdict[res] = results[res].ID
@@ -198,21 +230,21 @@ def getStckSymbol(stckID):
     return result
 
 def putCredentials(email,password):
-    import meSchema
+    from meSchema import GDATACredentials
     from base64 import b64encode
     key_name = email
     email = b64encode(email)
     password = b64encode(password)
-    creds = meSchema.GDATACredentials(key_name=key_name,email=email,password=password)
+    creds = GDATACredentials(key_name=key_name,email=email,password=password)
     db.put(creds)
 
 def getCredentials(email):
-    import meSchema
+    from meSchema import GDATACredentials
     from base64 import b64decode
-    creds = memGet(meSchema.GDATACredentials,email)
+    creds = memGet(GDATACredentials,email)
     email    = b64decode(creds.email)
     password = b64decode(creds.password)
-    result = meSchema.GDATACredentials(email=email,password=password)
+    result = GDATACredentials(email=email,password=password)
     return result
 
 def wipeOutCreds():
