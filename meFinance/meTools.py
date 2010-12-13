@@ -2,70 +2,47 @@ from google.appengine.ext import db
 from google.appengine.api import memcache
 import cachepy
 
-def memGet(model,keyname,priority=1,time=0):
-    memkey = model.kind() + keyname
-    multiget = cachepy.get_multi([memkey],priority=priority)
-    if memkey in multiget:
-        result = multiget[memkey]
+def memGet(model, keyname, priority = 1, time = 0):
+    multiget = cachepy.get_multi([keyname], key_prefix = model.kind(), priority = priority)
+    if keyname in multiget:
+        result = multiget[keyname]
     else:
-        multiget = memcache.get_multi([memkey])
-        if memkey in multiget:
-            if multiget[memkey] is not None:
-                from google.appengine.datastore import entity_pb
-                result = db.model_from_protobuf(entity_pb.EntityProto(multiget[memkey]))
-            else:
-                result = None
+        multiget = memcache.get_multi([keyname], key_prefix = model.kind())
+        if keyname in multiget:
+            result = multiget[keyname]
         else:
             result = model.get_by_key_name(keyname)
-            if result is not None:
-                memcache.set(memkey,db.model_to_protobuf(result).Encode(),time)
-            else:
-                memcache.set(memkey,None)
-        cachepy.set(memkey,result,priority=priority)
+            memcache.set(model.kind() + keyname, result)
+        cachepy.set(model.kind() + keyname, result, priority = priority)
     return result
 
+''' Vanilla memGet_multi() '''
+''' For keys not found in Cachepy, check Memcache. '''
+''' Add found entities to Cachepy. '''
+''' For keys not found in Memcache, check Datastore. '''
+''' Add found keys to Memcache and Cachepy. '''
+''' Merge entities into EntityDict. '''
+
 def memGet_multi(model,keylist):
-    cachepykeylist = []
     entitykeylist = []
     memEntities = {}
     EntityDict = {}
-    for key in keylist:
-        memkey = model.kind() + key
-        cachepykeylist.append(memkey)
-    cachepyEntities = cachepy.get_multi(cachepykeylist)
-    memkeylist = getMissingKeys(cachepykeylist,cachepyEntities)
-    ''' For keys not found in Cachepy, check Memcache. '''
-    ''' Add found entities to Cachepy. '''
-    if len(memkeylist)>0:
-        memEntities = memcache.get_multi(memkeylist)
-        for key in memEntities:
-            if memEntities[key] is not None:
-                from google.appengine.datastore import entity_pb
-                memEntities[key] = db.model_from_protobuf(entity_pb.EntityProto(memEntities[key]))
-            cachepy.set(key,memEntities[key])
+    cachepyEntities = cachepy.get_multi(keylist, model.kind())
+    memkeylist = getMissingKeys(keylist,cachepyEntities)
+
+    if memkeylist:
+        memEntities = memcache.get_multi(memkeylist, model.kind())
+        cachepy.set_multi(memEntities, model.kind())
         entitykeylist = getMissingKeys(memkeylist,memEntities)
-    ''' For keys not found in Memcache, check Datastore. '''
-    ''' Add found keys to Memcache and Cachepy. '''
-    if len(entitykeylist) > 0:
-        for i in range(len(entitykeylist)):
-            entitykeylist[i] = entitykeylist[i].replace(model.kind(),'')
+
+    if entitykeylist:
         Entities = model.get_by_key_name(entitykeylist)
-        for i in range(len(entitykeylist)):
-            key = entitykeylist[i]
-            memkey = model.kind() + key
-            EntityDict[key] = Entities[i]
-            cachepy.set(memkey,EntityDict[key])
-            if EntityDict[key] is None:
-                memcache.set(memkey,None)
-            else:
-                memcache.set(memkey,db.model_to_protobuf(EntityDict[key]).Encode())
-    ''' Merge entities into EntityDict. '''
-    for key in cachepyEntities:
-        newkey = key.replace(model.kind(),'')
-        EntityDict[newkey] = cachepyEntities[key]
-    for key in memEntities:
-        newkey = key.replace(model.kind(),'')
-        EntityDict[newkey] = memEntities[key]
+        EntityDict = dict((entitykeylist[i], Entities[i]) for i in range(len(entitykeylist)))
+        memcache.set_multi(EntityDict, model.kind())
+        cachepy.set_multi(EntityDict, model.kind())
+
+    EntityDict.update(memEntities)
+    EntityDict.update(cachepyEntities)
     return EntityDict
 
 ''' memGet_multi with decorators. '''
@@ -77,15 +54,11 @@ def checkCache(cacheType):
     def wrap(F):
         def wrapper(model,keylist):
             Entities = {}
-            memkeylist = [ model.kind() + key for key in keylist ]
-            memEntities = cacheType.get_multi(memkeylist)
-            missingkeys = [ key.replace(model.kind(),'') for key in getMissingKeys(memkeylist, memEntities) ]
-            if len(missingkeys) > 0:
+            memEntities = cacheType.get_multi(keylist, model.kind())
+            missingkeys = getMissingKeys(keylist, memEntities)
+            if missingkeys:
                 Entities = F(model, missingkeys)
-                cacheDict = dict((model.kind() + missingkeys[i], Entities[missingkeys[i]])
-                                         for i in range(len(missingkeys)))
-                cacheType.set_multi(cacheDict)
-            memEntities = dict(((key.replace(model.kind(),''), memEntities[key]) for key in memEntities))
+                cacheType.set_multi(Entities, model.kind())
             Entities.update(memEntities)
             return Entities
         return wrapper
@@ -98,8 +71,6 @@ def memGet_multiV2(model, keylist):
     Entities = dict((keylist[i], Entities[i]) for i in range(len(keylist)))
     return Entities
 
-''' memGet_multi with decorators END. '''
-
 def memPut_multi(entities, priority=0):
     putlist = []
     cachedict = {}
@@ -109,11 +80,7 @@ def memPut_multi(entities, priority=0):
         memkey = entities[key].kind() + key
         cachedict[memkey] = entities[key]
     batchPut(putlist)
-    for key in cachedict:
-        cachepy.set(key,cachedict[key], priority=priority)
-    for key in cachedict:
-        if cachedict[key] is not None:
-            cachedict[key] = db.model_to_protobuf(cachedict[key]).Encode()
+    cachepy.set_multi(cachedict, '', priority)
     memcache.set_multi(cachedict)
 
 def batchPut(entities, batchSize = 100):
@@ -123,7 +90,7 @@ def batchPut(entities, batchSize = 100):
         if len(batch) == batchSize:
             db.put(batch)
             batch=[]
-    if len(batch) > 0:
+    if batch:
         db.put(batch)
 
 ''' Adding a few extra batch put functions for comparison. '''

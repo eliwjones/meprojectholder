@@ -35,7 +35,7 @@ Curious thing: A dictionary in the global scope can be referenced and changed in
 but it can not be redefined.
 """
 
-def get( key, priority=0 ):
+def get(key, priority=0):
     if ACTIVE is False:
         return None
         
@@ -53,7 +53,7 @@ def get( key, priority=0 ):
         delete( key )
         return None
 
-def get_multi(keylist, priority=0):
+def get_multi(keylist, key_prefix = '', priority=0):
     multilist = {}
     
     if ACTIVE is False:
@@ -62,18 +62,20 @@ def get_multi(keylist, priority=0):
     global CACHES, PRIORITY_CACHE, CACHE
 
     for key in keylist:
-        if key in CACHES[priority]:
-            value, expiry = CACHES[priority][key]
+        if key_prefix + key in CACHES[priority]:
+            value, expiry = CACHES[priority][key_prefix + key]
             current_timestamp = time.time()
             if expiry is None or current_timestamp < expiry:
+                ''' Per Appengine Memcache, dict keys do not contain key_prefix. '''
                 multilist[key] = value
     return multilist
     
-def set_multi(entityDict, priority=0, expiry = DEFAULT_CACHING_TIME):
+def set_multi(entityDict, key_prefix = '', priority=0, expiry = DEFAULT_CACHING_TIME):
     for key in entityDict:
+        key = key_prefix + key
         set(key, entityDict[key], priority, expiry)
 
-def set( key, value, priority=0, expiry = DEFAULT_CACHING_TIME ):
+def set(key, value, priority=0, expiry = DEFAULT_CACHING_TIME):
     if ACTIVE is False:
         return None
     
@@ -87,7 +89,7 @@ def set( key, value, priority=0, expiry = DEFAULT_CACHING_TIME ):
         """ It doesn't seems to catch the exception, something in the GAE's python runtime probably """
         logging.info( "%s memory error setting key '%s'" % ( __name__, key ) )
  
-def delete( key, priority=0 ):
+def delete(key, priority=0):
     """ 
     Deletes the key stored in the cache of the current instance, not all the instances.
     There's no reason to use it except for debugging when developing, use expiry when setting a value instead.
