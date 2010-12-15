@@ -205,19 +205,12 @@ def memGetStcks(stckKeyList):
     return meList
         
 def getBackTestReturns(memkeylist, stopStep, stats, namespace):
-    algkeys = {}
-    for key in stats:
-        key_name = key.split('_')[-1]  # Pull algkey from end of memkey
-        algkeys[key_name] = None       # So I don't have to check if algkey already there.
-    algkeys = algkeys.keys()           # Turn dictionary keys into list of keys.
+    ''' Using list(set()) to de-duplicate key list. '''
+    algkeys = list(set([key.split('_')[-1] for key in stats]))
     algs = meTools.memGet_multi(meSchema.meAlg,algkeys)
-    cuekeys = {}
-    for key in algs:
-        key_name = algs[key].BuyCue
-        cuekeys[key_name] = None
-        key_name = algs[key].SellCue
-        cuekeys[key_name] = None
-    cuekeys = cuekeys.keys()
+    cuekeys = [algs[key].BuyCue for key in algs]
+    cuekeys.extend([algs[key].SellCue for key in algs])
+    cuekeys = list(set(cuekeys))
     tradecues = meTools.memGet_multi(meSchema.tradeCue,cuekeys)
     stopStepQuotes = princeFunc.getStepQuotes(stopStep)
     backTestReturns = {}

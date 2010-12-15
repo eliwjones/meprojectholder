@@ -101,7 +101,7 @@ def doCompounds(stopStep, startStep, entities):
         idProp = 'technique'
         prefix = 'LAR-'
     else:
-        raise Exception('Got unexpected Model type!')
+        raise Exception('Model must be backTestResult or liveAlg!')
     maxR = getMaxRnum(model)
     stepBacks = [week for week in range(1,maxR)]
     for entity in entities:
@@ -130,17 +130,17 @@ def getMaxRnum(model):
             break
     return i
 
-def getRReturn(stopStep, startStep, algKey, R, prevReturns, prefix):
-    ''' algKey = liveAlg.technique, backTestResult.algKey '''
-    memkey = buildMemKey(stopStep - R*400, startStep - R*400, algKey, prefix)
+def getRReturn(stopStep, startStep, identifier, R, prevReturns, prefix):
+    ''' identifier = liveAlg.technique, backTestResult.algKey '''
+    memkey = buildMemKey(stopStep - R*400, startStep - R*400, identifier, prefix)
     ret = prevReturns[memkey]
     return ret
     
-def buildMemKey(stopStep, startStep, algKey, prefix):
+def buildMemKey(stopStep, startStep, identifier, prefix):
     if prefix == 'BTR-':
-        memkey = prefix + algKey.rjust(6,'0') + '_' + str(startStep).rjust(7,'0') + '_' + str(stopStep).rjust(7,'0')
+        memkey = prefix + identifier.rjust(6,'0') + '_' + str(startStep).rjust(7,'0') + '_' + str(stopStep).rjust(7,'0')
     elif prefix == 'LAR-':
-        memkey = prefix + str(stopStep).rjust(7,'0') + '-' + str(stopStep - startStep).rjust(7,'0') + '-' + algKey
+        memkey = prefix + str(stopStep).rjust(7,'0') + '-' + str(stopStep - startStep).rjust(7,'0') + '-' + identifier
     return memkey
 
 def memGetPercentReturns(memkeylist, prefix):
@@ -148,7 +148,7 @@ def memGetPercentReturns(memkeylist, prefix):
     newMemEntities = {}
     memEntities = memcache.get_multi(memkeylist)
     missingKeys = meSchema.getMissingKeys(memkeylist,memEntities)
-    if len(missingKeys) > 0:
+    if missingKeys:
         missingKeys = [key.replace(prefix,'') for key in missingKeys]
         if prefix == 'BTR-':
             Entities = meSchema.backTestResult.get_by_key_name(missingKeys)
@@ -170,6 +170,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-                
-                
-            

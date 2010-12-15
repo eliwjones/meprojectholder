@@ -103,12 +103,10 @@ def batchPutV2(entities, batchSize = 100):
         db.put(entities[startIndex : endIndex])
 
 def batchPutV3(entities, batchSize = 100):
-    count = len(entities)
-    while count > 0:
-        batchSize = min(count, batchSize)
+    while entities:
+        batchSize = min(batchSize, len(entities))
         db.put(entities[ : batchSize])
         entities = entities[batchSize : ]
-        count = len(entities)
 
 def memGqlQuery(query, n, time=0):
     memkey = query + "_" + str(n)
