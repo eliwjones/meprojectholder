@@ -245,6 +245,8 @@ def getBackTestReturns(memkeylist, stopStep, stats, namespace):
         #                              { 'return' : 'x2%', 'PandL' : '$y2', 'PosVal' : '$z2'}
         #               }
         backTestReturns[algkey]['returns'][int(startMonth)] = {'return'    : stepReturn,
+                                                               'lastBuy'   : stats[memkey]['lastBuy'],
+                                                               'lastSell'  : stats[memkey]['lastSell'],
                                                                'numTrades' : len(stats[memkey]['CashDelta']),
                                                                'PandL'     : stats[memkey]['PandL'],
                                                                'PosVal'    : positionsValue,
@@ -264,6 +266,8 @@ def persistBackTestReturns(backTestReturns):
                                                      startStep     = startMonth,
                                                      stopStep      = currentResult['stopStep'],
                                                      percentReturn = currentResult['return'],
+                                                     lastBuy       = currentResult['lastBuy'],
+                                                     lastSell      = currentResult['lastSell'],
                                                      numTrades     = currentResult['numTrades'],
                                                      PandL         = currentResult['PandL'],
                                                      PosVal        = currentResult['PosVal'],
