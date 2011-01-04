@@ -45,7 +45,7 @@ def doAlgSteps(algKey, startStep, stopStep, stats, stckIDs, MaxTrade = False):
     for step in range(startStep, stopStep + 1):
         stopRange = 80
         if (step - startStep - 44)%stopRange == 0:
-            stats = doStops(step, copy.copy(stats)), alginfo, stopRange)
+            stats = doStops(step, copy.copy(stats), alginfo, stopRange)
         potentialDesires = [meTools.buildDesireKey(step, algKey, stckID) for stckID in stckIDs]  # must feed stckIDs into func?
         for key in potentialDesires:
             if key in orderDesires:
@@ -53,8 +53,8 @@ def doAlgSteps(algKey, startStep, stopStep, stats, stckIDs, MaxTrade = False):
                 for des in currentDesire:            # Eventually re-do desires[key] to be just dict with 'Symbol' 'Shares' keys.
                     buysell = cmp(currentDesire[des]['Shares'], 0)
                     Symbol = des
-                tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), copy.copy(stats['Positions'])), step, accumulate)
-                cash = tradeCash + copy.copy(stats['Cash']))
+                tradeCash, PandL, position = princeFunc.mergePosition(eval(desires[key]), copy.copy(stats['Positions']), step, accumulate)
+                cash = tradeCash + copy.copy(stats['Cash'])
                 if buysell == -1:
                     timedelta = selldelta
                     lastTradeStep = stats['lastSell']
@@ -129,8 +129,8 @@ def doStops(step, statDict, alginfo, stopRange, scaleFactor = 0.0):
         statDict['Positions'][pos]['StopLoss'] = stopLoss
         statDict['Positions'][pos]['StopProfit'] = stopProfit
     for stop in stopDesires:
-        tradeCash, PandL, position = princeFunc.mergePosition(eval(stop), copy.copy(statDict['Positions'])), step, True)
-        cash = tradeCash + copy.copy(statDict['Cash']))
+        tradeCash, PandL, position = princeFunc.mergePosition(eval(stop), copy.copy(statDict['Positions']), step, True)
+        cash = tradeCash + copy.copy(statDict['Cash'])
         Symbol = eval(stop).keys()[0]
         buysell = cmp(eval(stop)[Symbol]['Shares'], 0)
         statDict['CashDelta'].appendleft({'Symbol'  : Symbol,
