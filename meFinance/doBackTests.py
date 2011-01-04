@@ -13,7 +13,6 @@ class doBackTests(webapp.RequestHandler):
         
         startAlg = int(self.request.get('startAlg'))
         stopAlg = int(self.request.get('stopAlg'))
-        #alglist = [meTools.buildAlgKey(i) for i in range(startAlg, stopAlg+1)]
         
         stopStep = int(self.request.get('stopStep'))
         batchSize = int(self.request.get('batchSize'))
@@ -102,27 +101,6 @@ def runBackTests(startAlg, stopAlg, stop, batchSize = 5, stepRange=None, uniquif
         batchEnd = min(batchStart + batchSize - 1, stopAlg)
         batchName = str(batchStart) + '-' + str(batchEnd) + '-' + str(monthList[0]) + '-' + str(monthList[-1]) + '-' + str(stop) + '-' + uniquifier + namespace
         batchTaskAdd(batchName, batchStart, batchEnd, monthList, stop, namespace)
-        
-        
-    '''     
-    for alg in alglist:
-        algBatch.append(alg)
-        if len(monthList)*len(algBatch) > batchSize:
-            batchName = str(algBatch[0]) + '-' + str(algBatch[-1]) + '-' + str(monthList[0]) + '-' + str(monthList[-1]) + '-' + str(stop) + '-' + uniquifier
-            batchTaskAdd(batchName, algBatch, monthList, stop, namespace)
-            algBatch = []
-    if len(algBatch) > 0:
-        batchName = str(algBatch[0]) + '-' + str(algBatch[-1]) + '-' + str(monthList[0]) + '-' + str(monthList[-1]) + '-' + str(stop) + '-' + uniquifier
-        batchTaskAdd(batchName, algBatch, monthList, stop, namespace)
-        algBatch = []
-    
-    keylist = []
-    for startMonth in monthList:
-        for algkey in alglist:
-            memprefix = startMonth + '_' + str(stop) + '_'
-            keylist.append(memprefix + algkey)
-    return keylist
-    '''
 
 def backTestBatch(algBatch, monthBatch, stopStep, namespace):
     import processDesires
