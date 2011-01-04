@@ -72,8 +72,8 @@ def get_multi(keylist, key_prefix = '', priority=0):
     
 def set_multi(entityDict, key_prefix = '', priority=0, expiry = DEFAULT_CACHING_TIME):
     for key in entityDict:
-        key = key_prefix + key
-        set(key, entityDict[key], priority, expiry)
+        #key = key_prefix + key
+        set(key_prefix + key, entityDict[key], priority, expiry)
 
 def set(key, value, priority=0, expiry = DEFAULT_CACHING_TIME):
     if ACTIVE is False:

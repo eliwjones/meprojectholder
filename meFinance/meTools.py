@@ -27,19 +27,19 @@ def memGet_multi(model,keylist):
     entitykeylist = []
     memEntities = {}
     EntityDict = {}
-    cachepyEntities = cachepy.get_multi(keylist, model.kind())
+    cachepyEntities = cachepy.get_multi(keylist, key_prefix = model.kind())
     memkeylist = getMissingKeys(keylist,cachepyEntities)
 
     if memkeylist:
-        memEntities = memcache.get_multi(memkeylist, model.kind())
-        cachepy.set_multi(memEntities, model.kind())
+        memEntities = memcache.get_multi(memkeylist, key_prefix = model.kind())
+        cachepy.set_multi(memEntities, key_prefix = model.kind())
         entitykeylist = getMissingKeys(memkeylist,memEntities)
 
     if entitykeylist:
         Entities = model.get_by_key_name(entitykeylist)
         EntityDict = dict((entitykeylist[i], Entities[i]) for i in range(len(entitykeylist)))
-        memcache.set_multi(EntityDict, model.kind())
-        cachepy.set_multi(EntityDict, model.kind())
+        memcache.set_multi(EntityDict, key_prefix = model.kind())
+        cachepy.set_multi(EntityDict, key_prefix = model.kind())
 
     EntityDict.update(memEntities)
     EntityDict.update(cachepyEntities)
@@ -54,11 +54,11 @@ def checkCache(cacheType):
     def wrap(F):
         def wrapper(model,keylist):
             Entities = {}
-            memEntities = cacheType.get_multi(keylist, model.kind())
+            memEntities = cacheType.get_multi(keylist, key_prefix = model.kind())
             missingkeys = getMissingKeys(keylist, memEntities)
             if missingkeys:
                 Entities = F(model, missingkeys)
-                cacheType.set_multi(Entities, model.kind())
+                cacheType.set_multi(Entities, key_prefix = model.kind())
             Entities.update(memEntities)
             return Entities
         return wrapper
@@ -80,7 +80,7 @@ def memPut_multi(entities, priority=0):
         memkey = entities[key].kind() + key
         cachedict[memkey] = entities[key]
     batchPut(putlist)
-    cachepy.set_multi(cachedict, '', priority)
+    cachepy.set_multi(cachedict, priority = priority)
     memcache.set_multi(cachedict)
 
 def batchPut(entities, batchSize = 100):

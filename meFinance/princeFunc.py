@@ -1,4 +1,5 @@
 import meSchema
+import meTools
 from google.appengine.ext import db
 from google.appengine.api.datastore import Key
 from collections import deque
@@ -10,7 +11,7 @@ def updateAlgStats(step,alphaAlg=1,omegaAlg=3540):
     desires = getDesires(step,alphaAlg,omegaAlg)
     alglist = {}
     for alg in algstats:
-        desireKey = meSchema.buildDesireKey(step,alg)
+        desireKey = meTools.buildDesireKey(step,alg)
         if desires[desireKey] is not None:
             tradeCash, PandL, position = mergePosition(eval(desires[desireKey].desire),eval(algstats[alg].Positions))
             cash = tradeCash + algstats[alg].Cash
@@ -30,7 +31,7 @@ def updateAlgStats(step,alphaAlg=1,omegaAlg=3540):
                 alglist[alg] = algstats[alg]
         else:
             pass
-    meSchema.memPut_multi(meSchema.algStats,alglist)
+    meTools.memPut_multi(meSchema.algStats,alglist)
 
 def moveAlgorithms():
     print 'move algorithms towards better positions'
@@ -42,30 +43,30 @@ def getDesires(step,alphaAlg=1,omegaAlg=3540):
     keylist = []
     model = meSchema.desire
     for i in range(alphaAlg,omegaAlg+1):
-        key_name = meSchema.buildDesireKey(step, str(i))
+        key_name = meTools.buildDesireKey(step, str(i))
         keylist.append(key_name)
-    desires = meSchema.memGet_multi(model,keylist)
+    desires = meTools.memGet_multi(model,keylist)
     return desires
 
 def getAlgStats(alphaAlg=1,omegaAlg=3540):
     keylist = []
     model = meSchema.algStats
     for i in range(alphaAlg,omegaAlg+1):
-        key_name = meSchema.buildAlgKey(str(i))
+        key_name = meTools.buildAlgKey(str(i))
         keylist.append(key_name)
-    algs = meSchema.memGet_multi(model,keylist)
+    algs = meTools.memGet_multi(model,keylist)
     return algs
 
 def getDesireQueryStr(startStep,stopStep):
-    alpha = meSchema.buildDesireKey(startStep,0,0)
-    omega = meSchema.buildDesireKey(stopStep,61,5)    # Technically, this value should now be 60 since there are only 60 tradeCues.
+    alpha = meTools.buildDesireKey(startStep,0,0)
+    omega = meTools.buildDesireKey(stopStep,61,5)    # Technically, this value should now be 60 since there are only 60 tradeCues.
     model = 'desire'
     query = "Select * from %s Where __key__ > Key('%s','%s') AND __key__ < Key('%s','%s')" % (model,model,alpha,model,omega)
     return query
 
 def getAlgQueryStr(alphaAlg='0',omegaAlg='999999'):
-    alpha = meSchema.buildAlgKey(alphaAlg)
-    omega = meSchema.buildAlgKey(omegaAlg)
+    alpha = meTools.buildAlgKey(alphaAlg)
+    omega = meTools.buildAlgKey(omegaAlg)
     model = 'algStats'
     query = "Select * from %s Where __key__ > Key('%s','%s') AND __key__ < Key('%s','%s')" % (model,model,alpha,model,omega)
     return query
@@ -262,10 +263,10 @@ def getStepQuotes(step):
     stckKeyList = []
     for i in range(1,5):
         stckKeyList.append(str(i) + "_" + str(step))
-    quotes = meSchema.memGet_multi(meSchema.stck, stckKeyList)
+    quotes = meTools.memGet_multi(meSchema.stck, stckKeyList)
     stepQuotes = {}
     for quote in quotes:
-        symbol = meSchema.getStckSymbol(quotes[quote].ID)
+        symbol = meTools.getStckSymbol(quotes[quote].ID)
         stepQuotes[symbol] = quotes[quote].quote
     namespace_manager.set_namespace(originalNameSpace)
     return stepQuotes
@@ -276,9 +277,9 @@ def closeoutPositions(step):
     desires = {}
     prices = {}
     for stckID in [1,2,3,4]:
-        symbol = meSchema.getStckSymbol(stckID)
+        symbol = meTools.getStckSymbol(stckID)
         pricekey = str(stckID)+"_"+str(step)
-        price = meSchema.memGet(meSchema.stck,pricekey,priority=0).quote
+        price = meTools.memGet(meSchema.stck,pricekey,priority=0).quote
         prices[symbol] = price
     for alg in algstats:
         desires[alg] = eval(algstats[alg].Positions)
@@ -329,4 +330,4 @@ def initializeAlgStats():
             meDict[key] = algstat
         cursor = query.cursor()
         count = len(algs)
-    meSchema.memPut_multi(meSchema.algStats,meDict)
+    meTools.memPut_multi(meSchema.algStats,meDict)
