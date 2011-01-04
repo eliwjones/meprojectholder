@@ -82,7 +82,6 @@ def doAlgSteps(algKey, startStep, stopStep, stats, stckIDs, MaxTrade = False):
 
 def doStops(step, statDict, alginfo, stopRange, scaleFactor = 0.0):
     from random import random
-    import CurrentTrader
 
     stopDesires = []
     stckKeys = [str(stckID) + '_' + str(step) for stckID in [1,2,3,4]]
