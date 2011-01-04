@@ -88,10 +88,23 @@ def batchPut(entities, batchSize = 100):
     for entity in entities:
         batch.append(entity)
         if len(batch) == batchSize:
-            db.put(batch)
+            retryPut(batch)
             batch=[]
     if batch:
-        db.put(batch)
+        retryPut(batch)
+
+def retryPut(entities, wait = 0.5):
+    from google.appengine.runtime import apiproxy_errors
+    try:
+        db.put(entities)
+    except (db.Timeout, apiproxy_errors.CapabilityDisabledError, apiproxy_errors.DeadlineExceededError):
+        from time import sleep
+        sleep(wait)
+        wait *= 1.5
+        retryPut(entities, wait)
+    except:
+        raise
+        
 
 ''' Adding a few extra batch put functions for comparison. '''
 ''' All functions depend on unique key_names for entities. '''
