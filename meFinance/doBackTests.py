@@ -84,20 +84,10 @@ def batchTaskAdd(name, startAlg, stopAlg, monthBatch, stopStep, namespace, delay
         sleep(wait)
         batchTaskAdd(name, startAlg, stopAlg, monthBatch, stopStep, namespace, delay, 2*wait)
 
-def runBackTests(startAlg, stopAlg, stop, batchSize = 5, stepRange=None, uniquifier='', namespace=''):
-    '''
-      Removing alglist and just partitioning out proper start,stop alg keys.
-      doBackTestBatch() will ultimately build out proper algBatch list.
-    '''
-    monthList = []
-    algBatch = []
-    if stepRange is None:
-        monthList.append(str(max(stop - 1600, 1)))  # Default monthList now just contains startStep from 4 weeks ago.
-    else:
-        for step in stepRange:
-            monthList.append(str(step))             # Simply want it to test the range I give it.
-
-    for batchStart in range(startAlg, stopAlg, batchSize):
+def runBackTests(startAlg, stopAlg, stop, batchSize, stepRange, uniquifier='', namespace=''):
+    monthList = [str(step) for step in stepRange]
+    
+    for batchStart in range(startAlg, stopAlg + 1, batchSize):
         batchEnd = min(batchStart + batchSize - 1, stopAlg)
         batchName = str(batchStart) + '-' + str(batchEnd) + '-' + str(monthList[0]) + '-' + str(monthList[-1]) + '-' + str(stop) + '-' + uniquifier + namespace
         batchTaskAdd(batchName, batchStart, batchEnd, monthList, stop, namespace)
