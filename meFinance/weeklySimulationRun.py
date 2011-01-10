@@ -1,48 +1,79 @@
-# General outline for code that must be scheduled by Cron to run every Wednesday night.
+from google.appengine.ext import webapp
+from google.appengine.ext.webapp.util import run_wsgi_app
+import meTools
+import meSchema
 
+class weeklySimulationRun(webapp.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.out.write('I do the simulate.')
+        if 'X-AppEngine-Cron' in self.request.headers:
+            ''' Do weekly calculation once verify it is Wed Night. '''
+            ''' fire-off task for weeklyDesires handler first.  '''
+            pass
+        else:
+            ''' Do sample range of startStep, stopStep simulates! '''
+            pass
 
-'''
-0.1 Must already have desires calculated, since live trading will need that.
-    Thus First step is to munge desire code to have it be taskable.
-    statPutCron can either calculate desire or fire off task to do it..
-    Easier to incorporate desire calc into statPutCron.
+class weeklyDesires(webapp.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.out.write('I do desires')
 
-    ** Easier to do.. but possibly wrong.  No need to calculate all desires
-       for live running alg.
+    def post(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.out.write('I do desires and check completion?')
 
-       It has only two Cues that need be checked.
+class weeklyBackTests(webapp.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.out.write('I do weekly Back Tests!')
 
-       Quicker to check those two cues only?  Do bulk desires with wed night simulation.
-       #  At moment, CurrentTrader = 'FTLe-R3' metaAlg.  This is best liveAlg ordered by R3 for last simStep.
-       Launch CurrentTraderTask:
-         CurrentTrader = getCurrenTradeAlg()     # Should contain all trade info.  LastBuy, LastSell, BuyCue, SellCue, Positions, etc.
-         if stopStep:                            #   also contains:  StopProfit, StopLoss, etc
-             doStops(CurrentTrader)                          # If stop desired, e-mail stop info and record stop desire to datastore.
-         cuekeys = [CurrentTrader.BuyCue, CurrentTrader.SellCue]:
-         desires = getCurrentTraderDesires(step, cuekeys)    # Do not alter datastore desires since no way to know if trade filled.
-         if desires:
-             processDesires(CurrenTrader, desires)           # If trade is desired, e-mail trade info, and record trade desire to datastore.
+    def post(self):
+        jobtype = self.request.get('type')
+        
+        if jobtype == 'callback':
+            jobID = self.request.get('jobID')
+            taskname = self.request.get('taskname')
+            totalBatches = int(self.request.get('totalBatches'))
+            entity = meSchema.WorkQueue(key_name = taskname,
+                                        JobID = jobID)
+            meTools.retryPut(entity)
+            batchCount = meSchema.WorkQueue.all(keys_only=True).filter('JobID =',jobID).count()
+            if batchCount == totalBatches:
+                doRvals(jobID, 'backTestResult')  # doRvals() adds task to start calculateRvals with unique name.
+            return
+        elif jobtype != 'startup':
+            raise('Must be jobtype: startup or callback!')
 
-        # Possibly need a form to submit cleared trades/stops to.
-        # Main point being, nothing is recorded until a form is submitted, verifying a cleared trade.
-          1. Trade/stop desire is e-mailed, but CurrentTrader.Positions, .Cash, .LastBuy, .LastSell are not updated.
-          2. Submit trade.
-          3. If trade filled, submit form with info for fill price and account Cash. Positions, LastBuy, LastSell, Cash get updated.
-              # Question being: Does this process use princeFunc.mergePosition()?
-          4. If trade not filled, update trade/stop desire data as attempted but not filled.
+        doBackTests.addTaskRange()
+    
+class calculateRvals(webapp.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.out.write('I do weekly RVals!')
 
-        # Add screen to check most recently submitted trades/stops.  In case e-mail does not come through.
-          
-             
+    def post(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.out.write('I do Rvals for backTestResult and liveAlg!')
 
-1. do backtests
+class weeklyLiveAlgs(webapp.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.out.write('I do weekly Live Algs!')
 
-2. calculate Rvals for backtests.
+    def post(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.out.write('I do weekly Live Algs and check completion?!')
 
-3. do liveAlgs
+application = webapp.WSGIApplication([('/simulate/weeklyDesires',weeklyDesires),
+                                      ('/simulate/weeklyBackTests',weeklyBackTests),
+                                      ('/simulate/calculateRvals',calculateRvals),
+                                      ('/simulate/weeklyLiveAlgs',weeklyLiveAlgs)],
+                                     debug = True)
 
-4. calculate Rvals for liveAlgs
+def main():
+    run_wsgi_app(application)
 
-
-
-'''
+if __name__ == "__main__":
+    main()

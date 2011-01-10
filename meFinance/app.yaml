@@ -30,6 +30,10 @@ handlers:
   script: CurrentTrader.py
   login: admin
 
+- url: /simulate/.*
+  script: weeklySimulationRun.py
+  login: admin
+
 - url: /stats/.*
   script: outputStats.py
   login: admin

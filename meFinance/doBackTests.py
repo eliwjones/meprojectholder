@@ -65,8 +65,9 @@ def doCallback(jobID, callback, totalBatches, taskname, wait = .5):
                       name   = 'callback-' + taskname,
                       params = {'jobID'        : jobID,
                                 'taskname'     : taskname,
-                                'totalBatches' : totalBatches} )
-    except: (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
+                                'totalBatches' : totalBatches,
+                                'jobtype'      : 'callback' } )
+    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
         pass
     except:
         from time import sleep
@@ -90,7 +91,8 @@ def addTaskRange(initialStopStep, globalStop, unique, namespace, batchSize=5, st
     ''' Pre-calculating number of batches for callback to check against. '''
     numWeeks = ceil((globalStop - initialStopStep)/400.0)
     numAlgs = stopAlg - startAlg + 1
-    totalBatches = ceil((numWeeks*numAlgs)/float(batchSize))
+    batchesWeek = ceil(numAlgs/float(batchSize))
+    totalBatches = numWeeks*batchesWeek
     jobID = namespace + unique + '-' + str(stepRange).rjust(7,'0')
 
     ''' Probably need to add a WorkQueue clear function just in case have overlapping jobIDs.  '''
