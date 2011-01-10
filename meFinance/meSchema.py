@@ -70,6 +70,10 @@ class algStats(db.Model):                                       # key_name = meA
     PandL     = db.FloatProperty(required=False)                # total sum of all PandL from trades.
     Positions = db.BlobProperty(required=False)                 # Serialized dict() of stock positions.
 
+class WorkQueue(db.Model):
+    ''' key_name = taskname '''
+    JobID = db.StringProperty(required=True)
+
 class baseAlgClass(db.Model):
     stopStep      = db.IntegerProperty(required=True)
     startStep     = db.IntegerProperty(required=True)
