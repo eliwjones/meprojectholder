@@ -72,7 +72,9 @@ class algStats(db.Model):                                       # key_name = meA
 
 class WorkQueue(db.Model):
     ''' key_name = taskname '''
-    JobID = db.StringProperty(required=True)
+    WorkID      = db.StringProperty(required=False)             # == stepType + JobID for work.
+    globalStop  = db.IntegerProperty(required=False)            # key_name == JobID
+    initialStop = db.IntegerProperty(required=False)
 
 class baseAlgClass(db.Model):
     stopStep      = db.IntegerProperty(required=True)

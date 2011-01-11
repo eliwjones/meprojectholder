@@ -53,7 +53,8 @@ def doCallback(jobID, callback, totalBatches, taskname, wait = .5):
                       params = {'jobID'        : jobID,
                                 'taskname'     : taskname,
                                 'totalBatches' : totalBatches,
-                                'jobtype'      : 'callback' } )
+                                'jobtype'      : 'callback',
+                                'stepType'     : 'weeklyBackTests'} )
     except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
         pass
     except:
@@ -80,7 +81,8 @@ def addTaskRange(initialStopStep, globalStop, unique, namespace, batchSize=5, st
     numAlgs = stopAlg - startAlg + 1
     batchesWeek = ceil(numAlgs/float(batchSize))
     totalBatches = int(numWeeks*batchesWeek)
-    jobID = namespace + unique + '-' + str(stepsBack).rjust(7,'0')
+    JobID = namespace + unique + '-' + str(globalStop) + '-' + str(initialStopStep) + '-' + str(stepsBack).rjust(7,'0')
+    # Want to make JobID consistent across all work batches.
 
     ''' Probably need to add a WorkQueue clear function just in case have overlapping jobIDs.  '''
     
@@ -89,9 +91,9 @@ def addTaskRange(initialStopStep, globalStop, unique, namespace, batchSize=5, st
         startStep = stopStep - stepsBack
         stepRange = [startStep]
         name = jobID + '-' + str(stopStep).rjust(7,'0')
-        mainTaskAdd(name, jobID, totalBatches, callback, startAlg, stopAlg, stopStep, batchSize, stepRange, unique, namespace)
+        mainTaskAdd(name, JobID, totalBatches, callback, startAlg, stopAlg, stopStep, batchSize, stepRange, unique, namespace)
 
-def mainTaskAdd(name, jobID, totalBatches, callback, startAlg, stopAlg, stopStep, batchSize, stepRange, uniquifier, namespace, delay = 0, wait = .5):
+def mainTaskAdd(name, JobID, totalBatches, callback, startAlg, stopAlg, stopStep, batchSize, stepRange, uniquifier, namespace, delay = 0, wait = .5):
     from google.appengine.api.labs import taskqueue
     try:
         taskqueue.add(url = '/backtest/doBackTests', countdown = delay,
@@ -103,7 +105,7 @@ def mainTaskAdd(name, jobID, totalBatches, callback, startAlg, stopAlg, stopStep
                                 'stepRange' : stepRange,
                                 'uniquifier': uniquifier,
                                 'namespace' : namespace,
-                                'jobID'     : jobID,
+                                'jobID'     : JobID,
                                 'totalBatches' : totalBatches,
                                 'callback'  : callback} )
     except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
