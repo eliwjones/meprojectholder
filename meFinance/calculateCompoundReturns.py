@@ -1,4 +1,5 @@
 import meSchema
+import cachepy
 from google.appengine.ext import deferred
 from google.appengine.api.labs import taskqueue
 from google.appengine.api import memcache
@@ -11,6 +12,10 @@ class calculateCompounds(webapp.RequestHandler):
         self.response.headers['Content-Type'] = 'text/plain'
         self.response.out.write('I just calculate compound returns.\n')
     def post(self):
+        JobID = self.request.get('JobID')
+        callback = self.request.get('callback')
+        taskname = self.request.headers['X-AppEngine-TaskName']
+        
         stopStep = int(self.request.get('stopStep'))
         startStep = int(self.request.get('startStep'))
         globalStop = int(self.request.get('globalStop'))
@@ -19,27 +24,29 @@ class calculateCompounds(webapp.RequestHandler):
         i = int(self.request.get('i'))
         cursor = str(self.request.get('cursor'))
         model = str(self.request.get('model'))
-        doCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, cursor, model)
+        doCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, cursor, model, JobID, callback, taskname)
 
-def fanoutTaskAdd(stopStep, startStep, globalStop, namespace, name, model):
+def fanoutTaskAdd(stopStep, startStep, globalStop, namespace, name, model, callback = ''):
     ''' Partition range of steps into batches to add in parallel. '''
     stepRange = stopStep - startStep
     if stepRange == 800:
         stepBlock = 2800
     elif stepRange == 1600:
         stepBlock = 2000
+
+    JobID = namespace + name + '-' + model
     for i in range(stopStep, globalStop + 1, stepBlock):
         newStopStep = i
         newStartStep = newStopStep - stepRange
         newGlobalStop = min(newStopStep + stepBlock - 1, globalStop)
-        taskAdd(newStopStep, newStartStep, newGlobalStop, namespace, name, 0, '', model)
+        taskAdd(newStopStep, newStartStep, newGlobalStop, namespace, name, 0, '', model, JobID, callback)
 
-def taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, model, wait = 0.5):
+def taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, model, JobID, callback, wait = 0.5):
     from google.appengine.api import namespace_manager
     namespace_manager.set_namespace(namespace)
     try:
         taskqueue.add(url = '/calculate/compounds/calculateCompounds', countdown = 0,
-                      name = model + '-' + str(stopStep) + '-' + str(startStep) + '-' + str(i) + '-' + name + '-' + namespace,
+                      name = JobID + '-' + str(stopStep) + '-' + str(startStep) + '-' + str(i),
                       params = {'stopStep'  : stopStep,
                                 'startStep' : startStep,
                                 'globalStop': globalStop,
@@ -47,18 +54,21 @@ def taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, model, 
                                 'namespace' : namespace,
                                 'i'         : i,
                                 'cursor'    : cursor,
-                                'model'     : model} )
+                                'model'     : model,
+                                'callback'  : callback,
+                                'JobID'     : JobID} )
     except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
         pass
     except:
         from time import sleep
         sleep(wait)
-        taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, model, 2*wait)
+        taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, model, JobID, callback, 2*wait)
     namespace_manager.set_namespace('')
 
-def doCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, cursor, model):
-    from time import time
-    deadline = time() + 20.00
+def doCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, cursor, model, JobID, callback, taskname, deadline = None):
+    if not deadline:
+        from time import time
+        deadline = time() + 540.00
     entityModel = getattr(meSchema, model)
     if entityModel == meSchema.backTestResult:
         prefix = 'BTR-'
@@ -80,15 +90,19 @@ def doCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, curso
                 memkey = prefix + entity.key().name()
                 memEntities[memkey] = entity.percentReturn
             memcache.set_multi(memEntities)
+            cachepy.set_multi(memEntities)
             doCompounds(stopStep, startStep, entities)
             cursor = query.cursor()
         else:
-            taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, model)
+            taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, model, JobID, callback)
             return
     if stopStep <= globalStop - 400:
         stopStep += 400
         startStep += 400
-        taskAdd(stopStep, startStep, globalStop, namespace, name, 0, '', model)
+        #taskAdd(stopStep, startStep, globalStop, namespace, name, 0, '', model)
+        doCompoundReturns(stopStep,startStep,globalStop,namespace,name,0,'',model, JobID, callback, deadline)
+    elif callback:
+        doCallback(JobID, taskname)
 
 def doCompounds(stopStep, startStep, entities):
     putList = []
@@ -146,8 +160,16 @@ def buildMemKey(stopStep, startStep, identifier, prefix):
 def memGetPercentReturns(memkeylist, prefix):
     EntityDict = {}
     newMemEntities = {}
-    memEntities = memcache.get_multi(memkeylist)
+    memCacheEntities = {}
+    
+    memEntities = cachepy.get_multi(memkeylist)
     missingKeys = meSchema.getMissingKeys(memkeylist,memEntities)
+    
+    memCacheEntities = memcache.get_multi(missingKeys)
+    cachepy.set_multi(memCacheEntities)
+    missingKeys = meSchema.getMissingKeys(memkeylist,memCacheEntities)
+
+    memEntities.update(memCacheEntities)
     if missingKeys:
         missingKeys = [key.replace(prefix,'') for key in missingKeys]
         if prefix == 'BTR-':
@@ -160,6 +182,7 @@ def memGetPercentReturns(memkeylist, prefix):
             newMemEntities[memkey] = pReturn
             memEntities[memkey] = pReturn
         memcache.set_multi(newMemEntities)
+        cachepy.set_multi(newMemEntities)
     return memEntities
 
 application = webapp.WSGIApplication([('/calculate/compounds/calculateCompounds', calculateCompounds)],

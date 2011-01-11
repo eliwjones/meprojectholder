@@ -30,7 +30,7 @@ class weeklyBackTests(webapp.RequestHandler):
         self.response.out.write('I do weekly Back Tests!')
 
     def post(self):
-        jobtype = self.request.get('type')
+        jobtype = self.request.get('jobtype')
         
         if jobtype == 'callback':
             jobID = self.request.get('jobID')
@@ -65,6 +65,10 @@ class weeklyLiveAlgs(webapp.RequestHandler):
     def post(self):
         self.response.headers['Content-Type'] = 'text/plain'
         self.response.out.write('I do weekly Live Algs and check completion?!')
+
+def doRvals(jobID, RvalType):
+    entity = meSchema.WorkQueue(key_name=jobID, JobID = 'FINISHED')
+    meTools.retryPut(entity)
 
 application = webapp.WSGIApplication([('/simulate/weeklyDesires',weeklyDesires),
                                       ('/simulate/weeklyBackTests',weeklyBackTests),

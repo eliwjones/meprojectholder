@@ -44,19 +44,6 @@ class doBackTestBatch(webapp.RequestHandler):
         backTestBatch(algBatch, monthBatch, stopStep, namespace)
         if callback:
             doCallback(jobID, callback, totalBatches, taskname)
-            
-        '''
-        If callbackURL:
-          Fire off task to callbackURL that
-          puts completion entity in work Queue
-          with key_name based off jobID,
-          and checks completion count against
-          expected count.
-
-          OR check that
-            float(numCompletionEntities)/numWeeks == numBatchesPerWeek
-            numBatchesPerWeek = ceil(numMeAlgs/float(batchSize))
-        '''
 
 def doCallback(jobID, callback, totalBatches, taskname, wait = .5):
     from google.appengine.api.labs import taskqueue
@@ -89,11 +76,11 @@ def addTaskRange(initialStopStep, globalStop, unique, namespace, batchSize=5, st
     stopAlg = int(meSchema.meAlg.all(keys_only=True).order('-__key__').get().name())
     
     ''' Pre-calculating number of batches for callback to check against. '''
-    numWeeks = ceil((globalStop - initialStopStep)/400.0)
+    numWeeks = ((globalStop - initialStopStep)/400) + 1
     numAlgs = stopAlg - startAlg + 1
     batchesWeek = ceil(numAlgs/float(batchSize))
-    totalBatches = numWeeks*batchesWeek
-    jobID = namespace + unique + '-' + str(stepRange).rjust(7,'0')
+    totalBatches = int(numWeeks*batchesWeek)
+    jobID = namespace + unique + '-' + str(stepsBack).rjust(7,'0')
 
     ''' Probably need to add a WorkQueue clear function just in case have overlapping jobIDs.  '''
     
