@@ -8,7 +8,7 @@ class doBackTests(webapp.RequestHandler):
         self.response.out.write('I do backtests! Please use mainTaskAdd().\n')
             
     def post(self):
-        jobID = self.request.get('jobID')
+        JobID = self.request.get('JobID')
         totalBatches = int(self.request.get('totalBatches'))
         callback = self.request.get('callback')
         
@@ -22,7 +22,7 @@ class doBackTests(webapp.RequestHandler):
         batchSize = int(self.request.get('batchSize'))
         stepRange = self.request.get_all('stepRange')
         stepRange = [int(step) for step in stepRange]
-        runBackTests(startAlg, stopAlg, stopStep, batchSize, stepRange, uniquifier, namespace, jobID, totalBatches, callback)
+        runBackTests(startAlg, stopAlg, stopStep, batchSize, stepRange, uniquifier, namespace, JobID, totalBatches, callback)
 
 class doBackTestBatch(webapp.RequestHandler):
     def get(self):
@@ -30,7 +30,7 @@ class doBackTestBatch(webapp.RequestHandler):
         self.response.out.write('I aint nothing but a task handler..\n')
         
     def post(self):
-        jobID = self.request.get('jobID')
+        JobID = self.request.get('JobID')
         totalBatches = int(self.request.get('totalBatches'))
         callback = self.request.get('callback')
         taskname = self.request.headers['X-AppEngine-TaskName']
@@ -43,14 +43,14 @@ class doBackTestBatch(webapp.RequestHandler):
         namespace = str(self.request.get('namespace'))
         backTestBatch(algBatch, monthBatch, stopStep, namespace)
         if callback:
-            doCallback(jobID, callback, totalBatches, taskname)
+            doCallback(JobID, callback, totalBatches, taskname)
 
 def doCallback(jobID, callback, totalBatches, taskname, wait = .5):
     from google.appengine.api.labs import taskqueue
     try:
         taskqueue.add(url    = callback,
                       name   = 'callback-' + taskname,
-                      params = {'jobID'        : jobID,
+                      params = {'JobID'        : JobID,
                                 'taskname'     : taskname,
                                 'totalBatches' : totalBatches,
                                 'jobtype'      : 'callback',
@@ -81,16 +81,15 @@ def addTaskRange(initialStopStep, globalStop, unique, namespace, batchSize=5, st
     numAlgs = stopAlg - startAlg + 1
     batchesWeek = ceil(numAlgs/float(batchSize))
     totalBatches = int(numWeeks*batchesWeek)
-    JobID = namespace + unique + '-' + str(globalStop) + '-' + str(initialStopStep) + '-' + str(stepsBack).rjust(7,'0')
-    # Want to make JobID consistent across all work batches.
+    JobID = meTools.buildJobID(namespace, unique, globalStop, initialStopStep, stepsBack)
 
-    ''' Probably need to add a WorkQueue clear function just in case have overlapping jobIDs.  '''
+    ''' Probably need to add a WorkQueue clear function just in case have overlapping JobIDs.  '''
     
     for i in range(initialStopStep, globalStop+1, 400):
         stopStep = i
         startStep = stopStep - stepsBack
         stepRange = [startStep]
-        name = jobID + '-' + str(stopStep).rjust(7,'0')
+        name = 'Main-backTestResult-' + JobID + '-' + str(stopStep).rjust(7,'0')
         mainTaskAdd(name, JobID, totalBatches, callback, startAlg, stopAlg, stopStep, batchSize, stepRange, unique, namespace)
 
 def mainTaskAdd(name, JobID, totalBatches, callback, startAlg, stopAlg, stopStep, batchSize, stepRange, uniquifier, namespace, delay = 0, wait = .5):
@@ -105,7 +104,7 @@ def mainTaskAdd(name, JobID, totalBatches, callback, startAlg, stopAlg, stopStep
                                 'stepRange' : stepRange,
                                 'uniquifier': uniquifier,
                                 'namespace' : namespace,
-                                'jobID'     : JobID,
+                                'JobID'     : JobID,
                                 'totalBatches' : totalBatches,
                                 'callback'  : callback} )
     except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
@@ -113,10 +112,10 @@ def mainTaskAdd(name, JobID, totalBatches, callback, startAlg, stopAlg, stopStep
     except:
         from time import sleep
         sleep(wait)
-        mainTaskAdd(name,jobID,totalBatches,callback,startAlg,stopAlg,stopStep,batchSize,stepRange,uniquifier,namespace,delay,2*wait)
+        mainTaskAdd(name,JobID,totalBatches,callback,startAlg,stopAlg,stopStep,batchSize,stepRange,uniquifier,namespace,delay,2*wait)
         
 
-def batchTaskAdd(name, startAlg, stopAlg, monthBatch, stopStep, namespace, jobID, totalBatches, callback, delay=0,wait=.5):
+def batchTaskAdd(name, startAlg, stopAlg, monthBatch, stopStep, namespace, JobID, totalBatches, callback, delay=0,wait=.5):
     from google.appengine.api.labs import taskqueue
     try:
         taskqueue.add(url = '/backtest/doBackTestBatch', countdown = delay,
@@ -127,7 +126,7 @@ def batchTaskAdd(name, startAlg, stopAlg, monthBatch, stopStep, namespace, jobID
                                 'monthBatch' : monthBatch,
                                 'stopStep'   : stopStep,
                                 'namespace'  : namespace,
-                                'jobID'      : jobID,
+                                'JobID'      : JobID,
                                 'totalBatches': totalBatches,
                                 'callback'   : callback} )
     except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
@@ -135,15 +134,15 @@ def batchTaskAdd(name, startAlg, stopAlg, monthBatch, stopStep, namespace, jobID
     except:
         from time import sleep
         sleep(wait)
-        batchTaskAdd(name, startAlg, stopAlg, monthBatch, stopStep, namespace, jobID, totalBatches, callback, delay, 2*wait)
+        batchTaskAdd(name, startAlg, stopAlg, monthBatch, stopStep, namespace, JobID, totalBatches, callback, delay, 2*wait)
 
-def runBackTests(startAlg, stopAlg, stop, batchSize, stepRange, uniquifier, namespace, jobID, totalBatches, callback):
+def runBackTests(startAlg, stopAlg, stop, batchSize, stepRange, uniquifier, namespace, JobID, totalBatches, callback):
     monthList = [str(step) for step in stepRange]
     
     for batchStart in range(startAlg, stopAlg + 1, batchSize):
         batchEnd = min(batchStart + batchSize - 1, stopAlg)
-        batchName = str(batchStart) + '-' + str(batchEnd) + '-' + str(monthList[0]) + '-' + str(monthList[-1]) + '-' + str(stop) + '-' + uniquifier + namespace
-        batchTaskAdd(batchName, batchStart, batchEnd, monthList, stop, namespace, jobID, totalBatches, callback)
+        batchName = 'Batch-backTestResult-' + JobID + '-' + str(batchStart) + '-' + str(batchEnd) + '-' + str(stop)
+        batchTaskAdd(batchName, batchStart, batchEnd, monthList, stop, namespace, JobID, totalBatches, callback)
 
 def backTestBatch(algBatch, monthBatch, stopStep, namespace):
     import processDesires

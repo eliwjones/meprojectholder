@@ -244,6 +244,15 @@ def buildTradeCueKey(id):
     keyname = str(id).rjust(4,'0')
     return keyname
 
+def buildJobID(namespace, unique, globalStop, initialStop, stepRange):
+    '''
+      doBackTests.addTaskRange still uses stepsBack instead of stepRange
+      like calculateCompoundReturns.fanoutTaskAdd.
+      Also, initialStopStep == stopStep == initialStop
+    '''
+    JobID = namespace + unique + '-' + str(globalStop) + '-' + str(initialStop) + '-' + str(stepRange).rjust(7,'0')
+    return JobID
+
 
 ''' Older functions that aren't really used,
       but are still referenced by old converter. '''

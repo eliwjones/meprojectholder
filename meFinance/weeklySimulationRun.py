@@ -62,6 +62,8 @@ def doNext(JobID, stepType, model):
     stops = meTools.memGet(meSchema.WorkQueue, JobID)
     globalStop = stops.globalStop
     initialStop = stops.initialStop
+    if None in [globalStop, initialStop]:
+        raise(BaseException('globalStop or initialStop is None!'))
 
     if stepType == 'weeklyDesires':
         doBackTests.addTaskRange(initialStop, globalStop, JobID, '', 639)
@@ -77,16 +79,6 @@ def doNext(JobID, stepType, model):
         print 'Done? or goto metaAlgs?'
     else:
         raise(BaseException('Received unknown stepType, model: %s, %s' % (stepType, model)))
-
-def doRvals(JobID, RvalType):
-    entity = meSchema.WorkQueue(key_name=JobID, JobID = 'FINISHED')
-    meTools.retryPut(entity)
-
-def followRvals(JobID, model):
-    if model == 'backTestResult':
-        print 'do weeklyLiveAlgs'
-    elif model == 'liveAlg':
-        print 'do metaAlgs AND/OR select official CurrentTrader.'
 
 application = webapp.WSGIApplication([('/simulate/weeklyDesires',weeklyDesires),
                                       ('/simulate/weeklySimulationRun',weeklySimulationRun),

@@ -1,4 +1,5 @@
 import meSchema
+import meTools
 import cachepy
 from google.appengine.ext import deferred
 from google.appengine.api.labs import taskqueue
@@ -39,7 +40,7 @@ def fanoutTaskAdd(stopStep, startStep, globalStop, namespace, unique, model, cal
 
     #JobID = namespace + unique + '-' + model
     # Trying to standardize JobID for all tasks.
-    JobID = namespace + unique + '-' str(globalStop) + '-' + str(stopStep) + '-' str(stepRange).rjust(7,'0')
+    JobID = meTools.buildJobID(namespace, unique, globalStop, stopStep, stepRange)
     totalBatches = ((globalStop - stopStep)/stepBlock) + 1
     for i in range(stopStep, globalStop + 1, stepBlock):
         newStopStep = i
@@ -74,8 +75,8 @@ def taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, model, 
     namespace_manager.set_namespace('')
 
 def doCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, cursor, model, JobID, callback, totalBatches, taskname, deadline = None):
+    from time import time
     if not deadline:
-        from time import time
         deadline = time() + 540.00
     entityModel = getattr(meSchema, model)
     if entityModel == meSchema.backTestResult:
@@ -107,7 +108,6 @@ def doCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, curso
     if stopStep <= globalStop - 400:
         stopStep += 400
         startStep += 400
-        #taskAdd(stopStep, startStep, globalStop, namespace, name, 0, '', model)
         doCompoundReturns(stopStep,startStep,globalStop,namespace,name,0,'',model, JobID, callback, totalBatches, taskname, deadline)
     elif callback:
         doCallback(JobID, callback, totalBatches, taskname, model)
@@ -192,11 +192,11 @@ def memGetPercentReturns(memkeylist, prefix):
     memCacheEntities = {}
     
     memEntities = cachepy.get_multi(memkeylist)
-    missingKeys = meSchema.getMissingKeys(memkeylist,memEntities)
+    missingKeys = meTools.getMissingKeys(memkeylist,memEntities)
     
     memCacheEntities = memcache.get_multi(missingKeys)
     cachepy.set_multi(memCacheEntities)
-    missingKeys = meSchema.getMissingKeys(memkeylist,memCacheEntities)
+    missingKeys = meTools.getMissingKeys(memkeylist,memCacheEntities)
 
     memEntities.update(memCacheEntities)
     if missingKeys:
