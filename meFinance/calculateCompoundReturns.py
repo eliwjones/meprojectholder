@@ -53,7 +53,7 @@ def taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, model, 
     namespace_manager.set_namespace(namespace)
     try:
         taskqueue.add(url = '/calculate/compounds/calculateCompounds', countdown = 0,
-                      name = JobID + '-' + model + '-' + str(stopStep) + '-' + str(startStep) + '-' + str(i),
+                      name = 'RVals-' + JobID + '-' + model + '-' + str(stopStep) + '-' + str(startStep) + '-' + str(i),
                       params = {'stopStep'  : stopStep,
                                 'startStep' : startStep,
                                 'globalStop': globalStop,

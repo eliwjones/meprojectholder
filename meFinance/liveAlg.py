@@ -22,12 +22,14 @@ from google.appengine.ext import db
 from google.appengine.ext import deferred
 from google.appengine.api import namespace_manager
 
-def doAllLiveAlgs(initialStopStep, stepRange, globalStop, namespace, name):
+def doAllLiveAlgs(initialStopStep, stepRange, globalStop, namespace, name, callback = ''):
+    JobID = meTools.buildJobID(namespace, name, globalStop, initialStopStep, stepRange)
     for i in range(initialStopStep, globalStop + 1, 400):
         stopStep = i
-        calculateWeeklyLiveAlgs(stopStep, stepRange, namespace, name)
+        calculateWeeklyLiveAlgs(stopStep, stepRange, namespace, JobID, callback)
 
-def calculateWeeklyLiveAlgs(stopStep, stepRange, namespace, name = ''):
+def calculateWeeklyLiveAlgs(stopStep, stepRange, namespace, JobID, callback):
+    from google.appengine.api.labs import taskqueue
     namespace_manager.set_namespace('')
     alginfo = meTools.memGet(meSchema.meAlg, meTools.buildAlgKey(1))
     namespace_manager.set_namespace(namespace)
@@ -47,14 +49,18 @@ def calculateWeeklyLiveAlgs(stopStep, stepRange, namespace, name = ''):
         liveAlgs.remove(secondAlgKey)
         algGroups.append([firstAlgKey.name(), secondAlgKey.name()])
     i = 0
+    totalBatches = len(algGroups)
     for algGroup in algGroups:
-        taskname = "liveAlgCalc-" + str(stopStep) + '-' + str(stopStep - stepRange) + '-' + '-' + str(stepRange) + '-group' + str(i) + '-' + name + '-' + namespace
-        deferred.defer(processLiveAlgStepRange, stopStep - stepRange, stopStep, stepRange, algGroup, namespace,
-                       _name = taskname)
+        taskname = "liveAlg-" + JobID + '-' + str(stopStep) + '-' + str(stopStep - stepRange) + '-group' + str(i)
+        try:
+            deferred.defer(processLiveAlgStepRange, stopStep - stepRange, stopStep, stepRange, algGroup, namespace,
+                           JobID, callback, totalBatches, taskname, _name = taskname)
+        except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
+            pass
         i += 1
     namespace_manager.set_namespace('')
 
-def processLiveAlgStepRange(start, stop, stepRange, algKeyFilter, namespace):
+def processLiveAlgStepRange(start, stop, stepRange, algKeyFilter, namespace, JobID, callback, totalBatches, taskname):
     namespace_manager.set_namespace(namespace)
     currentStep = start
     stopStepList = buildStopStepList(start,stop)
@@ -74,7 +80,30 @@ def processLiveAlgStepRange(start, stop, stepRange, algKeyFilter, namespace):
     putList = []
     for liveAlgKey in liveAlgInfo:
         putList.append(liveAlgInfo[liveAlgKey])
-    db.put(putList)
+    meTools.retryPut(putList)
+    if callback:
+        doCallback(JobID, callback, totalBatches, taskname)
+
+def doCallback(JobID, callback, totalBatches, taskname, model = '', wait = .5):
+    from google.appengine.api.labs import taskqueue
+    params = {'JobID'        : JobID,
+              'taskname'     : taskname,
+              'totalBatches' : totalBatches,
+              'jobtype'      : 'callback',
+              'stepType'     : 'weeklyLiveAlgs'}
+
+    params['model'] = model  # Here to make more sensible when end up merging doCallback() into meTools.
+    
+    try:
+        taskqueue.add(url    = callback,
+                      name   = 'callback-' + taskname,
+                      params = params )
+    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
+        pass
+    except:
+        from time import sleep
+        sleep(wait)
+        doCallback(JobID, callback, totalBatches, taskname, model, 2*wait)
 
 def getCurrentReturn(liveAlgInfo,stopStep, Cash = None):
     originalNameSpace = namespace_manager.get_namespace()
@@ -277,4 +306,4 @@ def initializeLiveAlgs(initialStopStep, stepRange, Cash, FTLtype = ['FTLe','dnFT
                                    CashDelta = repr(deque([])), Cash = Cash, numTrades = 0,
                                    history = repr(deque([])), technique = technique )
         liveAlgs.append(liveAlg)
-    db.put(liveAlgs)
+    meTools.retryPut(liveAlgs)
