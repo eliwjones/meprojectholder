@@ -45,7 +45,7 @@ class doBackTestBatch(webapp.RequestHandler):
         if callback:
             doCallback(JobID, callback, totalBatches, taskname)
 
-def doCallback(jobID, callback, totalBatches, taskname, wait = .5):
+def doCallback(JobID, callback, totalBatches, taskname, wait = .5):
     from google.appengine.api.labs import taskqueue
     try:
         taskqueue.add(url    = callback,
@@ -60,7 +60,7 @@ def doCallback(jobID, callback, totalBatches, taskname, wait = .5):
     except:
         from time import sleep
         sleep(wait)
-        doCallback(jobID, callback, totalBatches, taskname, 2*wait)
+        doCallback(JobID, callback, totalBatches, taskname, 2*wait)
 
 def addTaskRange(initialStopStep, globalStop, unique, namespace, batchSize=5, stepsBack=1600, callback = ''):
     '''

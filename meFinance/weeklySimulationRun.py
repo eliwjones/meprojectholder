@@ -1,7 +1,9 @@
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
+from google.appengine.api.datastore import Key
 import meTools
 import meSchema
+import desireFunc
 
 class weeklySimulationRun(webapp.RequestHandler):
     def get(self):
@@ -10,19 +12,29 @@ class weeklySimulationRun(webapp.RequestHandler):
         if 'X-AppEngine-Cron' in self.request.headers:
             ''' Do weekly calculation once verify it is Wed Night. '''
             ''' fire-off task for weeklyDesires handler first.  '''
-            pass
+            namespace = ''
+            unique = 'some unique string by datetime'
+            globalStop = meSchema.stepDate.all().filter('step <', 1000000).order('-step').get().step
+            initialStop = meSchema.backTestResult.all().filter('stopStep <', 1000000).order('-stopStep').get().stopStep
+            stepRange = 1600
+            JobID = meTools.buildJobID(namespace, unique, globalStop, initialStop, stepRange)
+
+            persistStops = meSchema.WorkQueue(key_name = JobID, globalStop = globalStop, initialStop = initialStop)
+            meTools.memPut_multi({persistStops.key().name() : persistStops}, priority = 1)
+            
+            if not globalStop > initialStop:
+                raise(BaseException('globalStop: %s is not greater than lastStopStep: %s' % (globalStop, initialStop)))
+
+            desireQuery = meSchema.desire.all(keys_only = True).filter('__key__ <', Key.from_path('desire','1000000_0000_00')).order('-__key__').get()
+            lastDesireStop = int(desireQuery.name().split('_')[0])
+            desireFunc.primeDesireCache(lastDesireStop)
+            for step in range(lastDesireStop, globalStop + 1):
+                desireFunc.doDesires(step)
+
+            doNext(JobID, 'weeklyDesires','')
         else:
             ''' Do sample range of startStep, stopStep simulates! '''
             pass
-
-class weeklyDesires(webapp.RequestHandler):
-    def get(self):
-        self.response.headers['Content-Type'] = 'text/plain'
-        self.response.out.write('I do desires')
-
-    def post(self):
-        self.response.headers['Content-Type'] = 'text/plain'
-        self.response.out.write('I do desires and check completion?')
 
 class callbackHandler(webapp.RequestHandler):
     def get(self):
@@ -37,7 +49,6 @@ class callbackHandler(webapp.RequestHandler):
             return
         else:
             raise(BaseException('Must be jobtype == callback'))
-
 
 def processCallback(handler):
     JobID = handler.request.get('JobID')
@@ -59,6 +70,8 @@ def doNext(JobID, stepType, model):
       stepType in ['weeklyDesires', 'weeklyBackTests', 'calculateRvals', 'weeklyLiveAlgs']
       model in ['', 'backTestResult', 'liveAlg']
     '''
+    callback = '/simulate/processCallback'
+    unique = JobID.split('-')[1]
     stops = meTools.memGet(meSchema.WorkQueue, JobID)
     globalStop = stops.globalStop
     initialStop = stops.initialStop
@@ -66,22 +79,19 @@ def doNext(JobID, stepType, model):
         raise(BaseException('globalStop or initialStop is None!'))
 
     if stepType == 'weeklyDesires':
-        doBackTests.addTaskRange(initialStop, globalStop, JobID, '', 639)
+        doBackTests.addTaskRange(initialStop, globalStop, unique, '', batchsize = 639, callback = callback )
     elif stepType == 'weeklyBackTests':
-        # Must figure out how to pass JobID around. Cant just use it as unique prop.
-        # Hack is to just use JobID.split('-')[0] to pull out unique value.
-        calculateCompoundReturns.fanoutTaskAdd(initialStop, initialStop - 1600, globalStop, '', JobID, 'backTestResult')
+        calculateCompoundReturns.fanoutTaskAdd(initialStop, initialStop - 1600, globalStop, '', unique, 'backTestResult', callback = callback)
     elif stepType == 'calculateRvals' and model == 'backTestResult':
-        liveAlg.doAllLiveAlgs(initialStop, 1600, globalStop, '', JobID)
+        liveAlg.doAllLiveAlgs(initialStop, 1600, globalStop, '', unique, callback = callback)
     elif stepType == 'weeklyLiveAlgs':
-        calculateCompoundReturns.fanoutTaskAdd(initialstop, initialStop - 1600, globalStop, '', JobID, 'liveAlg')
+        calculateCompoundReturns.fanoutTaskAdd(initialstop, initialStop - 1600, globalStop, '', unique, 'liveAlg', callback = callback)
     elif stepType == 'calculateRvals' and model == 'liveAlg':
         print 'Done? or goto metaAlgs?'
     else:
         raise(BaseException('Received unknown stepType, model: %s, %s' % (stepType, model)))
 
-application = webapp.WSGIApplication([('/simulate/weeklyDesires',weeklyDesires),
-                                      ('/simulate/weeklySimulationRun',weeklySimulationRun),
+application = webapp.WSGIApplication([('/simulate/weeklySimulationRun',weeklySimulationRun),
                                       ('/simulate/processCallback',processCallback)],
                                      debug = True)
 

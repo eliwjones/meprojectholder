@@ -250,7 +250,7 @@ def buildJobID(namespace, unique, globalStop, initialStop, stepRange):
       like calculateCompoundReturns.fanoutTaskAdd.
       Also, initialStopStep == stopStep == initialStop
     '''
-    JobID = namespace + unique + '-' + str(globalStop) + '-' + str(initialStop) + '-' + str(stepRange).rjust(7,'0')
+    JobID = namespace + '-' + unique + '-' + str(globalStop) + '-' + str(initialStop) + '-' + str(stepRange).rjust(7,'0')
     return JobID
 
 
