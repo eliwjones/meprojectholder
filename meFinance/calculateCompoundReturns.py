@@ -38,8 +38,6 @@ def fanoutTaskAdd(stopStep, startStep, globalStop, namespace, unique, model, cal
     elif stepRange == 1600:
         stepBlock = 2000
 
-    #JobID = namespace + unique + '-' + model
-    # Trying to standardize JobID for all tasks.
     JobID = meTools.buildJobID(namespace, unique, globalStop, stopStep, stepRange)
     totalBatches = ((globalStop - stopStep)/stepBlock) + 1
     for i in range(stopStep, globalStop + 1, stepBlock):
@@ -120,7 +118,7 @@ def doCallback(JobID, callback, totalBatches, taskname, model, wait = .5):
               'jobtype'      : 'callback',
               'stepType'     : 'calculateRvals'}
 
-    params['model'] = model  # Here to make more sensible when end up merging doCallback() into meTools.
+    params['model'] = model
     
     try:
         taskqueue.add(url    = callback,
@@ -159,10 +157,14 @@ def doCompounds(stopStep, startStep, entities):
         Rdict = {1: (1.0 + entity.percentReturn)}
         for Rnum in range(2, maxR + 1):
             identifier = getattr(entity,idProp)
-            Rdict[Rnum] = Rdict[Rnum-1]*(1.0 + getRReturn(stopStep, startStep, identifier, Rnum-1, prevReturns, prefix))
+            lastPercentReturn = getRReturn(stopStep, startStep, identifier, Rnum-1, prevReturns, prefix)
+            if lastPercentReturn:
+                Rdict[Rnum] = Rdict[Rnum-1]*(1.0 + lastPercentReturn)
+            else:
+                Rdict[Rnum] = None
             setattr(entity, 'R' + str(Rnum), Rdict[Rnum])
         putList.append(entity)
-    db.put(putList)
+    meTools.batchPut(putList)
 
 def getMaxRnum(model):
     i = 1
@@ -176,7 +178,10 @@ def getMaxRnum(model):
 def getRReturn(stopStep, startStep, identifier, R, prevReturns, prefix):
     ''' identifier = liveAlg.technique, backTestResult.algKey '''
     memkey = buildMemKey(stopStep - R*400, startStep - R*400, identifier, prefix)
-    ret = prevReturns[memkey]
+    try:
+        ret = prevReturns[memkey]
+    except KeyError:
+        ret = None
     return ret
     
 def buildMemKey(stopStep, startStep, identifier, prefix):
@@ -206,10 +211,11 @@ def memGetPercentReturns(memkeylist, prefix):
         elif prefix == 'LAR-':
             Entities = meSchema.liveAlg.get_by_key_name(missingKeys)
         for entity in Entities:
-            memkey = prefix + entity.key().name()
-            pReturn = entity.percentReturn
-            newMemEntities[memkey] = pReturn
-            memEntities[memkey] = pReturn
+            if entity:
+                memkey = prefix + entity.key().name()
+                pReturn = entity.percentReturn
+                newMemEntities[memkey] = pReturn
+                memEntities[memkey] = pReturn
         memcache.set_multi(newMemEntities)
         cachepy.set_multi(newMemEntities)
     return memEntities
