@@ -97,7 +97,8 @@ def retryPut(entities, wait = 0.5):
     from google.appengine.runtime import apiproxy_errors
     try:
         db.put(entities)
-    except (db.Timeout, apiproxy_errors.CapabilityDisabledError, apiproxy_errors.DeadlineExceededError):
+    except (db.Timeout, apiproxy_errors.CapabilityDisabledError,
+            apiproxy_errors.DeadlineExceededError, apiproxy_errors.OverQuotaError):
         from time import sleep
         sleep(wait)
         wait *= 1.5
@@ -113,12 +114,12 @@ def batchPutV2(entities, batchSize = 100):
     length = len(entities)
     for startIndex in range(0, length, batchSize):
         endIndex = min(startIndex + batchSize, length)
-        db.put(entities[startIndex : endIndex])
+        retryPut(entities[startIndex : endIndex])
 
 def batchPutV3(entities, batchSize = 100):
     while entities:
         batchSize = min(batchSize, len(entities))
-        db.put(entities[ : batchSize])
+        retryPut(entities[ : batchSize])
         entities = entities[batchSize : ]
 
 def memGqlQuery(query, n, time=0):
