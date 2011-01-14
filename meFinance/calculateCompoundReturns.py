@@ -63,7 +63,7 @@ def doCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, curso
     elif entityModel == meSchema.liveAlg:
         prefix = 'LAR-'
     else:
-        raise Exception('Model must be backTestResult or liveAlg!')
+        raise BaseException('Model must be backTestResult or liveAlg!')
     count = 100
     while count == 100:
         query = entityModel.all().filter('stopStep =', stopStep).filter('startStep =', startStep).order('percentReturn')
@@ -108,7 +108,7 @@ def doCompounds(stopStep, startStep, entities):
         idProp = 'technique'
         prefix = 'LAR-'
     else:
-        raise Exception('Model must be backTestResult or liveAlg!')
+        raise BaseException('Model must be backTestResult or liveAlg!')
     maxR = getMaxRnum(model)
     stepBacks = [week for week in range(1,maxR)]
     for entity in entities:

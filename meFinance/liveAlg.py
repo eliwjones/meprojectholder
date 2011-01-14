@@ -82,28 +82,9 @@ def processLiveAlgStepRange(start, stop, stepRange, algKeyFilter, namespace, Job
         putList.append(liveAlgInfo[liveAlgKey])
     meTools.retryPut(putList)
     if callback:
-        doCallback(JobID, callback, totalBatches, taskname)
-
-def doCallback(JobID, callback, totalBatches, taskname, model = '', wait = .5):
-    from google.appengine.api.labs import taskqueue
-    params = {'JobID'        : JobID,
-              'taskname'     : taskname,
-              'totalBatches' : totalBatches,
-              'jobtype'      : 'callback',
-              'stepType'     : 'weeklyLiveAlgs'}
-
-    params['model'] = model  # Here to make more sensible when end up merging doCallback() into meTools.
-    
-    try:
-        taskqueue.add(url    = callback,
-                      name   = 'callback-' + taskname,
-                      params = params )
-    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
-        pass
-    except:
-        from time import sleep
-        sleep(wait)
-        doCallback(JobID, callback, totalBatches, taskname, model, 2*wait)
+        meTools.taskAdd('callback-' + taskname, callback, 'default', 0.5,
+                        JobID = JobID, taskname = taskname, totalBatches = totalBatches,
+                        jobtype = 'callback', stepType = 'weeklyLiveAlgs', model = '')
 
 def getCurrentReturn(liveAlgInfo,stopStep, Cash = None):
     originalNameSpace = namespace_manager.get_namespace()
@@ -186,7 +167,7 @@ def getBestAlgs(stopStep, liveAlgInfo):
     for algKey in liveAlgInfo:
         # Must get .technique and .stepRange from liveAlgInfo
         #   to decide appropriate action.
-        startStep = stopStep - liveAlgInfo[algKey].stepRange   # Changing to hardcode 1600 to force test.
+        startStep = stopStep - liveAlgInfo[algKey].stepRange
         technique = liveAlgInfo[algKey].technique
         bestAlgs[algKey] = getTopAlg(stopStep, startStep, technique)
     return bestAlgs
