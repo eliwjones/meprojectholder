@@ -31,6 +31,8 @@ class calculateCompounds(webapp.RequestHandler):
         doCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, cursor, model, JobID, callback, totalBatches, taskname)
 
 def fanoutTaskAdd(stopStep, startStep, globalStop, namespace, unique, model, callback = ''):
+    from google.appengine.api import namespace_manager
+    namespace_manager.set_namespace(namespace)
     ''' Partition range of steps into batches to add in parallel. '''
     stepRange = stopStep - startStep
     if stepRange == 800:
@@ -44,32 +46,11 @@ def fanoutTaskAdd(stopStep, startStep, globalStop, namespace, unique, model, cal
         newStopStep = i
         newStartStep = newStopStep - stepRange
         newGlobalStop = min(newStopStep + stepBlock - 1, globalStop)
-        taskAdd(newStopStep, newStartStep, newGlobalStop, namespace, unique, 0, '', model, JobID, callback, totalBatches)
-
-def taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, model, JobID, callback, totalBatches, taskname = '', wait = 0.5):
-    from google.appengine.api import namespace_manager
-    namespace_manager.set_namespace(namespace)
-    try:
-        taskqueue.add(url = '/calculate/compounds/calculateCompounds', countdown = 0,
-                      name = 'RVals-' + JobID + '-' + model + '-' + str(stopStep) + '-' + str(startStep) + '-' + str(i),
-                      params = {'stopStep'  : stopStep,
-                                'startStep' : startStep,
-                                'globalStop': globalStop,
-                                'name'      : name,
-                                'namespace' : namespace,
-                                'i'         : i,
-                                'cursor'    : cursor,
-                                'model'     : model,
-                                'JobID'     : JobID,
-                                'callback'  : callback,
-                                'totalBatches' : totalBatches,
-                                'taskname'  : taskname} )
-    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
-        pass
-    except:
-        from time import sleep
-        sleep(wait)
-        taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, model, JobID, callback, totalBatches, taskname, 2*wait)
+        subTaskname = 'RVals-' + JobID + '-' + model + '-' + str(newStopStep) + '-' + str(newStartStep) + '-0'
+        meTools.taskAdd(subTaskname, '/calculate/compounds/calculateCompounds', 'default', 0.5,
+                        stopStep = newStopStep, startStep = newStartStep, globalStop = newGlobalStop, name = unique,
+                        i = 0, cursor = '', model = model, JobID = JobID, callback = callback, totalBatches = totalBatches,
+                        taskname = '')
     namespace_manager.set_namespace('')
 
 def doCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, cursor, model, JobID, callback, totalBatches, taskname, deadline = None):
@@ -101,35 +82,20 @@ def doCompoundReturns(stopStep, startStep, globalStop, namespace, name, i, curso
             doCompounds(stopStep, startStep, entities)
             cursor = query.cursor()
         else:
-            taskAdd(stopStep, startStep, globalStop, namespace, name, i, cursor, model, JobID, callback, totalBatches, taskname)
+            subTaskname = 'RVals-' + JobID + '-' + model + '-' + str(stopStep) + '-' + str(startStep) + '-' + str(i)
+            meTools.taskAdd(subTaskname, '/calculate/compounds/calculateCompounds', 'default', 0.5,
+                            stopStep = stopStep, startStep = startStep, globalStop = globalStop, name = name,
+                            i = i, cursor = cursor, model = model, JobID = JobID, callback = callback, totalBatches = totalBatches,
+                            taskname = taskname)
             return
     if stopStep <= globalStop - 400:
         stopStep += 400
         startStep += 400
         doCompoundReturns(stopStep,startStep,globalStop,namespace,name,0,'',model, JobID, callback, totalBatches, taskname, deadline)
     elif callback:
-        doCallback(JobID, callback, totalBatches, taskname, model)
-
-def doCallback(JobID, callback, totalBatches, taskname, model, wait = .5):
-    from google.appengine.api.labs import taskqueue
-    params = {'JobID'        : JobID,
-              'taskname'     : taskname,
-              'totalBatches' : totalBatches,
-              'jobtype'      : 'callback',
-              'stepType'     : 'calculateRvals'}
-
-    params['model'] = model
-    
-    try:
-        taskqueue.add(url    = callback,
-                      name   = 'callback-' + taskname,
-                      params = params )
-    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
-        pass
-    except:
-        from time import sleep
-        sleep(wait)
-        doCallback(JobID, callback, totalBatches, taskname, model, 2*wait)
+        meTools.taskAdd('callback-' + taskname, callback, 'default', 0.5,
+                        JobID = JobID, taskname = taskname, totalBatches = totalBatches,
+                        model = model, jobtype = 'callback', stepType = 'calculateRvals')
 
 def doCompounds(stopStep, startStep, entities):
     putList = []

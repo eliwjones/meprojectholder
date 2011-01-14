@@ -43,24 +43,9 @@ class doBackTestBatch(webapp.RequestHandler):
         namespace = str(self.request.get('namespace'))
         backTestBatch(algBatch, monthBatch, stopStep, namespace)
         if callback:
-            doCallback(JobID, callback, totalBatches, taskname)
-
-def doCallback(JobID, callback, totalBatches, taskname, wait = .5):
-    from google.appengine.api.labs import taskqueue
-    try:
-        taskqueue.add(url    = callback,
-                      name   = 'callback-' + taskname,
-                      params = {'JobID'        : JobID,
-                                'taskname'     : taskname,
-                                'totalBatches' : totalBatches,
-                                'jobtype'      : 'callback',
-                                'stepType'     : 'weeklyBackTests'} )
-    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
-        pass
-    except:
-        from time import sleep
-        sleep(wait)
-        doCallback(JobID, callback, totalBatches, taskname, 2*wait)
+            meTools.taskAdd('callback-' + taskname, callback, 'default', 0.5,
+                            JobID = JobID, taskname = taskname, totalBatches = totalBatches,
+                            model = '', jobtype = 'callback', stepType = 'weeklyBackTests')
 
 def addTaskRange(initialStopStep, globalStop, unique, namespace, batchSize=5, stepsBack=1600, callback = ''):
     '''
@@ -90,51 +75,10 @@ def addTaskRange(initialStopStep, globalStop, unique, namespace, batchSize=5, st
         startStep = stopStep - stepsBack
         stepRange = [startStep]
         name = 'Main-backTestResult-' + JobID + '-' + str(stopStep).rjust(7,'0')
-        mainTaskAdd(name, JobID, totalBatches, callback, startAlg, stopAlg, stopStep, batchSize, stepRange, unique, namespace)
-
-def mainTaskAdd(name, JobID, totalBatches, callback, startAlg, stopAlg, stopStep, batchSize, stepRange, uniquifier, namespace, delay = 0, wait = .5):
-    from google.appengine.api.labs import taskqueue
-    try:
-        taskqueue.add(url = '/backtest/doBackTests', countdown = delay,
-                      name = name,
-                      params = {'startAlg'  : startAlg,
-                                'stopAlg'   : stopAlg,
-                                'stopStep'  : stopStep,
-                                'batchSize' : batchSize,
-                                'stepRange' : stepRange,
-                                'uniquifier': uniquifier,
-                                'namespace' : namespace,
-                                'JobID'     : JobID,
-                                'totalBatches' : totalBatches,
-                                'callback'  : callback} )
-    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
-        pass
-    except:
-        from time import sleep
-        sleep(wait)
-        mainTaskAdd(name,JobID,totalBatches,callback,startAlg,stopAlg,stopStep,batchSize,stepRange,uniquifier,namespace,delay,2*wait)
-        
-
-def batchTaskAdd(name, startAlg, stopAlg, monthBatch, stopStep, namespace, JobID, totalBatches, callback, delay=0,wait=.5):
-    from google.appengine.api.labs import taskqueue
-    try:
-        taskqueue.add(url = '/backtest/doBackTestBatch', countdown = delay,
-                      name = name,
-                      queue_name = 'backTestQueue',
-                      params = {'startAlg'   : startAlg,
-                                'stopAlg'    : stopAlg,
-                                'monthBatch' : monthBatch,
-                                'stopStep'   : stopStep,
-                                'namespace'  : namespace,
-                                'JobID'      : JobID,
-                                'totalBatches': totalBatches,
-                                'callback'   : callback} )
-    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
-        pass
-    except:
-        from time import sleep
-        sleep(wait)
-        batchTaskAdd(name, startAlg, stopAlg, monthBatch, stopStep, namespace, JobID, totalBatches, callback, delay, 2*wait)
+        meTools.taskAdd(name, '/backtest/doBackTests', 'default', 0.5,
+                        startAlg = startAlg, stopAlg = stopAlg, stopStep = stopStep, batchSize = batchSize,
+                        stepRange = stepRange, uniquifier = unique, namespace = namespace, JobID = JobID,
+                        totalBatches = totalBatches, callback = callback)
 
 def runBackTests(startAlg, stopAlg, stop, batchSize, stepRange, uniquifier, namespace, JobID, totalBatches, callback):
     monthList = [str(step) for step in stepRange]
@@ -142,7 +86,9 @@ def runBackTests(startAlg, stopAlg, stop, batchSize, stepRange, uniquifier, name
     for batchStart in range(startAlg, stopAlg + 1, batchSize):
         batchEnd = min(batchStart + batchSize - 1, stopAlg)
         batchName = 'Batch-backTestResult-' + JobID + '-' + str(batchStart) + '-' + str(batchEnd) + '-' + str(stop)
-        batchTaskAdd(batchName, batchStart, batchEnd, monthList, stop, namespace, JobID, totalBatches, callback)
+        meTools.taskAdd(batchName, '/backtest/doBackTestBatch', 'backTestQueue', 0.5,
+                        startAlg = batchStart, stopAlg = batchEnd, monthBatch = monthList, stopStep = stop,
+                        namespace = namespace, JobID = JobID, totalBatches = totalBatches, callback = callback)
 
 def backTestBatch(algBatch, monthBatch, stopStep, namespace):
     import processDesires

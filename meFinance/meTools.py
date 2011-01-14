@@ -268,3 +268,17 @@ def getStck(ID,step):
     import meSchema
     meStocks = db.GqlQuery("Select * from stck Where ID = :1 AND step >= :2 AND step < :3 Order By step", ID,step,step+78).fetch(200)
     return meStocks
+
+def taskAdd(meTaskname, url, queue_name, wait,**kwargs):
+    from google.appengine.api.labs import taskqueue
+    try:
+        taskqueue.add(url = url,
+                      name = meTaskname,
+                      queue_name = queue_name,
+                      params = kwargs )
+    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
+        pass
+    except:
+        from time import sleep
+        sleep(wait)
+        taskAdd(meTaskname, url, queue_name, 2*wait, **kwargs)
