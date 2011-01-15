@@ -102,7 +102,8 @@ def doNext(JobID, stepType, model):
 
     if stepType == 'weeklyDesires':
         import doBackTests
-        doBackTests.addTaskRange(initialStop, globalStop, unique, '', batchSize = 639, callback = callback )
+        # batchSize = 639 takes 4 minutes.
+        doBackTests.addTaskRange(initialStop, globalStop, unique, '', batchSize = 284, callback = callback )
     elif stepType == 'weeklyBackTests':
         import calculateCompoundReturns
         calculateCompoundReturns.fanoutTaskAdd(initialStop, initialStop - 1600, globalStop, '', unique, 'backTestResult', callback = callback)
