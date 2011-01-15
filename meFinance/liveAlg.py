@@ -1,17 +1,3 @@
-# This is code to be used for processing performance of best algs
-# from backTestResult model for given weekly step range.
-#
-# Must get most recent step range by doing:
-#
-# result = meSchema.backTestResult.all().filter("stopStep <",currentStep).order("-stopStep").get()
-# recentStep = result.stopStep
-# bestAlg = {}
-# for stepRange in [6,8,10,12]:
-#    bestAlg[stepRange] = meSchema.backTestResult.all().filter("stopStep =", recentStep).filter("startStep =",stopStep - stepRange*400)
-#    bestAlg[stepRange] = bestAlg[stepRange].order("-percentReturn").get()
-#
-# Then process desires for liveAlg[stepRange] using its previous trade info and bestAlg[stepRange] desires.
-
 import meSchema
 import meTools
 import processDesires
@@ -22,13 +8,19 @@ from google.appengine.ext import db
 from google.appengine.ext import deferred
 from google.appengine.api import namespace_manager
 
+FTLtype = ['FTLe','dnFTLe']
+NRtype = ['R1','R2','R3','R4','R5']
+
 def doAllLiveAlgs(initialStopStep, stepRange, globalStop, namespace, name, callback = ''):
     JobID = meTools.buildJobID(namespace, name, globalStop, initialStopStep, stepRange)
+    #techneCount = len(FTLtype)*len(NRtype)
+    numWeeks = ((globalStop - initialStopStep)/400) + 1
+    totalBatches =  numWeeks
     for i in range(initialStopStep, globalStop + 1, 400):
         stopStep = i
-        calculateWeeklyLiveAlgs(stopStep, stepRange, namespace, JobID, callback)
+        calculateWeeklyLiveAlgs(stopStep, stepRange, namespace, JobID, totalBatches, callback)
 
-def calculateWeeklyLiveAlgs(stopStep, stepRange, namespace, JobID, callback):
+def calculateWeeklyLiveAlgs(stopStep, stepRange, namespace, JobID, totalBatches, callback):
     from google.appengine.api.labs import taskqueue
     namespace_manager.set_namespace('')
     alginfo = meTools.memGet(meSchema.meAlg, meTools.buildAlgKey(1))
@@ -38,26 +30,14 @@ def calculateWeeklyLiveAlgs(stopStep, stepRange, namespace, JobID, callback):
     # Get liveAlgs and branch out the different FTL, dnFTL Ntypes.
     # keys like:  0003955-0001600-FTLe-N1
     liveAlgs = meSchema.liveAlg.all(keys_only = True).filter("stopStep =", stopStep).filter("stepRange =", stepRange).filter("percentReturn =", 0.0).fetch(1000)
-    algGroups = []
-    while len(liveAlgs) > 1:
-        firstAlgKey = liveAlgs.pop(0)
-        algSplit = firstAlgKey.name().split('-')
-        firstTechnique = algSplit[-2] + '-' + algSplit[-1]  # Based on liveAlg key formation, this should give the alg's technique.
-        for algKey in liveAlgs:
-            if algKey.name().endswith(firstTechnique.replace('dn','')):
-                secondAlgKey = algKey
-        liveAlgs.remove(secondAlgKey)
-        algGroups.append([firstAlgKey.name(), secondAlgKey.name()])
-    i = 0
-    totalBatches = len(algGroups)
-    for algGroup in algGroups:
-        taskname = "liveAlg-" + JobID + '-' + str(stopStep) + '-' + str(stopStep - stepRange) + '-group' + str(i)
-        try:
-            deferred.defer(processLiveAlgStepRange, stopStep - stepRange, stopStep, stepRange, algGroup, namespace,
-                           JobID, callback, totalBatches, taskname, _name = taskname)
-        except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
-            pass
-        i += 1
+    algGroup = [alg.name() for alg in liveAlgs]
+
+    taskname = "liveAlg-" + JobID + '-' + str(stopStep) + '-' + str(stopStep - stepRange)
+    try:
+        deferred.defer(processLiveAlgStepRange, stopStep - stepRange, stopStep, stepRange, algGroup, namespace,
+                       JobID, callback, totalBatches, taskname, _name = taskname)
+    except (taskqueue.TaskAlreadyExistsError, taskqueue.TombstonedTaskError), e:
+        pass
     namespace_manager.set_namespace('')
 
 def processLiveAlgStepRange(start, stop, stepRange, algKeyFilter, namespace, JobID, callback, totalBatches, taskname):
@@ -268,10 +248,13 @@ def getStepRangeAlgDesires(algKey, alginfo, startStep,stopStep):
     return desireDict
     
 
-def initializeLiveAlgs(initialStopStep, stepRange, Cash, FTLtype = ['FTLe','dnFTLe'], NRtype = ['R1','R2','R3','R4','R5']):
+def initializeLiveAlgs(initialStopStep, stepRange, Cash):
     '''
     Removed FTLo types.  Adds unnecessary clutter.
     '''
+    global FTLtype
+    global NRtype
+    
     techniques = []
     for FTL in FTLtype:
         for NR in NRtype:

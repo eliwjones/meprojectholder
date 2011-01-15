@@ -124,8 +124,13 @@ def doCompounds(stopStep, startStep, entities):
         for Rnum in range(2, maxR + 1):
             identifier = getattr(entity,idProp)
             lastPercentReturn = getRReturn(stopStep, startStep, identifier, Rnum-1, prevReturns, prefix)
-            if lastPercentReturn:
-                Rdict[Rnum] = Rdict[Rnum-1]*(1.0 + lastPercentReturn)
+            if lastPercentReturn is not None:
+                try:
+                    Rdict[Rnum] = Rdict[Rnum-1]*(1.0 + lastPercentReturn)
+                except TypeError:
+                    memkey = buildMemKey(stopStep, startStep, identifier, prefix)
+                    message = 'Rnum: %s, memkey: %s, entity.key().name(): %s - V2' % (Rnum, memkey, entity.key().name())
+                    raise(BaseException(message))
             else:
                 Rdict[Rnum] = None
             setattr(entity, 'R' + str(Rnum), Rdict[Rnum])
@@ -167,7 +172,7 @@ def memGetPercentReturns(memkeylist, prefix):
     
     memCacheEntities = memcache.get_multi(missingKeys)
     cachepy.set_multi(memCacheEntities)
-    missingKeys = meTools.getMissingKeys(memkeylist,memCacheEntities)
+    missingKeys = meTools.getMissingKeys(missingKeys,memCacheEntities)
 
     memEntities.update(memCacheEntities)
     if missingKeys:
