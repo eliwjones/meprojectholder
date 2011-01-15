@@ -141,15 +141,18 @@ def syncProcessCache(step,startKey,stopKey):
     clockKey = 'stepclock_' + str(startKey) + '_' + str(stopKey)
     stepclock = cachepy.get(clockKey, priority=1)
     memkeylist = []
-    if stepclock != step-1:
+    if stepclock not in [step-1, step]:
         for i in range(startKey,stopKey + 1):
             for stckID in [1,2,3,4]:
                 cuekey = meTools.buildTradeCueKey(i)
                 recency_key = 'desire_' + cuekey + '_' + str(stckID)
                 memkeylist.append(recency_key)
         recentDesires = memcache.get_multi(memkeylist)
+        cachepy.set_multi(recentDesires, priority = 1)
+        '''
         for des in recentDesires:
             cachepy.set(des, recentDesires[des], priority=1)
+        '''
     cachepy.set(clockKey,step,priority=1)   # Set cachepy clockKey to current step since synced with Memcache.
 
 def makeDesire(stckID,keyname,step):
@@ -164,6 +167,7 @@ def primeDesireCache(step):
     # Function to pull out last 400 steps of potential desires.
     import princeFunc
     memdict = {}
+    clockKeyStep = step
     queryStr = princeFunc.getDesireQueryStr(max(step-405,0),step)
     desires = db.GqlQuery(queryStr).fetch(20000)
     for desire in desires:
@@ -177,6 +181,8 @@ def primeDesireCache(step):
         elif memdict[memkey] < step:
             memdict[memkey] = step
     memcache.set_multi(memdict)
+    cachepy.set_multi(memdict, priority = 1)
+    cachepy.set('stepclock_' + str(1) + '_' + str(60), clockKeyStep) # Manually syncing stepclock until get saner method.
 
 application = webapp.WSGIApplication([('/desire/doDesireStep',doDesireStep)],
                                      debug = True)

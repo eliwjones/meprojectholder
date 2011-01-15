@@ -61,8 +61,8 @@ def startSim(namespace, unique, globalStop, initialStop, stepRange):
     persistStops = meSchema.WorkQueue(key_name = JobID, globalStop = globalStop, initialStop = initialStop)
     meTools.memPut_multi({persistStops.key().name() : persistStops}, priority = 1)
     
-    if not globalStop > initialStop:
-        raise(BaseException('globalStop: %s is not greater than lastStopStep: %s' % (globalStop, initialStop)))
+    if not globalStop >= initialStop:
+        raise(BaseException('globalStop: %s is not >= lastStopStep: %s' % (globalStop, initialStop)))
 
     desireQuery = meSchema.desire.all(keys_only = True).filter('__key__ <', Key.from_path('desire','1000000_0000_00')).order('-__key__').get()
     lastDesireStop = int(desireQuery.name().split('_')[0])
