@@ -37,7 +37,7 @@ def doAlgSteps(algKey, startStep, stopStep, stats, stckIDs, MaxTrade = False):
         alginfo.TradeSize = (0.94/len(stckIDs))
     desires = liveAlg.getStepRangeAlgDesires(algKey, alginfo, startStep, stopStep)
     buydelta = meTools.memGet(meSchema.tradeCue, alginfo.BuyCue).TimeDelta
-    selldelta = meTools.memGet(meSchema.tradeCue, alginfo.BuyCue).TimeDelta
+    selldelta = meTools.memGet(meSchema.tradeCue, alginfo.SellCue).TimeDelta
 
     orderDesires = desires.keys()
     orderDesires.sort()
@@ -289,11 +289,8 @@ def resetAlgstats(memprefix = "unpacked_",algCash=20000.0,alphaAlg=1,omegaAlg=10
                           'CashDelta' : cashdelta[key],
                           'PandL'     : 0.0,
                           'Positions' : {},
-                          'lastBuy'   : -400,
-                          'lastSell'  : -400}
-        ''' Not using memcache anymore anyhow, eventually this entire resetAlgstats()
-              will be deprecated. '''
-        # memcache.set(key,statDict[key])
+                          'lastBuy'   : 0,
+                          'lastSell'  : 0}
     return statDict
 
 def convertDesireToDict(desire, buysell, tradesize, cash, shares = None):
