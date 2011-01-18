@@ -183,3 +183,8 @@ indexes:
   properties:
   - name: __key__
     direction: desc
+
+- kind: tradeCue
+  properties:
+  - name: __key__
+    direction: desc
