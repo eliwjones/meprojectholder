@@ -8,6 +8,8 @@ import desireFunc
   Can manually test a simulation run a given
     namespace, unique, initialStop, globalStop
   by issuing call:
+    initialStop = 1955
+    globalStop = 20355
     meTools.taskAdd(myuniquetaskname, '/simulate/weeklySimulationRun', 'default', 0.5,
                     namespace = namespace, unique = unique, initialStop = initialStop,
                     globalStop = globalStop, goNext = 'true')

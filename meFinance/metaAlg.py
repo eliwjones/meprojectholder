@@ -108,7 +108,7 @@ def playThatGame(startStep, stopStep, metaKeys, metaMeta = False):
         else:
             lastStep = stopStep
         if currentStep < lastStep:
-            metaAlgInfo = liveAlg.processStepRangeDesires(currentStep, lastStep, bestAlgs, metaAlgInfo, stckIDorder, True, 0.0)
+            metaAlgInfo = liveAlg.processStepRangeDesires(currentStep, lastStep, bestAlgs, metaAlgInfo, stckIDorder, True)
             metaAlgInfo = liveAlg.getCurrentReturn(metaAlgInfo, lastStep)
             metaAlgInfo = addLiveAlgTechne(metaAlgInfo, bestLiveAlgInfo)
             currentStep = lastStep + 1
