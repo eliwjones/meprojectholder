@@ -9,6 +9,22 @@ from google.appengine.api.labs import taskqueue
 
 # New Desire calculation function.
 
+class fanoutDesires(webapp.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.out.write('I am a single long running process to calculate desires for 1 or 2 Trade Cues.')
+        
+    def post(self):
+        globalStop = int(self.request.get('globalStop'))
+        startKey = int(self.request.get('startKey'))
+        stopKey = int(self.request.get('stopKey'))
+        
+        startCue = meTools.buildTradeCueKey(startKey)
+        stopCue = meTools.buildTradeCueKey(stopKey)
+
+        # get last desire for these start stop Keys
+        meSchema.desire.all().filter('CueKey IN', [startCue,stopCue]).filter('__key__ <', Key.from_path('desire','1000000_0000_00')).order('-__key__').get()
+
 class doDesireStep(webapp.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/plain'

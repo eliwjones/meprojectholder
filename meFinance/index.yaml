@@ -173,6 +173,12 @@ indexes:
   - name: startStep
   - name: R8
     direction: desc
+
+- kind: desire
+  properties:
+  - name: CueKey
+  - name: __key__
+    direction: desc
     
 - kind: desire
   properties:

@@ -9,7 +9,8 @@ import desireFunc
     namespace, unique, initialStop, globalStop
   by issuing call:
     meTools.taskAdd(myuniquetaskname, '/simulate/weeklySimulationRun', 'default', 0.5,
-                    namespace = namespace, unique = unique, initialStop = initialStop, globalStop = globalStop)
+                    namespace = namespace, unique = unique, initialStop = initialStop,
+                    globalStop = globalStop, goNext = 'true')
 
 '''
 
@@ -29,6 +30,7 @@ class weeklySimulationRun(webapp.RequestHandler):
     def post(self):
         namespace = self.request.get('namespace')
         unique = self.request.get('unique')
+        goNext = self.request.get('goNext')  # Set goNext to anything but 'true' to just do desire calculations.
         stepRange = 1600
         try:
             globalStop = int(self.request.get('globalStop'))
@@ -37,7 +39,7 @@ class weeklySimulationRun(webapp.RequestHandler):
             globalStop = meSchema.stepDate.all().filter('step <', 1000000).order('-step').get().step
             initialStop = meSchema.backTestResult.all().filter('stopStep <', 1000000).order('-stopStep').get().stopStep
 
-        startSim(namespace, unique, globalStop, initialStop, stepRange)
+        startSim(namespace, unique, globalStop, initialStop, stepRange, goNext)
 
 class processCallback(webapp.RequestHandler):
     def get(self):
@@ -53,7 +55,7 @@ class processCallback(webapp.RequestHandler):
         else:
             raise(BaseException('Must be jobtype == callback'))
 
-def startSim(namespace, unique, globalStop, initialStop, stepRange):
+def startSim(namespace, unique, globalStop, initialStop, stepRange, goNext):
     from google.appengine.api.datastore import Key
     
     JobID = meTools.buildJobID(namespace, unique, globalStop, initialStop, stepRange)
@@ -64,13 +66,17 @@ def startSim(namespace, unique, globalStop, initialStop, stepRange):
     if not globalStop >= initialStop:
         raise(BaseException('globalStop: %s is not >= lastStopStep: %s' % (globalStop, initialStop)))
 
-    desireQuery = meSchema.desire.all(keys_only = True).filter('__key__ <', Key.from_path('desire','1000000_0000_00')).order('-__key__').get()
-    lastDesireStop = int(desireQuery.name().split('_')[0])
+    lastDesire = meSchema.desire.all(keys_only = True).filter('__key__ <', Key.from_path('desire','1000000_0000_00')).order('-__key__').get()
+    if lastDesire:
+        lastDesireStop = int(lastDesire.name().split('_')[0])
+    else:
+        lastDesireStop = 1
     desireFunc.primeDesireCache(lastDesireStop)
     for step in range(lastDesireStop, globalStop + 1):
         desireFunc.doDesires(step)
 
-    doNext(JobID, 'weeklyDesires','')
+    if goNext == 'true':
+        doNext(JobID, 'weeklyDesires','')
 
 def doCallback(handler):
     JobID = handler.request.get('JobID')
