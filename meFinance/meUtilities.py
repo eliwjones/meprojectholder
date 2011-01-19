@@ -95,17 +95,17 @@ def wipeoutAlgStats(cursor = None):
         cursor = query.cursor()
         total += count
 
-def wipeoutBackTests(name = '', cursor = None):
+def wipeoutBackTests(name = '', cursor = None, maxStop = 9999999):
     i = 0
     count = 50
     while count == 50:
         try:
-            query = db.Query(meSchema.backTestResult, keys_only=True)
+            query = db.Query(meSchema.backTestResult, keys_only=True).filter('stopStep <', maxStop).order('stopStep')
             if cursor is not None:
                 query.with_cursor(cursor)
             btestKeys = query.fetch(50)
         except:
-            wipeoutBackTests(name, cursor)
+            wipeoutBackTests(name, cursor, maxStop)
         count = len(btestKeys)
         addDeferred(repr(btestKeys), name + '-batch' + str(i))
         i += 1
