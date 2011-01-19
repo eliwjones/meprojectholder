@@ -39,6 +39,15 @@ def addDeferred(delKeys, name = '', wait=.5):
         sleep(wait)
         addDeferred(delKeys, name, 2*wait)
 
+'''
+# Holding off on this .. since requires more changes than I'd like to make right now.
+# Just want backTestResults deleted as fast as possible.
+
+def deleteByKeyRange(model, startKey, stopkey):
+    keylist = model.all(keys_only = True).filter('__key__ >=', startKey).filter('__key__ <=', stopKey).fetch(3000)
+    db.delete(keylist)
+'''
+
 def deleteByKeyList(keylist):
     from google.appengine.api import datastore_types
     keylist = eval(keylist)

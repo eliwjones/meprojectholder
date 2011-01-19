@@ -55,8 +55,14 @@ def taskAdd(taskname, step, globalstop, primecache, uniquifier, wait = .5):
         sleep(wait)
         taskAdd(taskname, step, globalstop, uniquifier, 2*wait)
 
-def doDesires(step, startKey=1, stopKey=60):
+def doDesires(step, startKey=None, stopKey=None):
     global cvalDict
+    if stopKey is None and startKey is None:
+        startKey = 1
+        stopKey = int(meSchema.tradeCue.all(keys_only=True).order('-__key__').get().name())
+    elif stopKey is None or startKey is None:
+        raise(BaseException('Must define both startKey and stopKey, or both must be None!'))
+        
     # Check cachepy clock and sync with memcache if necessary.
     syncProcessCache(step,startKey,stopKey)
     # Construct cvalDict for this step.
@@ -163,9 +169,15 @@ def makeDesire(stckID,keyname,step):
     meDesire = meSchema.desire(key_name = key_name, CueKey = keyname, Symbol = symbol, Quote = price)
     return meDesire
 
-def primeDesireCache(step):
-    # Function to pull out last 400 steps of potential desires.
+def primeDesireCache(step, startKey = None, stopKey = None):
     import princeFunc
+    
+    if stopKey is None and startKey is None:
+        startKey = 1
+        stopKey = int(meSchema.tradeCue.all(keys_only=True).order('-__key__').get().name())
+    elif stopKey is None or startKey is None:
+        raise(BaseException('Must define both startKey and stopKey, or both must be None!'))
+    
     memdict = {}
     clockKeyStep = step
     queryStr = princeFunc.getDesireQueryStr(max(step-405,0),step)
@@ -182,7 +194,7 @@ def primeDesireCache(step):
             memdict[memkey] = step
     memcache.set_multi(memdict)
     cachepy.set_multi(memdict, priority = 1)
-    cachepy.set('stepclock_' + str(1) + '_' + str(60), clockKeyStep) # Manually syncing stepclock until get saner method.
+    cachepy.set('stepclock_' + str(startKey) + '_' + str(stopKey), clockKeyStep) # Manually syncing stepclock until get saner method.
 
 application = webapp.WSGIApplication([('/desire/doDesireStep',doDesireStep)],
                                      debug = True)
